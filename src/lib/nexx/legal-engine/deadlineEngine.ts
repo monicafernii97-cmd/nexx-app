@@ -21,13 +21,30 @@ export type DeadlineAnalysis = {
   explanation: string;
 };
 
-export function hasDeadlineQuestion(message: string, routeMode?: RouteMode) {
-  return routeMode === 'court_response_planning' ||
-    routeMode === 'filing_walkthrough' ||
-    routeMode === 'court_ready_drafting' ||
-    /\b(deadline|due|served|service|hearing|court date|answer by|response by|file by)\b/i.test(message);
+const EXPLICIT_DEADLINE_INTENT_PATTERNS = [
+  /\b(?:what|when|which)(?:['\u2019]s|\s+(?:is|are|was|were))?\s+(?:my|the|a)?\s*(?:filing|response|answer|service)?\s*(?:deadline|due date|court date|hearing date)\b/i,
+  /\b(?:when(?:['\u2019]s|\s+(?:is|are))|what\s+date\s+(?:is|are))\s+(?:my|the|a)\s+(?:response|answer|filing)\s+due\b/i,
+  /\b(?:when|by\s+what\s+date|what\s+date|how\s+soon)\s+(?:do|should|must|can)\s+i\s+(?:file|respond|answer|serve)\b/i,
+  /\bhow\s+(?:long|many\s+(?:calendar|business)?\s*days?)\s+(?:do\s+i\s+have|after\s+(?:being\s+)?served|from\s+(?:service|the\s+hearing))\b/i,
+  /\b(?:deadline|due\s+date)\s+(?:for|to)\s+(?:file|respond|answer|serve)\b/i,
+  /\b(?:calculate|check|verify|confirm|determine|work\s+out)\b.{0,100}\b(?:deadline|due\s+date|time\s+to\s+(?:file|respond|answer|serve)|within\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|fourteen|twenty|thirty)\s+(?:calendar\s+|business\s+)?days?)\b/i,
+];
+
+const SERVICE_TIMING_INTENT_PATTERN =
+  /\b(?:does|did|when|how)\b.{0,50}\bservice\b.{0,60}\b(?:start|trigger|affect|change|extend|deadline|due|clock|time)\b|\b(?:service|served)\b.{0,50}\b(?:start|trigger|affect|change|extend)\b.{0,40}\b(?:deadline|clock|time)\b/i;
+
+const HEARING_TIME_LOOKUP_PATTERN =
+  /\b(?:what|when|which)(?:['\u2019]s|\s+(?:is|are|was|were))?\s+(?:the|my)?\s*(?:hearing|court)\s+(?:date|time)\b|\bwhen(?:['\u2019]s|\s+is)\s+(?:the|my)\s+(?:hearing|court\s+date)\b/i;
+
+/** Detect an explicit request to calculate, verify, or look up legal timing. */
+export function hasDeadlineQuestion(message: string, _routeMode?: RouteMode) {
+  void _routeMode;
+  return EXPLICIT_DEADLINE_INTENT_PATTERNS.some((pattern) => pattern.test(message)) ||
+    SERVICE_TIMING_INTENT_PATTERN.test(message) ||
+    HEARING_TIME_LOOKUP_PATTERN.test(message);
 }
 
+/** Build a cautious deadline analysis only after the user actually asks about timing. */
 export function buildDeadlineAnalysis(args: {
   message: string;
   routeMode?: RouteMode;
@@ -38,7 +55,7 @@ export function buildDeadlineAnalysis(args: {
   serviceMethod?: string | null;
   timezone?: string | null;
 }): DeadlineAnalysis | null {
-  if (!hasDeadlineQuestion(args.message, args.routeMode) && !args.courtFiling?.deadlinesOrHearings.length) {
+  if (!hasDeadlineQuestion(args.message, args.routeMode)) {
     return null;
   }
 
@@ -99,6 +116,7 @@ export function buildDeadlineAnalysis(args: {
   };
 }
 
+/** Render a verified deadline analysis without inventing missing trigger inputs. */
 export function renderDeadlineAnalysisMarkdown(deadlineAnalysis: DeadlineAnalysis | null) {
   if (!deadlineAnalysis || deadlineAnalysis.status === 'not_applicable') return '';
   const sourcedDates = deadlineAnalysis.sourcedDates.length > 0

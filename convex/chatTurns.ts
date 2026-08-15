@@ -7,10 +7,14 @@ import {
     detectDocumentReference,
     type DocumentReferenceDetection,
 } from '../src/lib/nexx/documentReferenceDetection';
-import { classifyMessage, preserveOrUpgradeDocumentRoute } from '../src/lib/nexx/router';
+import { resolveTurnRoute } from '../src/lib/nexx/router';
 import type { RouteMode } from '../src/lib/types';
 import { buildContextualDocumentFollowUpMessage } from '../src/lib/nexx/followUpContext';
 import { summarizeActiveLegalIssue } from '../src/lib/nexx/legal-engine/activeIssueContract';
+import {
+    compactConversationMemoryContent,
+    shouldInvalidateConversationSummary,
+} from '../src/lib/nexx/conversationMemoryPolicy';
 import {
     detectStoredDocumentAmbiguity,
     normalizeDocumentAlias,
@@ -62,6 +66,23 @@ const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
 const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
+const MAX_CONVERSATION_SUMMARY_JSON_CHARS = 60_000;
+
+/** Compact JSON formatting without ever persisting a truncated document. */
+function compactConversationSummaryJson(value: string) {
+    try {
+        const parsed: unknown = JSON.parse(value);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+        const compacted = JSON.stringify(parsed);
+        return compacted.length <= MAX_CONVERSATION_SUMMARY_JSON_CHARS
+            ? compacted
+            : null;
+    } catch {
+        return null;
+    }
+}
 
 const documentEvidenceSourceValidator = v.object({
     uploadedFileId: v.id('uploadedFiles'),
@@ -925,38 +946,70 @@ export const acceptChatTurn = mutation({
             });
         }
         const deletedMessageIds = new Set(regenerationPlan.deleteMessageIds);
+
+        if (mode !== 'send' && (regenerationPlan.editedUserMessageId || deletedMessageIds.size > 0)) {
+            const existingSummary = await ctx.db
+                .query('conversationSummaries')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
+                .first();
+            const changesSummarizedHistory = shouldInvalidateConversationSummary({
+                summaryTurnCount: existingSummary?.turnCount,
+                editedMessageId: regenerationPlan.editedUserMessageId,
+                deletedMessageIds,
+                messages: regenerationMessages.map((candidate) => ({
+                    id: candidate._id.toString(),
+                    turnNumber: candidate.turnNumber ?? 0,
+                })),
+            });
+            if (existingSummary && changesSummarizedHistory) {
+                // A free-form summary cannot be patched safely after an edit/retry.
+                // Delete it now; the completed regeneration turn forces a rebuild
+                // from the surviving canonical message history.
+                await ctx.db.delete(existingSummary._id);
+            }
+        }
+
         for (const candidate of regenerationMessages) {
             if (deletedMessageIds.has(candidate._id.toString())) {
                 await ctx.db.delete(candidate._id);
             }
         }
 
-        const existingDocumentState = await ctx.db
-            .query('conversationDocumentState')
-            .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
-            .first();
+        const [existingDocumentState, conversationSummary] = await Promise.all([
+            ctx.db
+                .query('conversationDocumentState')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                .first(),
+            ctx.db
+                .query('conversationSummaries')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
+                .first(),
+        ]);
         const hasActiveDocumentContext =
             validatedAttachments.length > 0 ||
             Boolean(existingDocumentState?.activeUploadedFileId);
-        const classifiedRoute = classifyMessage(
-            effectiveMessage,
-            undefined,
-            conversation.routeMode as RouteMode | undefined,
-            hasActiveDocumentContext
-        );
-        const contextualRoute = hasActiveDocumentContext
-            ? preserveOrUpgradeDocumentRoute(
-                classifiedRoute,
-                effectiveMessage,
-                conversation.routeMode as RouteMode | undefined
-            )
-            : classifiedRoute;
+        const contextualRoute = resolveTurnRoute({
+            message: effectiveMessage,
+            conversationSummary: conversationSummary?.summary,
+            activeMode: conversation.routeMode as RouteMode | undefined,
+            hasActiveDocumentContext,
+        });
         const routeMode = args.routeMode === 'safety_escalation'
             ? args.routeMode
             : contextualRoute.mode;
-        const temperature = args.routeMode === routeMode
-            ? args.temperature
+        const requestedTemperature = args.routeMode === routeMode ? args.temperature : undefined;
+        const temperature = requestedTemperature !== undefined && Number.isFinite(requestedTemperature)
+            ? Math.min(2, Math.max(0, requestedTemperature))
             : contextualRoute.temperature;
+        console.info('[ChatTurns] Route resolved', {
+            conversationId: args.conversationId,
+            requestId: args.requestId,
+            apiRouteMode: args.routeMode,
+            finalRouteMode: routeMode,
+            activeRouteMode: conversation.routeMode,
+            hasActiveDocumentContext,
+            routeChangedAfterAdmission: args.routeMode !== routeMode,
+        });
 
         const turnNumber = conversation.nextTurnNumber ?? (conversation.messageCount ?? 0) + 1;
         const turnId = await ctx.db.insert('chatTurns', {
@@ -1518,6 +1571,144 @@ export const getGenerationContext = internalQuery({
             availableDocumentContexts,
             recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
         };
+    },
+});
+
+/**
+ * Load the unsummarized conversation segment at each six-turn boundary.
+ * This is internal-only so durable memory cannot be written from caller data.
+ */
+export const getConversationMemoryWork = internalQuery({
+    args: { turnId: v.id('chatTurns') },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn || turn.turnNumber <= 0) {
+            return null;
+        }
+        const forceCanonicalRebuild = turn.mode === 'edit' || turn.mode === 'retry';
+        if (!forceCanonicalRebuild && turn.turnNumber % 6 !== 0) return null;
+
+        const [conversation, summaryDoc] = await Promise.all([
+            ctx.db.get(turn.conversationId),
+            ctx.db
+                .query('conversationSummaries')
+                .withIndex('by_conversationId', (q) => q.eq('conversationId', turn.conversationId))
+                .first(),
+        ]);
+        if (!conversation || conversation.userId !== turn.userId) return null;
+
+        const previousTurnCount = summaryDoc?.turnCount ?? 0;
+        if (!forceCanonicalRebuild && previousTurnCount >= turn.turnNumber) return null;
+
+        return {
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            turnCount: turn.turnNumber,
+            fromTurnExclusive: forceCanonicalRebuild ? 0 : previousTurnCount,
+            existingSummaryJson: forceCanonicalRebuild ? undefined : summaryDoc?.summary,
+            previousSummaryId: summaryDoc?._id,
+            previousSummaryUpdatedAt: summaryDoc?.updatedAt,
+        };
+    },
+});
+
+/**
+ * Page canonical message history for durable-memory compaction. Keeping the
+ * database read paginated prevents a retry in a long thread from collecting
+ * the entire conversation into one Convex query result.
+ */
+export const getConversationMemoryPage = internalQuery({
+    args: {
+        turnId: v.id('chatTurns'),
+        cursor: v.union(v.string(), v.null()),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return null;
+
+        const page = await ctx.db
+            .query('messages')
+            .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+            .order('asc')
+            .paginate({
+                cursor: args.cursor,
+                numItems: 24,
+            });
+
+        return {
+            page: page.page.map((message) => ({
+                role: message.role,
+                content: compactConversationMemoryContent(message.content),
+                status: message.status,
+                turnNumber: message.turnNumber ?? 0,
+                roleOrder: message.roleOrder ?? (message.role === 'user' ? 0 : 1),
+            })),
+            continueCursor: page.continueCursor,
+            isDone: page.isDone,
+        };
+    },
+});
+
+/** Persist a model-generated compacted summary after verifying ownership. */
+export const upsertConversationSummaryInternal = internalMutation({
+    args: {
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        summary: v.string(),
+        turnCount: v.number(),
+        previousSummaryId: v.optional(v.id('conversationSummaries')),
+        previousSummaryUpdatedAt: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (
+            !conversation ||
+            conversation.userId !== args.userId ||
+            !Number.isInteger(args.turnCount) ||
+            args.turnCount < 0
+        ) {
+            return null;
+        }
+
+        const existing = await ctx.db
+            .query('conversationSummaries')
+            .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
+            .first();
+        const hasPreviousSummaryId = args.previousSummaryId !== undefined;
+        const hasPreviousSummaryVersion = args.previousSummaryUpdatedAt !== undefined;
+        if (hasPreviousSummaryId !== hasPreviousSummaryVersion) return null;
+
+        if (existing) {
+            if (
+                !hasPreviousSummaryId ||
+                existing._id !== args.previousSummaryId ||
+                existing.updatedAt !== args.previousSummaryUpdatedAt ||
+                existing.turnCount >= args.turnCount
+            ) {
+                return null;
+            }
+        } else if (hasPreviousSummaryId) {
+            return null;
+        }
+
+        const summary = compactConversationSummaryJson(args.summary);
+        if (!summary) return null;
+
+        const value = {
+            summary,
+            turnCount: args.turnCount,
+            updatedAt: Math.max(Date.now(), (existing?.updatedAt ?? 0) + 1),
+        };
+
+        if (existing) {
+            await ctx.db.patch(existing._id, value);
+            return existing._id;
+        }
+
+        return await ctx.db.insert('conversationSummaries', {
+            conversationId: args.conversationId,
+            ...value,
+        });
     },
 });
 

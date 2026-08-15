@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
-import { classifyMessage, preserveOrUpgradeDocumentRoute } from '@/lib/nexx/router';
+import { resolveTurnRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 import type { RouteMode } from '@/lib/types';
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
 
   let conversation;
   try {
-    conversation = await convex.query(api.conversations.get, { id: typedConversationId });
+    conversation = await convex.query(api.conversations.getChatRoutingContext, { id: typedConversationId });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     if (errorMsg.includes('Not authorized') || errorMsg.includes('Not authenticated')) {
@@ -254,16 +254,21 @@ export async function POST(req: NextRequest) {
       : 'free';
 
   const activeRouteMode = conversation.routeMode as RouteMode | undefined;
-  const classified = classifyMessage(message, undefined, activeRouteMode, sanitizedAttachments.length > 0);
-  const routerResult =
-    sanitizedAttachments.length > 0 && classified.mode !== 'safety_escalation'
-      ? preserveOrUpgradeDocumentRoute(classified, message, activeRouteMode)
-      : classified;
+  const hasActiveDocumentContext =
+    sanitizedAttachments.length > 0 ||
+    Boolean(conversation.activeUploadedFileId);
+  const routerResult = resolveTurnRoute({
+    message,
+    conversationSummary: conversation.conversationSummary ?? undefined,
+    activeMode: activeRouteMode,
+    hasActiveDocumentContext,
+  });
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
     conversationIdPresent: Boolean(conversationId),
     messageLength: message.length,
     attachmentCount: sanitizedAttachments.length,
+    hasActiveDocumentContext,
     attachmentStatuses: sanitizedAttachments.map((attachment) => attachment.status),
     routeMode: routerResult.mode,
   });

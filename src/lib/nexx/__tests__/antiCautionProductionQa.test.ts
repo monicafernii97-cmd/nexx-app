@@ -263,8 +263,7 @@ describe('NEXX anti-caution production QA matrix', () => {
     const route = classifyMessage(
       prompt,
       "Prior issue: the other parent demanded Thursday possession for Father's Day under the uploaded order.",
-      'possession_access_schedule',
-      true
+      'possession_access_schedule'
     );
     const text = render(clearInterpretation(), clearSources, prompt);
 

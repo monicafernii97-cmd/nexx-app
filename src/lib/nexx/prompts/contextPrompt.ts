@@ -50,6 +50,11 @@ export interface ContextPacket {
     prefersStepByStepProcess?: boolean;
     tonePreference?: string;
   };
+  /** Current support context used only to calibrate tone and emotional buffering. */
+  supportProfile?: {
+    emotionalState?: string;
+    hasTherapist?: boolean;
+  };
   /** Structured case graph */
   caseGraph?: CaseGraph;
   /** Compacted conversation summary */
@@ -64,9 +69,12 @@ export interface ContextPacket {
   nexProfile?: {
     nickname?: string;
     communicationStyle?: string;
+    behaviors?: string[];
     manipulationTactics?: string[];
     triggerPatterns?: string[];
     detectedPatterns?: string[];
+    aiInsights?: string;
+    dangerLevel?: number;
   };
 }
 
@@ -140,6 +148,24 @@ export function buildContextPrompt(ctx: ContextPacket): string {
     }
   }
 
+  if (ctx.supportProfile) {
+    const s = ctx.supportProfile;
+    const supportParts: string[] = [];
+    if (s.emotionalState) {
+      supportParts.push(`Current self-reported emotional state: ${s.emotionalState}`);
+    }
+    if (s.hasTherapist !== undefined) {
+      supportParts.push(`Has outside therapeutic support: ${s.hasTherapist ? 'yes' : 'no'}`);
+    }
+    if (supportParts.length > 0) {
+      sections.push([
+        '### Support Calibration',
+        '> Use this only to calibrate pacing, warmth, and whether a brief emotional buffer may help. Do not turn a practical request into therapy, and do not repeat this profile back unless it is directly useful.',
+        supportParts.join('\n'),
+      ].join('\n'));
+    }
+  }
+
   // Case graph (inject as structured summary, not raw JSON)
   if (ctx.caseGraph) {
     const g = ctx.caseGraph;
@@ -161,6 +187,8 @@ export function buildContextPrompt(ctx: ContextPacket): string {
     const summaryParts: string[] = [];
     if (s.decisions?.length) summaryParts.push(`Key decisions: ${s.decisions.join('; ')}`);
     if (s.keyFacts?.length) summaryParts.push(`Key facts: ${s.keyFacts.join('; ')}`);
+    if (s.dates?.length) summaryParts.push(`Important dates: ${s.dates.join('; ')}`);
+    if (s.goals?.length) summaryParts.push(`User goals: ${s.goals.join('; ')}`);
     if (s.unresolvedQuestions?.length) summaryParts.push(`Unresolved: ${s.unresolvedQuestions.join('; ')}`);
     if (summaryParts.length > 0) {
       sections.push(`### Conversation History (${s.turnCount} turns)\n${summaryParts.join('\n')}`);
@@ -210,10 +238,18 @@ export function buildContextPrompt(ctx: ContextPacket): string {
     const nexParts: string[] = [];
     if (n.nickname) nexParts.push(`NEX nickname: ${n.nickname}`);
     if (n.communicationStyle) nexParts.push(`Communication style: ${n.communicationStyle}`);
+    if (n.behaviors?.length) nexParts.push(`User-reported behaviors: ${n.behaviors.join(', ')}`);
     if (n.manipulationTactics?.length) nexParts.push(`Known tactics: ${n.manipulationTactics.join(', ')}`);
+    if (n.triggerPatterns?.length) nexParts.push(`User trigger patterns: ${n.triggerPatterns.join(', ')}`);
     if (n.detectedPatterns?.length) nexParts.push(`Detected patterns: ${n.detectedPatterns.join(', ')}`);
+    if (n.aiInsights) nexParts.push(`Saved AI insight: ${n.aiInsights}`);
+    if (n.dangerLevel !== undefined) nexParts.push(`Saved danger level: ${n.dangerLevel}/5`);
     if (nexParts.length > 0) {
-      sections.push(`### NEX Behavioral Profile\n${nexParts.join('\n')}`);
+      sections.push([
+        '### NEX Behavioral Profile',
+        '> Treat these as user-provided or previously inferred context, not independently proven facts or a clinical diagnosis. Use them to recognize communication dynamics and tailor safe, practical guidance without overclaiming motive.',
+        nexParts.join('\n'),
+      ].join('\n'));
     }
   }
 

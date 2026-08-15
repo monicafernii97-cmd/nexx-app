@@ -38,7 +38,7 @@ const PRESSURE_MANIPULATION_PATTERN =
   /\b(pressuring|threatening|twisting|manipulating|won'?t stop|keeps saying|accusing|gaslight|lying|bullying|harassing|calling me controlling|withholding)\b/i;
 
 const RESPONSE_STRATEGY_PATTERN =
-  /\b(what should i say|what do i say|what should i respond|what do i respond|how do i respond|respond back|reply back|message him|message her|text back|help me respond|can you write back|(?:appclose|ourfamilywizard)\s+(?:response|reply|message))\b/i;
+  /\b(what should i say|what do i say|what i should say|what should i respond|what do i respond|how do i respond|how should i respond|how i should respond|respond back|reply back|message him|message her|text back|help me respond|can you write back|(?:appclose|ourfamilywizard)\s+(?:response|reply|message))\b/i;
 
 const DOCUMENTATION_PATTERN =
   /\b(should i document|document this|save this|record this|make a timeline|timeline this|court record)\b/i;

@@ -337,6 +337,9 @@ export default defineSchema({
         leaseOwner: v.optional(v.string()),
         leaseExpiresAt: v.optional(v.number()),
         leaseAvailableAt: v.optional(v.number()),
+        // Retained for compatibility with jobs inspected by the production
+        // recovery sweep. Older records may already carry this timestamp.
+        recoveryCheckedAt: v.optional(v.number()),
         errorCode: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
         createdAt: v.number(),

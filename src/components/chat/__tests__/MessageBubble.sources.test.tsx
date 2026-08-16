@@ -42,6 +42,24 @@ async function renderMessage(
   return { container, root };
 }
 
+async function renderUserMessage(metadata: unknown) {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  await act(async () => {
+    root.render(
+      <MessageBubble
+        role="user"
+        content="Perform a full document review."
+        metadata={metadata}
+      />
+    );
+  });
+
+  return { container, root };
+}
+
 describe('MessageBubble document evidence panel', () => {
   let roots: Root[] = [];
 
@@ -398,5 +416,27 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('"draftReady"');
     expect(container.textContent).not.toContain('"filingNotes"');
     expect(container.textContent).not.toContain('{"');
+  });
+
+  it('renders the persisted upload filename, analysis mode, and conservative coverage state', async () => {
+    const { container, root } = await renderUserMessage({
+      attachments: [{
+        uploadedFileId: 'file_123',
+        filename: 'Signed Final Order.pdf',
+        status: 'partial',
+        analysisMode: 'full_document_review',
+        pagesProcessed: 8,
+        pagesTotal: 62,
+        contextTruncated: true,
+      }],
+    });
+    roots.push(root);
+
+    expect(container.textContent).toContain('Signed Final Order.pdf');
+    expect(container.textContent).toContain('Full document review');
+    expect(container.textContent).toContain('8/62 pages explicitly accounted for');
+    expect(container.textContent).toContain('complete source coverage has not been verified');
+    expect(container.getAttribute('aria-label')).toBeNull();
+    expect(container.querySelector('[aria-label="Uploaded document status"]')).not.toBeNull();
   });
 });

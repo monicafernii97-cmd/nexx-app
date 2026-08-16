@@ -289,6 +289,13 @@ export default defineSchema({
             v.literal('cancelled')
         ),
         routeMode: v.optional(routeModeValidator),
+        analysisMode: v.optional(v.union(
+            v.literal('full_document_review'),
+            v.literal('obligations_and_deadlines'),
+            v.literal('custody_and_possession'),
+            v.literal('compare_with_conversation'),
+            v.literal('focused_question')
+        )),
         userMessageId: v.optional(v.id('messages')),
         assistantMessageId: v.optional(v.id('messages')),
         assistantDraftMessageId: v.optional(v.id('messages')),
@@ -482,6 +489,13 @@ export default defineSchema({
         mimeType: v.string(),
         byteSize: v.number(),
         status: v.union(v.literal('ready'), v.literal('partial'), v.literal('failed')),
+        analysisMode: v.optional(v.union(
+            v.literal('full_document_review'),
+            v.literal('obligations_and_deadlines'),
+            v.literal('custody_and_possession'),
+            v.literal('compare_with_conversation'),
+            v.literal('focused_question')
+        )),
         createdAt: v.number(),
     })
         .index('by_message', ['messageId'])

@@ -7,6 +7,12 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { classifyMessage } from '../src/lib/nexx/router';
+import type { DocumentAnalysisMode } from '../src/lib/chat/documentAnalysisMode';
+import {
+    buildCoverageGateMessage,
+    requiresVerifiedCoverage,
+    type DocumentCoverageStatus,
+} from '../src/lib/nexx/fullDocumentReviewGate';
 import { buildSystemPolicyPrompt } from '../src/lib/nexx/prompts/systemPrompt';
 import { buildDeveloperBehaviorPrompt } from '../src/lib/nexx/prompts/developerPrompt';
 import { actualToolCapabilitiesFromPlan, buildFeatureToolPrompt } from '../src/lib/nexx/prompts/featurePrompt';
@@ -552,6 +558,7 @@ type GenerationContext = {
         userId?: Id<'users'>;
         message: string;
         routeMode?: RouteMode;
+        analysisMode?: DocumentAnalysisMode;
         model?: string;
         temperature?: number;
         userContextJson?: string;
@@ -629,6 +636,9 @@ type AttachmentContext = {
     contextTruncated?: boolean;
     indexingError?: string;
     extractionError?: string;
+    pagesProcessed?: number;
+    pagesTotal?: number;
+    coverageStatus?: DocumentCoverageStatus;
     documentChunks?: DocumentChunkContext[];
 };
 
@@ -1038,11 +1048,13 @@ function buildAttachmentContextPrompt(
     attachments: AttachmentContext[],
     detection: DocumentReferenceDetection,
     sourcePackets: LegalDocumentSourcePacket[],
-    routeMode: RouteMode
+    routeMode: RouteMode,
+    analysisMode?: DocumentAnalysisMode,
 ) {
     if (attachments.length === 0) return '';
 
-    const preferRetrievedChunks = shouldPreferRetrievedChunks(detection);
+    const isFullDocumentReview = analysisMode === 'full_document_review';
+    const preferRetrievedChunks = !isFullDocumentReview && shouldPreferRetrievedChunks(detection);
     const shouldFillLegalInterpretation =
         routeMode === 'order_interpretation' ||
         routeMode === 'possession_access_schedule' ||
@@ -1099,6 +1111,9 @@ function buildAttachmentContextPrompt(
         'When selected document excerpts contain relevant provisions, answer substantively from those excerpts and cite them. Do not collapse a useful answer into a generic "not enough text" fallback just because the document is long or the exact issue requires explanation.',
         'When selected excerpt attributes include clause-priority buckets, compare the controlling_specific_clause, competing_general_clause, exception_priority_language, later_modification_language, and definition_language buckets before answering a possession or clause-conflict question.',
         'If the visible order language does not contain the answer, say plainly what the order language available here does and does not state.',
+        isFullDocumentReview
+            ? 'This is an explicit full-document review. Use complete canonical document coverage and its persisted understanding record; do not reinterpret it as a deadline lookup or answer from isolated relevance-ranked chunks.'
+            : undefined,
         'If SOURCE_ID chunks are present for a document, make document-specific claims about that document only from those SOURCE_ID chunks. Uncited extracted context is not enough for a document-specific claim for that document.',
         'For court-order review, identify which document was reviewed and cite compact page labels like [p. 2] or [pp. 2-3] when available.',
         'Quote short exact phrases only when exact wording matters.',
@@ -1249,7 +1264,8 @@ function buildInput(
         attachmentContexts,
         documentReference,
         documentSourcePackets,
-        routeMode
+        routeMode,
+        context.turn.analysisMode,
     );
     const shouldUseUploadedDocumentMemory =
         attachmentContexts.length > 0 &&
@@ -2858,6 +2874,32 @@ export const processChatGenerationJob = internalAction({
                     degraded: true,
                     errorCode: 'missing_generation_context',
                     errorMessage: 'Unable to load generation context.',
+                });
+                return null;
+            }
+
+            const fullReviewAttachments = context.attachmentContexts ?? [];
+            if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
+                await ctx.runMutation(internal.chatTurns.completeAssistant, {
+                    jobId: args.jobId,
+                    leaseOwner,
+                    content: buildCoverageGateMessage(fullReviewAttachments),
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    degraded: false,
+                    metadataJson: JSON.stringify({
+                        analysisMode: context.turn.analysisMode,
+                        documentCoverageGate: 'awaiting_verified_coverage',
+                        attachments: fullReviewAttachments.map((attachment) => ({
+                            uploadedFileId: attachment.uploadedFileId,
+                            filename: attachment.filename,
+                            status: attachment.status,
+                            coverageStatus: attachment.coverageStatus,
+                            pagesProcessed: attachment.pagesProcessed,
+                            pagesTotal: attachment.pagesTotal,
+                            contextTruncated: attachment.contextTruncated,
+                            extractionWarnings: attachment.extractionWarnings,
+                        })),
+                    }),
                 });
                 return null;
             }

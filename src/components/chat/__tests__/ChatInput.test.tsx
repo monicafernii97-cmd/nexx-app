@@ -85,7 +85,7 @@ describe('ChatInput file send flow', () => {
   it('builds intent-specific fallback prompts for file-only sends', () => {
     expect(buildFileFallbackMessage('attachment', 'order.pdf')).toBe('Analyze this file: order.pdf');
     expect(buildFileFallbackMessage('court_order', 'order.pdf')).toBe(
-      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+      'Perform a full document review of the uploaded court order: order.pdf. Read it as a complete document, identify all material provisions and time-sensitive requirements, explain risks, and recommend next steps. State the document-processing coverage before making conclusions and do not rely on isolated excerpts as a complete review.',
     );
     expect(buildFileFallbackMessage('thread', 'thread.txt')).toBe('Analyze this uploaded thread: thread.txt');
   });
@@ -194,7 +194,7 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(onSend).toHaveBeenCalledWith(
-      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+      'Perform a full document review of the uploaded court order: signed-order.pdf. Read it as a complete document, identify all material provisions and time-sensitive requirements, explain risks, and recommend next steps. State the document-processing coverage before making conclusions and do not rely on isolated excerpts as a complete review.',
       expect.objectContaining({
         file,
         intent: 'court_order',
@@ -224,7 +224,7 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(onSend).toHaveBeenCalledWith(
-      'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.',
+      'Perform a full document review of the uploaded court order: signed-order.pdf. Read it as a complete document, identify all material provisions and time-sensitive requirements, explain risks, and recommend next steps. State the document-processing coverage before making conclusions and do not rely on isolated excerpts as a complete review.',
       expect.objectContaining({
         file,
         intent: 'court_order',

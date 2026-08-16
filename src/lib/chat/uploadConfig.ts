@@ -1,4 +1,5 @@
 import { CHAT_UPLOAD_CONFIG } from './uploadShared';
+import type { DocumentAnalysisMode } from './documentAnalysisMode';
 
 export { CHAT_UPLOAD_CONFIG };
 
@@ -28,6 +29,12 @@ export type ChatAttachmentRef = {
   mimeType: string;
   byteSize: number;
   status: 'ready' | 'partial';
+  analysisMode?: DocumentAnalysisMode;
+  extractionMethod?: string;
+  pagesProcessed?: number;
+  pagesTotal?: number;
+  contextTruncated?: boolean;
+  extractionWarnings?: string[];
 };
 
 export function getChatUploadExtension(filename: string) {

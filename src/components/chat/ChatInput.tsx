@@ -57,7 +57,11 @@ const QUICK_ACTIONS = [
 
 export function buildFileFallbackMessage(intent: FilePromptIntent, filename?: string) {
     if (intent === 'court_order') {
-        return 'Analyze this court order and extract the key obligations, deadlines, risks, and recommended next steps.';
+        return [
+            `Perform a full document review of the uploaded court order: ${filename ?? 'uploaded court order'}.`,
+            'Read it as a complete document, identify all material provisions and time-sensitive requirements, explain risks, and recommend next steps.',
+            'State the document-processing coverage before making conclusions and do not rely on isolated excerpts as a complete review.',
+        ].join(' ');
     }
     if (intent === 'thread') {
         return `Analyze this uploaded thread: ${filename ?? 'uploaded thread'}`;

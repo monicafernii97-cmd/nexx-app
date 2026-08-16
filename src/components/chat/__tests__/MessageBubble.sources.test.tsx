@@ -121,6 +121,7 @@ describe('MessageBubble document evidence panel', () => {
         pageEnd: 4,
         pageLabel: 'p. 4',
         quotedText: 'Respondent shall pay by Friday.',
+        sourceTextPreview: 'The Court orders that Respondent shall pay by Friday. Payment must be received before 5:00 p.m.',
         citationVerifierStatus: 'verified',
       }],
     });
@@ -162,6 +163,8 @@ describe('MessageBubble document evidence panel', () => {
 
     expect(citationButton?.getAttribute('aria-expanded')).toBe('true');
     expect(container.textContent).toContain('Respondent shall pay by Friday.');
+    expect(container.textContent).toContain('Surrounding source passage');
+    expect(container.textContent).toContain('Payment must be received before 5:00 p.m.');
   });
 
   it('does not render legacy confidence artifacts to the user', async () => {

@@ -37,6 +37,18 @@ function quotePreview(value: string) {
     return `${normalized.slice(0, 277).trim()}...`;
 }
 
+function sourceTextPreview(sourceText: string, quote: string) {
+    const normalizedSource = sourceText.replace(/\s+/g, ' ').trim();
+    const normalizedQuote = quote.replace(/\s+/g, ' ').trim();
+    if (normalizedSource.length <= 1_600) return normalizedSource;
+    const quoteIndex = normalizedQuote ? normalizedSource.toLowerCase().indexOf(normalizedQuote.toLowerCase()) : -1;
+    const start = quoteIndex >= 0
+        ? Math.max(0, quoteIndex - 550)
+        : 0;
+    const end = Math.min(normalizedSource.length, start + 1_600);
+    return `${start > 0 ? '…' : ''}${normalizedSource.slice(start, end).trim()}${end < normalizedSource.length ? '…' : ''}`;
+}
+
 /** ── Mutations ── */
 
 /**
@@ -339,6 +351,7 @@ export const list = query({
                 pageLabel?: string;
                 citationLabel?: string;
                 quotePreview: string;
+                sourceTextPreview: string;
                 citationVerifierStatus: 'verified' | 'partial' | 'failed';
             }> = [];
 
@@ -372,6 +385,7 @@ export const list = query({
                     pageLabel: pageLabel(source.pageStart, source.pageEnd),
                     citationLabel: chunk.citationLabel,
                     quotePreview: quotePreview(source.quotedText),
+                    sourceTextPreview: sourceTextPreview(chunk.chunkText ?? chunk.text, source.quotedText),
                     citationVerifierStatus: source.citationVerifierStatus,
                 });
             }

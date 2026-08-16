@@ -1,4 +1,4 @@
-import { internalMutation, type MutationCtx } from './_generated/server';
+import { internalMutation, internalQuery, type MutationCtx } from './_generated/server';
 import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import {
@@ -29,6 +29,43 @@ const extractionPlanValidator = v.object({
   includeBlocks: v.optional(v.boolean()),
   tableFormat: v.optional(v.union(v.literal('html'), v.literal('markdown'))),
   confidenceGranularity: v.optional(v.union(v.literal('page'), v.literal('word'))),
+});
+
+export const getProviderPolicy = internalQuery({
+  args: { uploadedFileId: v.id('uploadedFiles') },
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.uploadedFileId);
+    if (!file) return null;
+    const payloadClassification = file.confidentialityLevel ?? 'normal';
+    return { payloadClassification, zdrRequired: requiresZdrForClassification(payloadClassification) };
+  },
+});
+
+export const recordEmbeddingUsage = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    model: v.string(),
+    inputTokens: v.number(),
+    providerRequestId: v.optional(v.string()),
+    zdrConfirmed: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const [file, generation] = await Promise.all([ctx.db.get(args.uploadedFileId), ctx.db.get(args.memoryGenerationId)]);
+    if (!file || !generation || generation.uploadedFileId !== file._id) throw new Error('Embedding usage scope is invalid.');
+    const payloadClassification = file.confidentialityLevel ?? 'normal';
+    const zdrRequired = requiresZdrForClassification(payloadClassification);
+    await ctx.db.insert('providerUsageEvents', {
+      orgId: file.orgId, accountId: file.accountId, matterId: file.matterId,
+      clerkUserId: file.clerkUserId, uploadedFileId: file._id,
+      memoryGenerationId: generation._id, caseId: file.caseId,
+      provider: 'openai', endpoint: 'embeddings', model: args.model,
+      payloadClassification, zdrRequired,
+      zdrConfirmed: !zdrRequired || args.zdrConfirmed,
+      inputTokens: Math.max(0, Math.floor(args.inputTokens)), status: 'succeeded',
+      providerRequestId: args.providerRequestId, createdAt: Date.now(),
+    });
+  },
 });
 
 const extractorValidator = v.union(
@@ -398,12 +435,14 @@ export const recordExtractionAttempt = internalMutation({
         uploadedFileId: args.uploadedFileId,
         memoryGenerationId: args.memoryGenerationId,
         caseId: uploadedFile.caseId,
-        provider: args.provider === 'mistral' ? 'mistral' : 'internal',
+        provider: args.provider,
         endpoint: 'ocr',
         model: args.modelId ?? args.extractor,
         payloadClassification,
         zdrRequired,
-        zdrConfirmed: !zdrRequired || args.provider !== 'mistral' || requestMode === 'base64_stateless',
+        zdrConfirmed: !zdrRequired ||
+          (args.provider === 'mistral' && requestMode === 'base64_stateless') ||
+          (args.provider === 'openai' && process.env.OPENAI_ZDR_CONFIRMED === 'true'),
         pagesProcessed: args.usagePages ?? args.pageCountSucceeded,
         bytesProcessed: args.usageBytes,
         estimatedCostUsd: args.estimatedCostUsd,

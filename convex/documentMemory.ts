@@ -104,6 +104,9 @@ const chunkArtifactValidator = v.object({
   paragraphRange: v.optional(v.string()),
   citationLabel: v.optional(v.string()),
   retrievalMetadata: v.optional(retrievalMetadataValidator),
+  embedding: v.optional(v.array(v.number())),
+  embeddingModel: v.optional(v.string()),
+  embeddingVersion: v.optional(v.string()),
   warnings: v.array(v.string()),
 });
 
@@ -502,6 +505,9 @@ export const insertDocumentChunkBatch = internalMutation({
         extractionMethod: uploadedFile.extractionMethod,
         warnings: chunk.warnings,
         retrievalMetadata: chunk.retrievalMetadata ?? retrievalMetadataForText(chunk.text),
+        embedding: chunk.embedding,
+        embeddingModel: chunk.embeddingModel,
+        embeddingVersion: chunk.embeddingVersion,
         createdAt: now,
       });
     }

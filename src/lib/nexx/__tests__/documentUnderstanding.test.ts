@@ -43,12 +43,14 @@ describe('document understanding verification', () => {
   it('renders page citations and an explicit complete-coverage receipt', () => {
     const rendered = renderVerifiedDocumentReview({
       filename: 'Order.pdf', payload, chunks,
+      sourceUrl: '/api/documents/source/file_123',
       coverageReceipt: { unitKind: 'page', unitsRead: 3, unitsExpected: 3, ocrUnits: 1, lowConfidenceUnits: 1 },
     });
     expect(rendered.startsWith('I received and processed Order.pdf. I read 3 of 3 pages.')).toBe(true);
     expect(rendered).toContain('OCR was used on 1 page.');
     expect(rendered).toContain('1 passage had low extraction confidence');
     expect(rendered).toContain('Payment deadline [p. 2]');
+    expect(rendered).toContain('[p. 2](/api/documents/source/file_123#page=2)');
     expect(rendered).toContain('all 3 canonical document chunks');
   });
 });

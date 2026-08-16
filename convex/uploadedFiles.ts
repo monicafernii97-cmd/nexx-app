@@ -2,6 +2,7 @@ import { mutation, query, internalMutation, internalQuery, action } from "./_gen
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib/auth';
+import { canAccessDocumentSource } from '../src/lib/nexx/documentSourceAccess';
 
 /**
  * Uploaded Files — metadata for user-uploaded documents.
@@ -202,20 +203,23 @@ export const getAuthorizedSourceFileInternal = internalQuery({
             return null;
         }
 
-        let authorized = file.clerkUserId === clerkUserId;
-        if (!authorized) {
-            const now = Date.now();
-            const grants = await ctx.db
-                .query('fileAccessGrants')
-                .withIndex('by_subject', (q) => q.eq('subjectType', 'user').eq('subjectId', clerkUserId))
-                .collect();
-            authorized = grants.some((grant) =>
-                grant.uploadedFileId === file._id &&
-                grant.permissions.chat &&
-                grant.revokedAt === undefined &&
-                (grant.expiresAt === undefined || grant.expiresAt > now)
-            );
-        }
+        const grants = file.clerkUserId === clerkUserId ? [] : await ctx.db
+            .query('fileAccessGrants')
+            .withIndex('by_subject', (q) => q.eq('subjectType', 'user').eq('subjectId', clerkUserId))
+            .collect();
+        const authorized = canAccessDocumentSource({
+            uploadedFileId: file._id.toString(),
+            ownerClerkUserId: file.clerkUserId,
+            viewerClerkUserId: clerkUserId,
+            grants: grants.map((grant) => ({
+                uploadedFileId: grant.uploadedFileId.toString(),
+                subjectId: grant.subjectId,
+                chatAllowed: grant.permissions.chat,
+                revokedAt: grant.revokedAt,
+                expiresAt: grant.expiresAt,
+            })),
+            now: Date.now(),
+        });
         if (!authorized) return null;
 
         const storageUrl = await ctx.storage.getUrl(file.storageId);

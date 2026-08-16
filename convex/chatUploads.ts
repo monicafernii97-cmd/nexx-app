@@ -17,6 +17,8 @@ import {
   isValidFallbackTokenHash,
 } from './lib/chatUploadFallbackPolicy';
 import { hasCompleteDocumentRetrieval } from './lib/chatUploadReadiness';
+import { isReusableDocumentCandidate } from '../src/lib/nexx/documentDeduplication';
+import { documentProviderPolicy } from '../src/lib/nexx/documentProviderPolicy';
 
 type StorageMetadata = {
   _id: Id<'_storage'>;
@@ -935,10 +937,13 @@ export const findReusableExtraction = internalQuery({
       .withIndex('by_clerk_storage_hash', (q) => q.eq('clerkUserId', session.clerkUserId).eq('storageSha256', session.storageSha256))
       .order('desc')
       .take(10);
-    const file = candidates.find((candidate) =>
-      candidate.status !== 'deleted' && candidate.status !== 'quarantined' &&
-      candidate.fullDocumentReviewStatus === 'ready' && candidate.coverageStatus === 'complete' &&
-      Boolean(candidate.fullTextStorageId && candidate.activeMemoryGenerationId));
+    const file = candidates.find((candidate) => isReusableDocumentCandidate({
+      status: candidate.status,
+      fullDocumentReviewStatus: candidate.fullDocumentReviewStatus,
+      coverageStatus: candidate.coverageStatus,
+      fullTextStorageId: candidate.fullTextStorageId?.toString(),
+      activeMemoryGenerationId: candidate.activeMemoryGenerationId?.toString(),
+    }));
     if (!file?.fullTextStorageId || !file.activeMemoryGenerationId) return null;
     const pages = await ctx.db.query('documentPages')
       .withIndex('by_generation_page', (q) => q.eq('memoryGenerationId', file.activeMemoryGenerationId!))
@@ -1112,6 +1117,7 @@ export const upsertProcessedUploadedFile = internalMutation({
       if (!existingUploadedFile) throw new Error('Linked uploaded file is unavailable');
       const previousFullTextStorageId = existingUploadedFile.fullTextStorageId;
       await ctx.db.patch(existingUploadedFile._id, {
+        confidentialityLevel: documentProviderPolicy(session.intent, false).confidentialityLevel,
         status: args.status,
         fullTextStorageId: args.fullTextStorageId,
         fullTextSha256: args.fullTextSha256,
@@ -1161,6 +1167,7 @@ export const upsertProcessedUploadedFile = internalMutation({
       storageId: session.storageId,
       storageSha256: session.storageSha256,
       duplicateOfUploadedFileId: args.duplicateOfUploadedFileId,
+      confidentialityLevel: documentProviderPolicy(session.intent, false).confidentialityLevel,
       status: args.status,
       fullTextStorageId: args.fullTextStorageId,
       fullTextSha256: args.fullTextSha256,

@@ -104,12 +104,12 @@ describe('PDF page coverage extraction', () => {
 
   it('has no eight-page OCR ceiling and accounts for all requested pages', async () => {
     mocks.getText.mockResolvedValue({
-      total: 10,
+      total: 62,
       text: '',
-      pages: Array.from({ length: 10 }, (_, index) => ({ num: index + 1, text: '' })),
+      pages: Array.from({ length: 62 }, (_, index) => ({ num: index + 1, text: '' })),
     });
     mocks.getScreenshot.mockImplementation(async ({ partial }: { partial: number[] }) => ({
-      total: 10,
+      total: 62,
       pages: partial.map((pageNumber) => ({
         pageNumber,
         dataUrl: `data:image/png;base64,page-${pageNumber}`,
@@ -121,12 +121,12 @@ describe('PDF page coverage extraction', () => {
     const { extractDocumentText } = await import('../documentExtraction');
     const result = await extractDocumentText(pdfFile());
 
-    expect(mocks.getScreenshot).toHaveBeenNthCalledWith(1, expect.objectContaining({ partial: [1, 2, 3, 4, 5, 6] }));
-    expect(mocks.getScreenshot).toHaveBeenNthCalledWith(2, expect.objectContaining({ partial: [7, 8, 9, 10] }));
-    expect(mocks.responsesCreate).toHaveBeenCalledTimes(10);
-    expect(result.pages).toHaveLength(10);
-    expect(result.pages?.at(-1)?.pageNumber).toBe(10);
-    expect(result.coverage).toMatchObject({ expectedUnits: 10, attemptedUnits: 10, status: 'complete' });
+    const requestedPages = mocks.getScreenshot.mock.calls.flatMap(([request]) => request.partial);
+    expect(requestedPages).toEqual(Array.from({ length: 62 }, (_, index) => index + 1));
+    expect(mocks.responsesCreate).toHaveBeenCalledTimes(62);
+    expect(result.pages).toHaveLength(62);
+    expect(result.pages?.at(-1)?.pageNumber).toBe(62);
+    expect(result.coverage).toMatchObject({ expectedUnits: 62, attemptedUnits: 62, status: 'complete' });
   });
 
   it('never discards short native text when OCR cannot confirm it', async () => {

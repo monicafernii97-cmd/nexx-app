@@ -136,7 +136,11 @@ function inferImageMime(buffer: Buffer, declared: string) {
   return 'image/jpeg';
 }
 
-async function ocrImageUnit(image: EmbeddedDocumentImage, unitIndex: number): Promise<CanonicalExtractedTextUnit> {
+async function ocrImageUnit(image: EmbeddedDocumentImage, unitIndex: number, allowOpenAiOcr = true): Promise<CanonicalExtractedTextUnit> {
+  if (!allowOpenAiOcr) return {
+    unitIndex, unitLabel: image.label, text: '', status: 'omitted', nativeTextChars: 0,
+    canonicalTextChars: 0, ocrApplied: false, warnings: ['IMAGE_OCR_BLOCKED_BY_PRIVACY_POLICY'],
+  };
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { unitIndex, unitLabel: image.label, text: '', status: 'failed', nativeTextChars: 0, canonicalTextChars: 0, ocrApplied: false, warnings: ['IMAGE_OCR_UNAVAILABLE'] };
   try {
@@ -166,22 +170,28 @@ async function ocrImageUnit(image: EmbeddedDocumentImage, unitIndex: number): Pr
   }
 }
 
-async function extractContainerDocument(buffer: Buffer, type: DetectedDocumentType, detectionWarnings: string[]): Promise<DocumentExtractionResult> {
+async function extractContainerDocument(
+  buffer: Buffer,
+  type: DetectedDocumentType,
+  detectionWarnings: string[],
+  allowOpenAiOcr: boolean,
+): Promise<DocumentExtractionResult> {
   try {
     const container = await extractZipDocumentContainer(buffer, type);
     const indexedImages = container.images.map((image, imageIndex) => ({ image, imageIndex }));
     const imageUnits = await mapWithConcurrency(indexedImages, OCR_REQUEST_CONCURRENCY,
-      ({ image, imageIndex }) => ocrImageUnit(image, container.units.length + imageIndex));
+      ({ image, imageIndex }) => ocrImageUnit(image, container.units.length + imageIndex, allowOpenAiOcr));
     const sourceUnits = [...container.units, ...imageUnits];
     const text = normalizeText(sourceUnits.filter((sourceUnit) => sourceUnit.text).map((sourceUnit) => `[${sourceUnit.unitLabel}]\n${sourceUnit.text}`).join('\n\n'));
     const coverage = buildTextCoverageReceipt(sourceUnits);
+    const ocrAppliedUnits = imageUnits.filter((unit) => unit.ocrApplied).length;
     return text ? {
       text, method: `${type}_structured`, detectedType: type,
-      ocrAttempted: container.images.length > 0,
-      ocrProvider: container.images.length > 0 ? 'openai' : undefined,
-      ocrModel: container.images.length > 0 ? 'gpt-5.4-mini' : undefined,
-      ocrRequestMode: container.images.length > 0 ? 'base64_stateless' : undefined,
-      pagesOcrProcessed: imageUnits.length,
+      ocrAttempted: ocrAppliedUnits > 0,
+      ocrProvider: ocrAppliedUnits > 0 ? 'openai' : undefined,
+      ocrModel: ocrAppliedUnits > 0 ? 'gpt-5.4-mini' : undefined,
+      ocrRequestMode: ocrAppliedUnits > 0 ? 'base64_stateless' : undefined,
+      pagesOcrProcessed: ocrAppliedUnits,
       warnings: [...detectionWarnings, ...container.warnings, ...coverage.warnings],
       sourceUnits, coverage,
     } : {
@@ -430,7 +440,7 @@ async function extractPdfTextFromImages(
  */
 export async function extractDocumentText(
   file: File,
-  options: { buffer?: Buffer; detection?: DocumentDetectionResult } = {},
+  options: { buffer?: Buffer; detection?: DocumentDetectionResult; allowOpenAiOcr?: boolean } = {},
 ): Promise<DocumentExtractionResult> {
   const buffer = options.buffer ?? Buffer.from(await file.arrayBuffer());
   const detection = options.detection ?? detectDocumentType(buffer, {
@@ -478,12 +488,17 @@ export async function extractDocumentText(
   }
 
   if (detection.detectedType === 'image') {
-    const sourceUnits = [await ocrImageUnit({ label: 'Document image', filename: file.name, mimeType: inferImageMime(buffer, file.type), bytes: new Uint8Array(buffer) }, 0)];
+    const sourceUnits = [await ocrImageUnit(
+      { label: 'Document image', filename: file.name, mimeType: inferImageMime(buffer, file.type), bytes: new Uint8Array(buffer) },
+      0,
+      options.allowOpenAiOcr !== false,
+    )];
     const text = normalizeText(sourceUnits[0].text);
     const coverage = buildTextCoverageReceipt(sourceUnits);
+    const ocrApplied = sourceUnits[0].ocrApplied;
     return text
       ? { text, method: 'image_ocr', detectedType: 'image', ocrAttempted: true, ocrProvider: 'openai', ocrModel: 'gpt-5.4-mini', ocrRequestMode: 'base64_stateless', pagesOcrProcessed: 1, warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage }
-      : { error: 'No readable text was found in this image.', errorCode: 'OCR_EMPTY', detectedType: 'image', ocrAttempted: true, ocrProvider: 'openai', ocrModel: 'gpt-5.4-mini', ocrRequestMode: 'base64_stateless', warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage };
+      : { error: 'No readable text was found in this image.', errorCode: 'OCR_EMPTY', detectedType: 'image', ocrAttempted: ocrApplied, ocrProvider: ocrApplied ? 'openai' : undefined, ocrModel: ocrApplied ? 'gpt-5.4-mini' : undefined, ocrRequestMode: ocrApplied ? 'base64_stateless' : undefined, warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage };
   }
 
   if (isPdf(file, detection)) {
@@ -532,6 +547,18 @@ export async function extractDocumentText(
         }
 
         if (lowTextPageNumbers.length > 0) {
+          if (options.allowOpenAiOcr === false) {
+            const coverage = buildPageCoverageReceipt(nativePages, result.total);
+            return {
+              text,
+              method: 'pdf_text_partial',
+              detectedType: detection.detectedType,
+              pagesTotal: result.total,
+              pages: nativePages,
+              coverage,
+              warnings: [...detection.warnings, 'OPENAI_OCR_BLOCKED_BY_PRIVACY_POLICY', ...coverage.warnings],
+            };
+          }
           const selectiveOcr = await extractPdfTextFromImages(buffer, {
             pageNumbers: lowTextPageNumbers,
             pagesTotal: result.total,
@@ -623,6 +650,21 @@ export async function extractDocumentText(
       mistralOcrError = mistralOcr.error;
     }
 
+    if (options.allowOpenAiOcr === false) {
+      const coverage = parsedPages?.length
+        ? buildPageCoverageReceipt(parsedPages, parsedPagesTotal)
+        : undefined;
+      return {
+        error: 'This document requires OCR, but the configured privacy policy does not allow the available OCR provider.',
+        errorCode: 'OCR_EMPTY',
+        detectedType: detection.detectedType,
+        pages: parsedPages,
+        pagesTotal: parsedPagesTotal,
+        coverage,
+        warnings: [...detection.warnings, 'OPENAI_OCR_BLOCKED_BY_PRIVACY_POLICY', ...(mistralOcrError ? ['MISTRAL_OCR4_UNAVAILABLE'] : [])],
+      };
+    }
+
     const ocr = await extractPdfTextFromImages(buffer, {
       pageNumbers: parsedPages?.map((page) => page.pageNumber),
       pagesTotal: parsedPagesTotal,
@@ -683,7 +725,7 @@ export async function extractDocumentText(
   }
 
   if (isDocx(file, detection) || ['pptx', 'xlsx', 'odt'].includes(detection.detectedType)) {
-    return await extractContainerDocument(buffer, detection.detectedType, detection.warnings);
+    return await extractContainerDocument(buffer, detection.detectedType, detection.warnings, options.allowOpenAiOcr !== false);
   }
 
   if (detection.detectedType === 'doc' || file.type === DOC_MIME || file.name.toLowerCase().endsWith('.doc')) {

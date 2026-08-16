@@ -1427,8 +1427,18 @@ export const getGenerationContext = internalQuery({
                 uploadedFile.byteSize ?? attachment.byteSize
             );
             if (context) {
+                const understandingRecord = uploadedFile.activeUnderstandingRecordId
+                    ? await ctx.db.get(uploadedFile.activeUnderstandingRecordId)
+                    : null;
                 attachmentContexts.push({
                     ...context,
+                    fullDocumentReviewMarkdown:
+                        understandingRecord?.verificationStatus === 'verified' &&
+                        understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
+                            ? understandingRecord.renderedReviewMarkdown
+                            : undefined,
+                    fullDocumentReviewRecordId: understandingRecord?._id,
+                    fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
                         message: contextualFollowUpMessage,
@@ -1605,8 +1615,18 @@ export const getGenerationContext = internalQuery({
                     (uploadedFile.activeMemoryGenerationId && (uploadedFile.chunkCount ?? 0) > 0)
                 )
             ) {
+                const understandingRecord = uploadedFile.activeUnderstandingRecordId
+                    ? await ctx.db.get(uploadedFile.activeUnderstandingRecordId)
+                    : null;
                 availableDocumentContexts.push({
                     ...context,
+                    fullDocumentReviewMarkdown:
+                        understandingRecord?.verificationStatus === 'verified' &&
+                        understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
+                            ? understandingRecord.renderedReviewMarkdown
+                            : undefined,
+                    fullDocumentReviewRecordId: understandingRecord?._id,
+                    fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
                         message: contextualFollowUpMessage,

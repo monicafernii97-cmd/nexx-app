@@ -33,6 +33,7 @@ import type * as documentMemory from "../documentMemory.js";
 import type * as documentMemoryGenerations from "../documentMemoryGenerations.js";
 import type * as documentOperations from "../documentOperations.js";
 import type * as documentReprocessJobs from "../documentReprocessJobs.js";
+import type * as documentUnderstanding from "../documentUnderstanding.js";
 import type * as documents from "../documents.js";
 import type * as exportJobs from "../exportJobs.js";
 import type * as exportOverrides from "../exportOverrides.js";
@@ -95,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   documentMemoryGenerations: typeof documentMemoryGenerations;
   documentOperations: typeof documentOperations;
   documentReprocessJobs: typeof documentReprocessJobs;
+  documentUnderstanding: typeof documentUnderstanding;
   documents: typeof documents;
   exportJobs: typeof exportJobs;
   exportOverrides: typeof exportOverrides;

@@ -640,6 +640,9 @@ type AttachmentContext = {
     pagesTotal?: number;
     coverageStatus?: DocumentCoverageStatus;
     fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
+    fullDocumentReviewMarkdown?: string;
+    fullDocumentReviewRecordId?: Id<'documentUnderstandingRecords'>;
+    fullDocumentReviewSourceChunkIds?: Id<'documentChunks'>[];
     documentChunks?: DocumentChunkContext[];
 };
 
@@ -2879,7 +2882,7 @@ export const processChatGenerationJob = internalAction({
                 return null;
             }
 
-            const fullReviewAttachments = context.attachmentContexts ?? [];
+            const fullReviewAttachments: AttachmentContext[] = context.attachmentContexts ?? [];
             if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
                 await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
@@ -2903,6 +2906,48 @@ export const processChatGenerationJob = internalAction({
                         })),
                     }),
                 });
+                return null;
+            }
+
+            if (context.turn.analysisMode === 'full_document_review' && fullReviewAttachments.length > 0) {
+                const missingRecord = fullReviewAttachments.find((attachment) => !attachment.fullDocumentReviewMarkdown?.trim());
+                if (missingRecord) {
+                    await ctx.runMutation(internal.chatTurns.completeAssistant, {
+                        jobId: args.jobId,
+                        leaseOwner,
+                        content: buildCoverageGateMessage(fullReviewAttachments),
+                        artifactsJson: JSON.stringify(emptyArtifacts()),
+                        degraded: false,
+                        metadataJson: JSON.stringify({
+                            analysisMode: context.turn.analysisMode,
+                            documentCoverageGate: 'missing_verified_understanding_record',
+                            uploadedFileId: missingRecord.uploadedFileId,
+                        }),
+                    });
+                    return null;
+                }
+                const content = fullReviewAttachments
+                    .map((attachment) => attachment.fullDocumentReviewMarkdown!.trim())
+                    .join('\n\n');
+                await ctx.runMutation(internal.chatTurns.completeAssistant, {
+                    jobId: args.jobId,
+                    leaseOwner,
+                    content,
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    degraded: false,
+                    metadataJson: JSON.stringify({
+                        analysisMode: context.turn.analysisMode,
+                        documentCoverageGate: 'verified_complete',
+                        understandingRecords: fullReviewAttachments.map((attachment) => ({
+                            uploadedFileId: attachment.uploadedFileId,
+                            recordId: attachment.fullDocumentReviewRecordId,
+                            sourceChunkIds: attachment.fullDocumentReviewSourceChunkIds,
+                        })),
+                    }),
+                });
+                if (lease.turnId) {
+                    await ctx.scheduler.runAfter(0, internal.chatWorker.persistConversationMemory, { turnId: lease.turnId });
+                }
                 return null;
             }
 

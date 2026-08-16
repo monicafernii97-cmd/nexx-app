@@ -11,7 +11,7 @@ export const CHAT_UPLOAD_CONFIG = {
   maxDirectChatContextChars: 60_000,
   maxUploadResponsePreviewChars: 4_000,
   uploadSessionTtlMs: 60 * 60 * 1000,
-  processingStaleAfterMs: 12 * 60 * 1000,
+  processingStaleAfterMs: 45 * 60 * 1000,
   maxProcessingAttempts: 3,
   maxStorageAttempts: 4,
   uploadUrlTtlMs: 60 * 60 * 1000,

@@ -346,6 +346,7 @@ export const processRun = internalAction({
       }
       const root = work.nodes[0];
       const chunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
+      const coverageReceipt = await ctx.runQuery(internal.documentUnderstanding.getCoverageReceipt, { runId: work.run._id });
       if (!root) throw new Error('Understanding reduction produced no root node.');
       const payload = parsePayload(root.payloadJson);
       const verification = verifyDocumentUnderstanding({ payload, chunks, provenance: root });
@@ -354,7 +355,7 @@ export const processRun = internalAction({
       await ctx.runMutation(internal.documentUnderstanding.finalizeRun, {
         runId: work.run._id,
         structuredJson: JSON.stringify(payload),
-        renderedReviewMarkdown: renderVerifiedDocumentReview({ filename: work.file.filename, payload, chunks }),
+        renderedReviewMarkdown: renderVerifiedDocumentReview({ filename: work.file.filename, payload, chunks, coverageReceipt: coverageReceipt ?? undefined }),
         sourceChunkIds: chunks.map((chunk) => chunk._id),
         sourceChunkIndexes,
         checks: ['coverage_manifest_complete', ...verification.checks],
@@ -379,6 +380,26 @@ export const getAllChunks = internalQuery({
     return await ctx.db.query('documentChunks')
       .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', run.memoryGenerationId))
       .collect();
+  },
+});
+
+export const getCoverageReceipt = internalQuery({
+  args: { runId: v.id('documentUnderstandingRuns') },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (!run) return undefined;
+    const manifest = await ctx.db.get(run.coverageManifestId);
+    if (!manifest || manifest.status !== 'complete') return undefined;
+    const units = await ctx.db.query('documentSourceUnitCoverage')
+      .withIndex('by_manifest_unit', (q) => q.eq('manifestId', manifest._id))
+      .collect();
+    return {
+      unitKind: manifest.unitKind,
+      unitsRead: manifest.succeededUnits + manifest.lowConfidenceUnits + manifest.verifiedBlankUnits,
+      unitsExpected: manifest.expectedUnits,
+      ocrUnits: units.filter((unit) => unit.ocrApplied).length,
+      lowConfidenceUnits: manifest.lowConfidenceUnits,
+    };
   },
 });
 

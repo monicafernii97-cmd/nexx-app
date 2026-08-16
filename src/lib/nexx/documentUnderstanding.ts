@@ -71,6 +71,13 @@ export function renderVerifiedDocumentReview(args: {
   filename: string;
   payload: DocumentUnderstandingPayload;
   chunks: UnderstandingSourceChunk[];
+  coverageReceipt?: {
+    unitKind: 'page' | 'text';
+    unitsRead: number;
+    unitsExpected: number;
+    ocrUnits: number;
+    lowConfidenceUnits: number;
+  };
 }) {
   const byIndex = new Map(args.chunks.map((chunk) => [chunk.chunkIndex, chunk]));
   const sections = new Map<string, DocumentUnderstandingFinding[]>();
@@ -78,7 +85,19 @@ export function renderVerifiedDocumentReview(args: {
     const key = finding.category.trim() || 'Other provisions';
     sections.set(key, [...(sections.get(key) ?? []), finding]);
   }
-  const lines = [`# Full-document review: ${args.filename}`, '', args.payload.overview.trim(), ''];
+  const unitLabel = args.coverageReceipt?.unitKind === 'page' ? 'page' : 'source unit';
+  const receipt = args.coverageReceipt
+    ? [
+        `I received and processed ${args.filename}. I read ${args.coverageReceipt.unitsRead} of ${args.coverageReceipt.unitsExpected} ${unitLabel}${args.coverageReceipt.unitsExpected === 1 ? '' : 's'}.`,
+        args.coverageReceipt.ocrUnits > 0
+          ? `OCR was used on ${args.coverageReceipt.ocrUnits} ${unitLabel}${args.coverageReceipt.ocrUnits === 1 ? '' : 's'}.`
+          : 'OCR was not needed.',
+        args.coverageReceipt.lowConfidenceUnits > 0
+          ? `${args.coverageReceipt.lowConfidenceUnits} passage${args.coverageReceipt.lowConfidenceUnits === 1 ? '' : 's'} had low extraction confidence and should be checked against the original.`
+          : 'No low-confidence passages were reported.',
+      ].join(' ')
+    : `I received and processed ${args.filename}. All ${args.chunks.length} canonical document chunks were included in this review.`;
+  const lines = [receipt, '', `# Full-document review: ${args.filename}`, '', args.payload.overview.trim(), ''];
   for (const [category, findings] of sections) {
     lines.push(`## ${category}`, '');
     for (const finding of findings) {

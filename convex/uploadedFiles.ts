@@ -185,3 +185,46 @@ export const getByConversation = query({
             .collect();
     },
 });
+
+/**
+ * Return a short-lived storage URL only to the owner or an active chat grantee.
+ * This is internal-only; the HTTP action consumes the URL server-side and
+ * returns bytes, so no client-callable Convex function exposes storage URLs.
+ */
+export const getAuthorizedSourceFileInternal = internalQuery({
+    args: { uploadedFileId: v.id('uploadedFiles') },
+    handler: async (ctx, args) => {
+        const user = await getAuthenticatedUser(ctx);
+        if (!user.clerkId) return null;
+        const clerkUserId = user.clerkId;
+        const file = await ctx.db.get(args.uploadedFileId);
+        if (!file || !file.storageId || file.deletedAt || file.status === 'deleted' || file.status === 'quarantined') {
+            return null;
+        }
+
+        let authorized = file.clerkUserId === clerkUserId;
+        if (!authorized) {
+            const now = Date.now();
+            const grants = await ctx.db
+                .query('fileAccessGrants')
+                .withIndex('by_subject', (q) => q.eq('subjectType', 'user').eq('subjectId', clerkUserId))
+                .collect();
+            authorized = grants.some((grant) =>
+                grant.uploadedFileId === file._id &&
+                grant.permissions.chat &&
+                grant.revokedAt === undefined &&
+                (grant.expiresAt === undefined || grant.expiresAt > now)
+            );
+        }
+        if (!authorized) return null;
+
+        const storageUrl = await ctx.storage.getUrl(file.storageId);
+        if (!storageUrl) return null;
+        return {
+            filename: file.displayFileName ?? file.filename,
+            mimeType: file.mimeType || 'application/octet-stream',
+            byteLength: file.byteSize ?? 0,
+            storageUrl,
+        };
+    },
+});

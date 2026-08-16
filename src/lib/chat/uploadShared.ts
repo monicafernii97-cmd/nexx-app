@@ -3,9 +3,22 @@ export const CHAT_UPLOAD_CONFIG = {
   allowedMimeTypes: [
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.oasis.opendocument.text',
     'text/plain',
+    'text/csv',
+    'text/html',
+    'text/rtf',
+    'application/rtf',
+    'message/rfc822',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
+    'image/tiff',
   ],
-  allowedExtensions: ['pdf', 'docx', 'txt'],
+  allowedExtensions: ['pdf', 'docx', 'txt', 'pptx', 'xlsx', 'odt', 'csv', 'html', 'htm', 'rtf', 'eml', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff'],
   legacyDocMimeTypes: ['application/msword'],
   legacyDocExtensions: ['doc'],
   maxDirectChatContextChars: 60_000,
@@ -25,6 +38,18 @@ export const CHAT_UPLOAD_CONFIG = {
   workerTimeoutMs: 70_000,
   maxAttachmentsPerTurn: 5,
 } as const;
+
+export const CHAT_UPLOAD_MIME_BY_EXTENSION: Record<string, readonly string[]> = {
+  pdf: ['application/pdf'],
+  docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  odt: ['application/vnd.oasis.opendocument.text'],
+  txt: ['text/plain'], csv: ['text/csv', 'text/plain'], html: ['text/html'], htm: ['text/html'],
+  rtf: ['application/rtf', 'text/rtf'], eml: ['message/rfc822', 'text/plain'],
+  png: ['image/png'], jpg: ['image/jpeg'], jpeg: ['image/jpeg'], webp: ['image/webp'],
+  gif: ['image/gif'], tif: ['image/tiff'], tiff: ['image/tiff'],
+};
 
 export function shouldPersistUploadProgressDiagnostic(args: {
   now: number;

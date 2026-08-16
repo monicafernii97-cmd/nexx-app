@@ -78,13 +78,14 @@ function isBusyStatus(status: ChatComposerFileStatus) {
 }
 
 function isNonRetryableFailure(status: ChatComposerFileStatus) {
-    return status === 'failed_empty_extraction';
+    return status === 'failed_empty_extraction' || status === 'quarantined';
 }
 
 function isFailureStatus(status: ChatComposerFileStatus) {
     return status === 'failed_storage_upload' ||
         status === 'failed_processing' ||
         status === 'failed_empty_extraction' ||
+        status === 'quarantined' ||
         status === 'stalled' ||
         status === 'cancelled';
 }

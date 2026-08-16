@@ -20,6 +20,7 @@ export type StoredDocumentCandidateInput = {
   memorySource?: DocumentMemorySource;
   isActiveDocument?: boolean;
   recentReferenceRank?: number;
+  contentHash?: string;
 };
 
 export type StoredDocumentSelectionReason =
@@ -133,7 +134,14 @@ export function selectStoredDocumentCandidates(args: {
   maxDocuments: number;
 }) {
   const normalizedMessage = normalizeDocumentAlias(args.message);
-  const ranked = args.candidates.map((candidate, index): StoredDocumentSelection => {
+  const seenContentHashes = new Set<string>();
+  const uniqueCandidates = args.candidates.filter((candidate) => {
+    if (!candidate.contentHash) return true;
+    if (seenContentHashes.has(candidate.contentHash)) return false;
+    seenContentHashes.add(candidate.contentHash);
+    return true;
+  });
+  const ranked = uniqueCandidates.map((candidate, index): StoredDocumentSelection => {
     let score = Math.max(0, 30 - index);
     const reasons: StoredDocumentSelectionReason[] = ['recency'];
     const filenameAlias = normalizeDocumentAlias(candidate.filename);

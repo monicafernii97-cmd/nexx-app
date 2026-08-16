@@ -183,6 +183,7 @@ function normalizeStatus(status: string): ChatComposerFileStatus {
   if (status === 'failed_storage_upload') return 'failed_storage_upload';
   if (status === 'failed_processing') return 'failed_processing';
   if (status === 'failed_empty_extraction') return 'failed_empty_extraction';
+  if (status === 'quarantined') return 'quarantined';
   if (status === 'stalled') return 'stalled';
   if (status === 'cancelled') return 'cancelled';
   return 'failed_processing';
@@ -192,6 +193,7 @@ function toUploadError(snapshot: UploadSessionSnapshot) {
   const uploadStatus = typeof snapshot.status === 'string' ? normalizeStatus(snapshot.status) : undefined;
   const retryable = snapshot.retryable ?? (
     uploadStatus !== 'failed_empty_extraction' &&
+    uploadStatus !== 'quarantined' &&
     uploadStatus !== 'cancelled'
   );
   const errorOptions = {
@@ -206,6 +208,8 @@ function toUploadError(snapshot: UploadSessionSnapshot) {
       return new ChatUploadError('NEXX could not read any text from this file.', errorOptions);
     case 'failed_processing':
       return new ChatUploadError('NEXX could not finish processing this file. Please retry.', errorOptions);
+    case 'quarantined':
+      return new ChatUploadError('This file was isolated because it contains unsafe or active content. Export a clean copy before uploading again.', errorOptions);
     case 'stalled':
       return new ChatUploadError('File processing stalled. Please retry.', errorOptions);
     default:
@@ -486,6 +490,7 @@ async function waitForUploadProcessing(args: {
       snapshot.status === 'failed_storage_upload' ||
       snapshot.status === 'failed_processing' ||
       snapshot.status === 'failed_empty_extraction' ||
+      snapshot.status === 'quarantined' ||
       snapshot.status === 'stalled' ||
       snapshot.status === 'cancelled'
     ) {
@@ -672,6 +677,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     const normalizedStatus = typeof session.status === 'string' ? normalizeStatus(session.status) : undefined;
     if (
       normalizedStatus === 'failed_empty_extraction' ||
+      normalizedStatus === 'quarantined' ||
       normalizedStatus === 'cancelled' ||
       (session.retryable === false && !retryableIndexingPartial)
     ) {

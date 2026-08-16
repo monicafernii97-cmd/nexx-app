@@ -398,6 +398,7 @@ export default defineSchema({
             v.literal('failed_storage_upload'),
             v.literal('failed_processing'),
             v.literal('failed_empty_extraction'),
+            v.literal('quarantined'),
             v.literal('stalled'),
             v.literal('cancelled')
         ),
@@ -1018,11 +1019,12 @@ export default defineSchema({
             v.literal('native_docx'),
             v.literal('native_txt'),
             v.literal('mistral_ocr_4'),
+            v.literal('openai_vision'),
             v.literal('manual_upload'),
             v.literal('migration')
         ),
         extractorVersion: v.optional(v.string()),
-        provider: v.optional(v.union(v.literal('internal'), v.literal('mistral'))),
+        provider: v.optional(v.union(v.literal('internal'), v.literal('mistral'), v.literal('openai'))),
         modelId: v.optional(v.string()),
         modelVersion: v.optional(v.string()),
         status: extractionAttemptStatusValidator,
@@ -1767,6 +1769,7 @@ export default defineSchema({
         encryptionKeyId: v.optional(v.string()),
         storageId: v.optional(v.id('_storage')),
         storageSha256: v.optional(v.string()),
+        duplicateOfUploadedFileId: v.optional(v.id('uploadedFiles')),
         confidentialityLevel: v.optional(confidentialityLevelValidator),
         directUrlAllowed: v.optional(v.boolean()),
         detectedType: v.optional(v.string()),
@@ -1837,6 +1840,7 @@ export default defineSchema({
       .index('by_clerk_private_scope', ['clerkUserId', 'conversationId', 'caseId'])
       .index('by_upload_session', ['uploadSessionId'])
       .index('by_storage', ['storageId'])
+      .index('by_clerk_storage_hash', ['clerkUserId', 'storageSha256'])
       .index('by_active_generation', ['activeMemoryGenerationId'])
       .index('by_org_hash', ['orgId', 'sha256Hash'])
       .index('by_org_matter_status', ['orgId', 'matterId', 'status']),

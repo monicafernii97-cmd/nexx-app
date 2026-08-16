@@ -98,6 +98,19 @@ describe('selectStoredDocumentCandidates', () => {
     expect(result.ranked).toHaveLength(candidates.length);
   });
 
+  it('does not rank indistinguishable uploads of the same content twice', () => {
+    const result = selectStoredDocumentCandidates({
+      message: 'What does the order say?',
+      detection: detectDocumentReference('What does the order say?'),
+      candidates: [
+        { ...candidates[0], uploadedFileId: 'active-copy', contentHash: 'same-hash', isActiveDocument: true },
+        { ...candidates[0], uploadedFileId: 'older-copy', contentHash: 'same-hash' },
+      ],
+      maxDocuments: 5,
+    });
+    expect(result.ranked.map((item) => item.uploadedFileId)).toEqual(['active-copy']);
+  });
+
   it('uses memory source as a tiebreaker without overriding explicit matches', () => {
     const result = selectStoredDocumentCandidates({
       message: 'Please pull exhibit a.',

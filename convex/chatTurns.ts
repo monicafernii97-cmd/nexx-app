@@ -1585,6 +1585,7 @@ export const getGenerationContext = internalQuery({
             memorySource: memorySourceByUploadedFileId.get(uploadedFile._id.toString()),
             isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
             recentReferenceRank: recentReferenceRankById.get(uploadedFile._id.toString()),
+            contentHash: uploadedFile.storageSha256 ?? uploadedFile.sha256Hash,
         }));
         const selectedStoredDocuments = selectStoredDocumentCandidates({
             message: turn.message,

@@ -922,6 +922,27 @@ export const getProcessingContext = internalQuery({
   },
 });
 
+export const findReusableExtraction = internalQuery({
+  args: { uploadSessionId: v.id('chatUploadSessions') },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.uploadSessionId);
+    if (!session?.storageSha256) return null;
+    const candidates = await ctx.db.query('uploadedFiles')
+      .withIndex('by_clerk_storage_hash', (q) => q.eq('clerkUserId', session.clerkUserId).eq('storageSha256', session.storageSha256))
+      .order('desc')
+      .take(10);
+    const file = candidates.find((candidate) =>
+      candidate.status !== 'deleted' && candidate.status !== 'quarantined' &&
+      candidate.fullDocumentReviewStatus === 'ready' && candidate.coverageStatus === 'complete' &&
+      Boolean(candidate.fullTextStorageId && candidate.activeMemoryGenerationId));
+    if (!file?.fullTextStorageId || !file.activeMemoryGenerationId) return null;
+    const pages = await ctx.db.query('documentPages')
+      .withIndex('by_generation_page', (q) => q.eq('memoryGenerationId', file.activeMemoryGenerationId!))
+      .collect();
+    return { file, pages };
+  },
+});
+
 export const setConversationVectorStoreForSession = internalMutation({
   args: {
     uploadSessionId: v.id('chatUploadSessions'),
@@ -1030,7 +1051,7 @@ export const failProcessing = internalMutation({
   args: {
     uploadSessionId: v.id('chatUploadSessions'),
     lockId: v.string(),
-    status: v.union(v.literal('failed_processing'), v.literal('failed_empty_extraction')),
+    status: v.union(v.literal('failed_processing'), v.literal('failed_empty_extraction'), v.literal('quarantined')),
     errorCode: v.string(),
     errorMessage: v.string(),
     retryable: v.boolean(),
@@ -1074,6 +1095,7 @@ export const upsertProcessedUploadedFile = internalMutation({
     openaiFileId: v.optional(v.string()),
     openaiTextFileId: v.optional(v.string()),
     vectorStoreId: v.optional(v.string()),
+    duplicateOfUploadedFileId: v.optional(v.id('uploadedFiles')),
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.uploadSessionId);
@@ -1111,6 +1133,7 @@ export const upsertProcessedUploadedFile = internalMutation({
         openaiFileId: args.openaiFileId,
         openaiTextFileId: args.openaiTextFileId,
         vectorStoreId: args.vectorStoreId,
+        duplicateOfUploadedFileId: args.duplicateOfUploadedFileId,
         updatedAt: now,
       });
       if (
@@ -1133,6 +1156,7 @@ export const upsertProcessedUploadedFile = internalMutation({
       byteSize: session.byteSize,
       storageId: session.storageId,
       storageSha256: session.storageSha256,
+      duplicateOfUploadedFileId: args.duplicateOfUploadedFileId,
       status: args.status,
       fullTextStorageId: args.fullTextStorageId,
       fullTextSha256: args.fullTextSha256,
@@ -1264,6 +1288,7 @@ export const cleanupStaleUploadSessions = internalMutation({
       'failed_storage_upload',
       'failed_processing',
       'failed_empty_extraction',
+      'quarantined',
       'stalled',
       'cancelled',
     ] as const;

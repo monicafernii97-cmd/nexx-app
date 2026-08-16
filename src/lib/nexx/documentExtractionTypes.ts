@@ -44,6 +44,32 @@ export type DocumentCoverageReceipt = {
   warnings: string[];
 };
 
+export type CanonicalExtractedTextUnit = {
+  unitIndex: number;
+  unitLabel: string;
+  text: string;
+  status: DocumentSourceUnitStatus;
+  nativeTextChars: number;
+  canonicalTextChars: number;
+  ocrApplied: boolean;
+  warnings: string[];
+};
+
+export function buildTextCoverageReceipt(units: CanonicalExtractedTextUnit[]): DocumentCoverageReceipt {
+  const succeededUnits = units.filter((unit) => unit.status === 'succeeded').length;
+  const lowConfidenceUnits = units.filter((unit) => unit.status === 'low_confidence').length;
+  const verifiedBlankUnits = units.filter((unit) => unit.status === 'verified_blank').length;
+  const failedUnits = units.filter((unit) => unit.status === 'failed').length;
+  const omittedUnits = units.filter((unit) => unit.status === 'omitted').length;
+  const complete = units.length > 0 && failedUnits === 0 && lowConfidenceUnits === 0 && omittedUnits === 0;
+  return {
+    unitKind: 'text', expectedUnits: units.length, attemptedUnits: units.length,
+    succeededUnits, lowConfidenceUnits, verifiedBlankUnits, failedUnits, omittedUnits,
+    status: complete ? 'complete' : units.length > 0 ? 'partial' : 'failed',
+    warnings: Array.from(new Set(units.flatMap((unit) => unit.warnings))),
+  };
+}
+
 export function buildPageCoverageReceipt(
   pages: CanonicalExtractedPage[] | undefined,
   pagesTotal: number | undefined,

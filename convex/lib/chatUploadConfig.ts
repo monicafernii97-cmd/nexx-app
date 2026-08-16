@@ -1,4 +1,4 @@
-import { CHAT_UPLOAD_CONFIG } from '../../src/lib/chat/uploadShared';
+import { CHAT_UPLOAD_CONFIG, CHAT_UPLOAD_MIME_BY_EXTENSION } from '../../src/lib/chat/uploadShared';
 
 export { CHAT_UPLOAD_CONFIG };
 
@@ -15,6 +15,7 @@ export type ChatUploadStatus =
   | 'failed_storage_upload'
   | 'failed_processing'
   | 'failed_empty_extraction'
+  | 'quarantined'
   | 'stalled'
   | 'cancelled';
 
@@ -37,10 +38,8 @@ export function validateChatUploadMetadata(args: {
   const extension = getChatUploadExtension(filename);
   const mimeType = args.mimeType || 'application/octet-stream';
   const hasGenericMime = !args.mimeType || mimeType === 'application/octet-stream';
-  const allowedPair =
-    (extension === 'pdf' && (mimeType === 'application/pdf' || hasGenericMime)) ||
-    (extension === 'docx' && (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || hasGenericMime)) ||
-    (extension === 'txt' && (mimeType === 'text/plain' || hasGenericMime));
+  const allowedPair = Boolean(CHAT_UPLOAD_MIME_BY_EXTENSION[extension]?.includes(mimeType) ||
+    (hasGenericMime && CHAT_UPLOAD_CONFIG.allowedExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.allowedExtensions)[number])));
   const legacyDocMime = CHAT_UPLOAD_CONFIG.legacyDocMimeTypes.includes(
     mimeType as (typeof CHAT_UPLOAD_CONFIG.legacyDocMimeTypes)[number],
   );
@@ -70,7 +69,7 @@ export function validateChatUploadMetadata(args: {
       }
       return { ok: true as const, extension };
     }
-    return { ok: false as const, error: 'Unsupported file type. Upload PDF, DOCX, or TXT.', extension };
+    return { ok: false as const, error: 'Unsupported file type. Upload a document, image, presentation, spreadsheet, email, or text file.', extension };
   }
   if (args.byteSize > CHAT_UPLOAD_CONFIG.maxBytes) {
     return { ok: false as const, error: 'File too large. Maximum size is 25MB.', extension };

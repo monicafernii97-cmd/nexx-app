@@ -36,6 +36,7 @@ const extractorValidator = v.union(
   v.literal('native_docx'),
   v.literal('native_txt'),
   v.literal('mistral_ocr_4'),
+  v.literal('openai_vision'),
   v.literal('manual_upload'),
   v.literal('migration'),
 );
@@ -313,7 +314,7 @@ export const recordExtractionAttempt = internalMutation({
     memoryGenerationId: v.id('documentMemoryGenerations'),
     extractor: extractorValidator,
     extractorVersion: v.optional(v.string()),
-    provider: v.optional(v.union(v.literal('internal'), v.literal('mistral'))),
+    provider: v.optional(v.union(v.literal('internal'), v.literal('mistral'), v.literal('openai'))),
     modelId: v.optional(v.string()),
     modelVersion: v.optional(v.string()),
     status: extractionAttemptStatusValidator,

@@ -64,6 +64,39 @@ describe('detectDocumentType', () => {
     expect(result).toMatchObject({ ok: true, detectedType: 'pdf' });
   });
 
+  it('rejects PDFs with active JavaScript actions', () => {
+    const result = detectDocumentType(Buffer.from('%PDF-1.7\n/OpenAction << /S /JavaScript >>'), { filename: 'active.pdf' });
+    expect(result).toMatchObject({ ok: false, detectedType: 'pdf', errorCode: 'UNSAFE_ACTIVE_CONTENT' });
+  });
+
+  it('isolates executable and standard antivirus test signatures before parsing', () => {
+    expect(detectDocumentType(Buffer.from('MZ executable'), { filename: 'renamed.pdf' })).toMatchObject({ ok: false, errorCode: 'MALWARE_SCAN_FAILED' });
+    expect(detectDocumentType(Buffer.from('X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*'), { filename: 'note.txt' })).toMatchObject({ ok: false, errorCode: 'MALWARE_SCAN_FAILED' });
+  });
+
+  it('detects document images by magic bytes rather than extension', () => {
+    const result = detectDocumentType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), { filename: 'scan.png', mimeType: 'application/octet-stream' });
+    expect(result).toMatchObject({ ok: true, detectedType: 'image' });
+  });
+
+  it('detects PPTX, XLSX, and ODT containers by internal parts', () => {
+    expect(detectDocumentType(makeZip(['[Content_Types].xml', 'ppt/slides/slide1.xml']))).toMatchObject({ ok: true, detectedType: 'pptx' });
+    expect(detectDocumentType(makeZip(['[Content_Types].xml', 'xl/worksheets/sheet1.xml']))).toMatchObject({ ok: true, detectedType: 'xlsx' });
+    expect(detectDocumentType(makeZip(['META-INF/manifest.xml', 'content.xml']))).toMatchObject({ ok: true, detectedType: 'odt' });
+  });
+
+  it('rejects unsafe executable payloads inside document containers', () => {
+    const result = detectDocumentType(makeZip(['[Content_Types].xml', 'word/document.xml', 'word/media/payload.exe']));
+    expect(result).toMatchObject({ ok: false, errorCode: 'UNSAFE_ACTIVE_CONTENT' });
+  });
+
+  it('accepts safe text-family formats and rejects embedded RTF objects', () => {
+    expect(detectDocumentType(Buffer.from('a,b\n1,2'), { filename: 'data.csv', mimeType: 'text/csv' })).toMatchObject({ ok: true, detectedType: 'csv' });
+    expect(detectDocumentType(Buffer.from('<html><body>Order</body></html>'), { filename: 'order.html', mimeType: 'text/html' })).toMatchObject({ ok: true, detectedType: 'html' });
+    expect(detectDocumentType(Buffer.from('{\\rtf1 plain text}'), { filename: 'order.rtf' })).toMatchObject({ ok: true, detectedType: 'rtf' });
+    expect(detectDocumentType(Buffer.from('{\\rtf1 \\object unsafe}'), { filename: 'unsafe.rtf' })).toMatchObject({ ok: false, errorCode: 'UNSAFE_ACTIVE_CONTENT' });
+  });
+
   it('accepts macro-free DOCX packages', () => {
     const result = detectDocumentType(makeZip(['[Content_Types].xml', 'word/document.xml']), {
       filename: 'order.docx',

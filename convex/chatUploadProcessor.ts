@@ -12,6 +12,7 @@ import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/n
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
 import { buildDocumentAliases } from '../src/lib/nexx/documentSelection';
+import { buildPageCoverageReceipt, buildTextCoverageReceipt, type CanonicalExtractedPage } from '../src/lib/nexx/documentExtractionTypes';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
 
 type ProcessingContext = {
@@ -137,10 +138,11 @@ function extractionAttemptExtractor(args: {
   extension: string;
   extractionMethod?: string;
   ocrProvider?: DocumentExtractionResult['ocrProvider'];
-}): 'native_pdf' | 'native_docx' | 'native_txt' | 'mistral_ocr_4' | 'manual_upload' {
+}): 'native_pdf' | 'native_docx' | 'native_txt' | 'mistral_ocr_4' | 'openai_vision' | 'manual_upload' {
   if (args.ocrProvider === 'mistral' || args.extractionMethod === 'mistral_ocr_4') {
     return 'mistral_ocr_4';
   }
+  if (args.ocrProvider === 'openai') return 'openai_vision';
   const type = (args.detectedType || args.extension).toLowerCase();
   if (type === 'pdf') return 'native_pdf';
   if (type === 'docx') return 'native_docx';
@@ -153,13 +155,14 @@ function usedMistralOcr(extraction: DocumentExtractionResult) {
 }
 
 function extractionAttemptProvider(extraction: DocumentExtractionResult) {
-  return usedMistralOcr(extraction) ? 'mistral' as const : 'internal' as const;
+  return usedMistralOcr(extraction) ? 'mistral' as const
+    : extraction.ocrProvider === 'openai' ? 'openai' as const : 'internal' as const;
 }
 
 function extractionPlanForResult(extraction: DocumentExtractionResult) {
   const usedMistral = usedMistralOcr(extraction);
   return {
-    nativeExtraction: true,
+    nativeExtraction: extraction.detectedType !== 'image',
     mistralOcr: usedMistral,
     ocrModel: extraction.ocrModel,
     includeBlocks: usedMistral ? true : false,
@@ -311,22 +314,34 @@ async function writeDocumentMemoryArtifacts(
         coverageManifestId,
       });
     } else if (coverageManifestId && effectiveCoverage.unitKind === 'text') {
-      await ctx.runMutation(internal.documentMemoryGenerations.insertCoverageUnitBatch, {
-        uploadedFileId,
-        memoryGenerationId: generation.memoryGenerationId,
-        coverageManifestId,
-        unitKind: 'text',
-        units: [{
-          unitIndex: 0,
-          unitLabel: 'Document text',
-          status: 'succeeded',
-          extractionMethod: extraction.method,
-          nativeTextChars: extraction.text?.length ?? 0,
-          canonicalTextChars: extraction.text?.length ?? 0,
-          ocrApplied: Boolean(extraction.ocrAttempted),
-          warnings: effectiveCoverage.warnings,
-        }],
-      });
+      const textUnits = extraction.sourceUnits ?? [{
+        unitIndex: 0,
+        unitLabel: 'Document text',
+        text: extraction.text ?? '',
+        status: 'succeeded' as const,
+        nativeTextChars: extraction.text?.length ?? 0,
+        canonicalTextChars: extraction.text?.length ?? 0,
+        ocrApplied: Boolean(extraction.ocrAttempted),
+        warnings: effectiveCoverage.warnings,
+      }];
+      for (const units of chunkArray(textUnits, batchSize)) {
+        await ctx.runMutation(internal.documentMemoryGenerations.insertCoverageUnitBatch, {
+          uploadedFileId,
+          memoryGenerationId: generation.memoryGenerationId,
+          coverageManifestId,
+          unitKind: 'text',
+          units: units.map((unit) => ({
+            unitIndex: unit.unitIndex,
+            unitLabel: unit.unitLabel,
+            status: unit.status,
+            extractionMethod: extraction.method,
+            nativeTextChars: unit.nativeTextChars,
+            canonicalTextChars: unit.canonicalTextChars,
+            ocrApplied: unit.ocrApplied,
+            warnings: unit.warnings,
+          })),
+        });
+      }
       await ctx.runMutation(internal.documentMemoryGenerations.finalizeCoverageManifest, {
         uploadedFileId,
         memoryGenerationId: generation.memoryGenerationId,
@@ -673,7 +688,64 @@ export const processStoredUpload = internalAction({
       const buffer = Buffer.from(await blob.arrayBuffer());
       const file = buildProcessingFile(new Blob([buffer], { type: context.session.mimeType }), context.session.filename, context.session.mimeType);
       const extractionStartedAt = Date.now();
-      const extraction = await extractStoredDocument(ctx, context, file, buffer);
+      const reusable = await ctx.runQuery(internal.chatUploads.findReusableExtraction, {
+        uploadSessionId: args.uploadSessionId,
+      });
+      let duplicateOfUploadedFileId: Id<'uploadedFiles'> | undefined;
+      let extraction: DocumentExtractionResult;
+      if (reusable?.file.fullTextStorageId) {
+        const reusableTextBlob = await ctx.storage.get(reusable.file.fullTextStorageId);
+        const reusableText = reusableTextBlob ? (await reusableTextBlob.text()).trim() : '';
+        if (reusableText) {
+          duplicateOfUploadedFileId = reusable.file._id;
+          const realPages: CanonicalExtractedPage[] = reusable.pages
+            .filter((page) => !page.isSynthetic)
+            .map((page) => ({
+              pageNumber: page.pageNumber,
+              sourcePageIndex: page.sourcePageIndex ?? page.pageNumber - 1,
+              nativeText: page.nativeText,
+              ocrMarkdown: page.ocrMarkdown,
+              canonicalText: page.canonicalText ?? page.text,
+              canonicalSource: page.canonicalSource === 'manual' ? 'native' : page.canonicalSource ?? 'native',
+              status: page.sourceUnitStatus ?? 'succeeded',
+              confidence: page.confidence,
+              dimensions: page.dimensions,
+              warnings: page.warnings,
+            }));
+          if (realPages.length > 0) {
+            extraction = {
+              text: reusableText,
+              method: `deduplicated_${reusable.file.extractionMethod ?? 'document'}`,
+              detectedType: reusable.file.detectedType as DocumentExtractionResult['detectedType'],
+              ocrAttempted: reusable.file.ocrAttempted,
+              pagesOcrProcessed: reusable.file.pagesOcrProcessed,
+              pagesTotal: reusable.file.pagesTotal ?? realPages.length,
+              pages: realPages,
+              coverage: buildPageCoverageReceipt(realPages, reusable.file.pagesTotal ?? realPages.length),
+              warnings: [...(reusable.file.extractionWarnings ?? []), 'DUPLICATE_CONTENT_EXTRACTION_REUSED'],
+            };
+          } else {
+            const sourceUnits = [{
+              unitIndex: 0, unitLabel: 'Document text', text: reusableText, status: 'succeeded' as const,
+              nativeTextChars: reusableText.length, canonicalTextChars: reusableText.length,
+              ocrApplied: Boolean(reusable.file.ocrAttempted), warnings: ['DUPLICATE_CONTENT_EXTRACTION_REUSED'],
+            }];
+            extraction = {
+              text: reusableText,
+              method: `deduplicated_${reusable.file.extractionMethod ?? 'document'}`,
+              detectedType: reusable.file.detectedType as DocumentExtractionResult['detectedType'],
+              ocrAttempted: reusable.file.ocrAttempted,
+              sourceUnits,
+              coverage: buildTextCoverageReceipt(sourceUnits),
+              warnings: [...(reusable.file.extractionWarnings ?? []), 'DUPLICATE_CONTENT_EXTRACTION_REUSED'],
+            };
+          }
+        } else {
+          extraction = await extractStoredDocument(ctx, context, file, buffer);
+        }
+      } else {
+        extraction = await extractStoredDocument(ctx, context, file, buffer);
+      }
       const extractedText = extraction.text?.trim() ?? '';
 
       console.info('[ChatUpload] extraction completed', {
@@ -687,20 +759,23 @@ export const processStoredUpload = internalAction({
       });
 
       if (!extractedText) {
+        const quarantined = extraction.errorCode === 'UNSAFE_ACTIVE_CONTENT' ||
+          extraction.errorCode === 'MACRO_ENABLED_UNSUPPORTED' ||
+          extraction.errorCode === 'MALWARE_SCAN_FAILED';
         const retryableExtractionFailure =
           extraction.errorCode === 'WORKER_UNAVAILABLE' ||
           extraction.errorCode === 'CONVERSION_TIMEOUT';
         await ctx.runMutation(internal.chatUploads.failProcessing, {
           uploadSessionId: args.uploadSessionId,
           lockId,
-          status: retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
+          status: quarantined ? 'quarantined' : retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
           errorCode: extraction.errorCode ?? 'empty_extraction',
           errorMessage: extraction.error || 'NEXX could not read any text from this file.',
           retryable: retryableExtractionFailure,
         });
         return {
           ok: false,
-          status: retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
+          status: quarantined ? 'quarantined' : retryableExtractionFailure ? 'failed_processing' : 'failed_empty_extraction',
           error: extraction.error,
         };
       }
@@ -761,6 +836,7 @@ export const processStoredUpload = internalAction({
         openaiFileId,
         openaiTextFileId,
         vectorStoreId,
+        duplicateOfUploadedFileId,
       }) as Id<'uploadedFiles'>;
 
       try {

@@ -1,4 +1,4 @@
-import { CHAT_UPLOAD_CONFIG } from './uploadShared';
+import { CHAT_UPLOAD_CONFIG, CHAT_UPLOAD_MIME_BY_EXTENSION } from './uploadShared';
 import type { DocumentAnalysisMode } from './documentAnalysisMode';
 
 export { CHAT_UPLOAD_CONFIG };
@@ -18,6 +18,7 @@ export type ChatComposerFileStatus =
   | 'failed_storage_upload'
   | 'failed_processing'
   | 'failed_empty_extraction'
+  | 'quarantined'
   | 'stalled'
   | 'cancelled';
 
@@ -49,10 +50,8 @@ export function isAllowedChatUploadType(file: Pick<File, 'name' | 'type'>) {
   const extension = getChatUploadExtension(file.name);
   const mimeType = file.type || 'application/octet-stream';
   const hasGenericMime = !file.type || mimeType === 'application/octet-stream';
-  const isStandardType =
-    (extension === 'pdf' && (mimeType === 'application/pdf' || hasGenericMime)) ||
-    (extension === 'docx' && (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || hasGenericMime)) ||
-    (extension === 'txt' && (mimeType === 'text/plain' || hasGenericMime));
+  const isStandardType = Boolean(CHAT_UPLOAD_MIME_BY_EXTENSION[extension]?.includes(mimeType) ||
+    (hasGenericMime && CHAT_UPLOAD_CONFIG.allowedExtensions.includes(extension as (typeof CHAT_UPLOAD_CONFIG.allowedExtensions)[number])));
 
   if (isStandardType) return true;
 
@@ -71,7 +70,9 @@ export function isLegacyDocClientUploadEnabled() {
 }
 
 export function getChatUploadAccept() {
-  return isLegacyDocClientUploadEnabled() ? '.pdf,.docx,.doc,.txt' : '.pdf,.docx,.txt';
+  const extensions: string[] = [...CHAT_UPLOAD_CONFIG.allowedExtensions];
+  if (isLegacyDocClientUploadEnabled()) extensions.splice(2, 0, 'doc');
+  return extensions.map((extension) => `.${extension}`).join(',');
 }
 
 function looksLikeLegacyDoc(file: Pick<File, 'name' | 'type'>) {
@@ -91,7 +92,7 @@ export function validateChatUploadFile(file: Pick<File, 'name' | 'type' | 'size'
   if (looksLikeLegacyDoc(file) && !isLegacyDocClientUploadEnabled()) {
     return 'Legacy .doc support is being prepared. Please upload DOCX or PDF for now.';
   }
-  if (!isAllowedChatUploadType(file)) return 'Unsupported file type. Upload PDF, DOCX, or TXT.';
+  if (!isAllowedChatUploadType(file)) return 'Unsupported file type. Upload a document, image, presentation, spreadsheet, email, or text file.';
   if (file.size > CHAT_UPLOAD_CONFIG.maxBytes) return 'File too large. Maximum size is 25MB.';
   return null;
 }

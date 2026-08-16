@@ -3,9 +3,12 @@ import { ensurePdfRuntimeReady, isPdfRuntimeError } from './pdfRuntime';
 import { extractPdfTextWithMistralOcr, shouldTryMistralOcrForPdf } from './mistralOcr';
 import {
   buildPageCoverageReceipt,
+  buildTextCoverageReceipt,
   type CanonicalExtractedPage,
+  type CanonicalExtractedTextUnit,
   type DocumentCoverageReceipt,
 } from './documentExtractionTypes';
+import { extractSimpleDocumentText, extractZipDocumentContainer, type EmbeddedDocumentImage } from './documentContainerExtraction';
 
 const PDF_MIME = 'application/pdf';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -29,9 +32,9 @@ export type DocumentExtractionResult = {
   pagesOcrProcessed?: number;
   pagesTotal?: number;
   warnings?: string[];
-  ocrProvider?: 'mistral';
+  ocrProvider?: 'mistral' | 'openai';
   ocrModel?: string;
-  ocrRequestMode?: 'base64_stateless';
+  ocrRequestMode?: 'base64_stateless' | 'file_input';
   ocrAverageConfidence?: number;
   ocrMinConfidence?: number;
   ocrUsagePages?: number;
@@ -42,6 +45,7 @@ export type DocumentExtractionResult = {
   ocrProviderRequestId?: string;
   pages?: CanonicalExtractedPage[];
   coverage?: DocumentCoverageReceipt;
+  sourceUnits?: CanonicalExtractedTextUnit[];
 };
 
 /** Normalize provider/parser text into a stable plain-text payload. */
@@ -108,6 +112,88 @@ function isText(file: File, detection?: DocumentDetectionResult) {
   return detection?.detectedType === 'txt' || file.type === TXT_MIME || file.name.toLowerCase().endsWith('.txt');
 }
 
+function singleTextUnit(text: string, label = 'Document text'): CanonicalExtractedTextUnit[] {
+  return [{
+    unitIndex: 0, unitLabel: label, text, status: text ? 'succeeded' : 'failed',
+    nativeTextChars: text.length, canonicalTextChars: text.length, ocrApplied: false, warnings: [],
+  }];
+}
+
+async function normalizeImageForOcr(image: EmbeddedDocumentImage) {
+  if (image.mimeType !== 'image/tiff') return image;
+  const { default: sharp } = await import('sharp');
+  const bytes = await sharp(image.bytes, { animated: true, pages: 1 }).png().toBuffer();
+  return { ...image, mimeType: 'image/png', bytes: new Uint8Array(bytes) };
+}
+
+function inferImageMime(buffer: Buffer, declared: string) {
+  if (declared.startsWith('image/')) return declared;
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return 'image/jpeg';
+  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF') return 'image/webp';
+  if (buffer.subarray(0, 3).toString('ascii') === 'GIF') return 'image/gif';
+  if ((buffer[0] === 0x49 && buffer[1] === 0x49) || (buffer[0] === 0x4d && buffer[1] === 0x4d)) return 'image/tiff';
+  return 'image/jpeg';
+}
+
+async function ocrImageUnit(image: EmbeddedDocumentImage, unitIndex: number): Promise<CanonicalExtractedTextUnit> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { unitIndex, unitLabel: image.label, text: '', status: 'failed', nativeTextChars: 0, canonicalTextChars: 0, ocrApplied: false, warnings: ['IMAGE_OCR_UNAVAILABLE'] };
+  try {
+    const normalized = await normalizeImageForOcr(image);
+    const { default: OpenAI } = await import('openai');
+    const client = new OpenAI({ apiKey, maxRetries: 1, timeout: 75_000 });
+    const response = await client.responses.create({
+      model: 'gpt-5.4-mini',
+      input: [{ role: 'user', content: [
+        { type: 'input_text', text: 'OCR this document image. Return only visible text, preserving headings, fields, tables, dates, names, signatures, and legal provisions. Use [unclear] for uncertain words. If blank, return exactly [NO_READABLE_TEXT].' },
+        { type: 'input_image', image_url: `data:${normalized.mimeType};base64,${Buffer.from(normalized.bytes).toString('base64')}`, detail: 'high' },
+      ] }],
+      max_output_tokens: 8_000,
+    });
+    const raw = normalizeText(response.output_text ?? '');
+    const blank = raw === '[NO_READABLE_TEXT]';
+    const text = blank ? '' : raw;
+    return {
+      unitIndex, unitLabel: image.label, text,
+      status: blank ? 'verified_blank' : text ? 'succeeded' : 'failed',
+      nativeTextChars: 0, canonicalTextChars: text.length, ocrApplied: true,
+      warnings: blank ? ['OCR_VERIFIED_BLANK_IMAGE'] : text ? [] : ['IMAGE_OCR_EMPTY'],
+    };
+  } catch (error) {
+    console.warn('[DocumentExtraction] Embedded image OCR failed', { label: image.label, error: error instanceof Error ? error.message : String(error) });
+    return { unitIndex, unitLabel: image.label, text: '', status: 'failed', nativeTextChars: 0, canonicalTextChars: 0, ocrApplied: true, warnings: ['IMAGE_OCR_FAILED'] };
+  }
+}
+
+async function extractContainerDocument(buffer: Buffer, type: DetectedDocumentType, detectionWarnings: string[]): Promise<DocumentExtractionResult> {
+  try {
+    const container = await extractZipDocumentContainer(buffer, type);
+    const indexedImages = container.images.map((image, imageIndex) => ({ image, imageIndex }));
+    const imageUnits = await mapWithConcurrency(indexedImages, OCR_REQUEST_CONCURRENCY,
+      ({ image, imageIndex }) => ocrImageUnit(image, container.units.length + imageIndex));
+    const sourceUnits = [...container.units, ...imageUnits];
+    const text = normalizeText(sourceUnits.filter((sourceUnit) => sourceUnit.text).map((sourceUnit) => `[${sourceUnit.unitLabel}]\n${sourceUnit.text}`).join('\n\n'));
+    const coverage = buildTextCoverageReceipt(sourceUnits);
+    return text ? {
+      text, method: `${type}_structured`, detectedType: type,
+      ocrAttempted: container.images.length > 0,
+      ocrProvider: container.images.length > 0 ? 'openai' : undefined,
+      ocrModel: container.images.length > 0 ? 'gpt-5.4-mini' : undefined,
+      ocrRequestMode: container.images.length > 0 ? 'base64_stateless' : undefined,
+      pagesOcrProcessed: imageUnits.length,
+      warnings: [...detectionWarnings, ...container.warnings, ...coverage.warnings],
+      sourceUnits, coverage,
+    } : {
+      error: 'No readable text was found in this document.', errorCode: 'EXTRACTION_EMPTY', detectedType: type,
+      warnings: [...detectionWarnings, ...container.warnings, ...coverage.warnings], sourceUnits, coverage,
+    };
+  } catch (error) {
+    console.warn('[DocumentExtraction] Structured container extraction failed', error);
+    return { error: 'This document container is corrupted or could not be read.', errorCode: 'CORRUPT_FILE', detectedType: type, warnings: detectionWarnings };
+  }
+}
+
 /** Ask OpenAI to read a PDF directly when local text extraction finds no selectable text. */
 async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<DocumentExtractionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -170,12 +256,18 @@ async function extractPdfTextWithOpenAIFileInput(buffer: Buffer): Promise<Docume
       text,
       method: 'ocr',
       ocrAttempted: true,
+      ocrProvider: 'openai',
+      ocrModel: 'gpt-5.4-mini',
+      ocrRequestMode: 'file_input',
     };
   } catch (err) {
     console.warn('[DocumentExtraction] OpenAI PDF file extraction failed:', err);
     return {
       error: 'AI PDF extraction failed for this PDF.',
       ocrAttempted: true,
+      ocrProvider: 'openai',
+      ocrModel: 'gpt-5.4-mini',
+      ocrRequestMode: 'file_input',
     };
   } finally {
     if (uploadedFileId) {
@@ -300,6 +392,9 @@ async function extractPdfTextFromImages(
       error: text ? undefined : 'OCR completed but did not return readable text.',
       method: 'ocr',
       ocrAttempted: true,
+      ocrProvider: 'openai',
+      ocrModel: 'gpt-5.4-mini',
+      ocrRequestMode: 'base64_stateless',
       pagesOcrProcessed: canonicalPages.length,
       pagesTotal,
       pages: canonicalPages,
@@ -319,6 +414,9 @@ async function extractPdfTextFromImages(
     return {
       error: 'OCR fallback failed for this scanned PDF.',
       ocrAttempted: true,
+      ocrProvider: 'openai',
+      ocrModel: 'gpt-5.4-mini',
+      ocrRequestMode: 'base64_stateless',
     };
   }
 }
@@ -351,9 +449,41 @@ export async function extractDocumentText(
 
   if (isText(file, detection)) {
     const text = normalizeText(await file.text());
+    const sourceUnits = singleTextUnit(text);
     return text
-      ? { text, method: 'txt', detectedType: detection.detectedType, warnings: detection.warnings }
+      ? { text, method: 'txt', detectedType: detection.detectedType, warnings: detection.warnings, sourceUnits, coverage: buildTextCoverageReceipt(sourceUnits) }
       : { error: 'The text file is empty.', errorCode: 'EXTRACTION_EMPTY', detectedType: detection.detectedType, warnings: detection.warnings };
+  }
+
+  if (['csv', 'html', 'rtf', 'eml'].includes(detection.detectedType)) {
+    const text = normalizeText(extractSimpleDocumentText(buffer, detection.detectedType));
+    const sourceUnits = singleTextUnit(text, detection.detectedType === 'eml' ? 'Email message' : 'Document text');
+    const rawPreview = buffer.subarray(0, Math.min(buffer.length, 2_000_000)).toString('utf8');
+    const omittedVisual = detection.detectedType === 'html' && /<img\b/i.test(rawPreview) ||
+      detection.detectedType === 'rtf' && /\\pict\b/i.test(rawPreview);
+    const omittedEmailAttachment = detection.detectedType === 'eml' && /content-disposition:\s*attachment/i.test(rawPreview);
+    if (omittedVisual || omittedEmailAttachment) {
+      sourceUnits.push({
+        unitIndex: sourceUnits.length,
+        unitLabel: omittedEmailAttachment ? 'Email attachment' : 'Embedded visual',
+        text: '', status: 'omitted', nativeTextChars: 0, canonicalTextChars: 0,
+        ocrApplied: false,
+        warnings: [omittedEmailAttachment ? 'EMAIL_ATTACHMENT_REQUIRES_SEPARATE_UPLOAD' : 'EMBEDDED_VISUAL_NOT_EXTRACTED'],
+      });
+    }
+    const coverage = buildTextCoverageReceipt(sourceUnits);
+    return text
+      ? { text, method: `${detection.detectedType}_native`, detectedType: detection.detectedType, warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage }
+      : { error: 'No readable text was found in this document.', errorCode: 'EXTRACTION_EMPTY', detectedType: detection.detectedType, warnings: detection.warnings };
+  }
+
+  if (detection.detectedType === 'image') {
+    const sourceUnits = [await ocrImageUnit({ label: 'Document image', filename: file.name, mimeType: inferImageMime(buffer, file.type), bytes: new Uint8Array(buffer) }, 0)];
+    const text = normalizeText(sourceUnits[0].text);
+    const coverage = buildTextCoverageReceipt(sourceUnits);
+    return text
+      ? { text, method: 'image_ocr', detectedType: 'image', ocrAttempted: true, ocrProvider: 'openai', ocrModel: 'gpt-5.4-mini', ocrRequestMode: 'base64_stateless', pagesOcrProcessed: 1, warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage }
+      : { error: 'No readable text was found in this image.', errorCode: 'OCR_EMPTY', detectedType: 'image', ocrAttempted: true, ocrProvider: 'openai', ocrModel: 'gpt-5.4-mini', ocrRequestMode: 'base64_stateless', warnings: [...detection.warnings, ...coverage.warnings], sourceUnits, coverage };
   }
 
   if (isPdf(file, detection)) {
@@ -552,18 +682,8 @@ export async function extractDocumentText(
     };
   }
 
-  if (isDocx(file, detection)) {
-    try {
-      const mammoth = await import('mammoth');
-      const result = await mammoth.extractRawText({ buffer });
-      const text = normalizeText(result.value ?? '');
-      return text
-        ? { text, method: 'docx_native', detectedType: detection.detectedType, warnings: detection.warnings }
-        : { error: 'No readable text was found in this DOCX file.', errorCode: 'EXTRACTION_EMPTY', detectedType: detection.detectedType, warnings: detection.warnings };
-    } catch (err) {
-      console.warn('[DocumentExtraction] DOCX text extraction failed:', err);
-      return { error: 'DOCX text extraction failed.', errorCode: 'CORRUPT_FILE', detectedType: detection.detectedType, warnings: detection.warnings };
-    }
+  if (isDocx(file, detection) || ['pptx', 'xlsx', 'odt'].includes(detection.detectedType)) {
+    return await extractContainerDocument(buffer, detection.detectedType, detection.warnings);
   }
 
   if (detection.detectedType === 'doc' || file.type === DOC_MIME || file.name.toLowerCase().endsWith('.doc')) {

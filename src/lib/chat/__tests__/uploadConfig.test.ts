@@ -11,15 +11,23 @@ describe('chat upload config', () => {
   });
 
   it('keeps legacy DOC disabled by default', () => {
-    expect(getChatUploadAccept()).toBe('.pdf,.docx,.txt');
+    expect(getChatUploadAccept()).toContain('.pdf,.docx,.txt,.pptx,.xlsx');
     expect(validateChatUploadFile(fileMetadata('order.doc', 'application/msword'))).toContain('Legacy .doc support');
   });
 
   it('allows legacy DOC only behind the public rollout flag', () => {
     vi.stubEnv('NEXT_PUBLIC_ENABLE_LEGACY_DOC_EXTRACTION', 'true');
 
-    expect(getChatUploadAccept()).toBe('.pdf,.docx,.doc,.txt');
+    expect(getChatUploadAccept()).toContain('.pdf,.docx,.doc,.txt,.pptx');
     expect(validateChatUploadFile(fileMetadata('order.doc', 'application/msword'))).toBeNull();
+  });
+
+  it('allows capability-gated document, image, spreadsheet, presentation, and email formats', () => {
+    expect(validateChatUploadFile(fileMetadata('scan.png', 'image/png'))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('hearing.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('ledger.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('messages.eml', 'message/rfc822'))).toBeNull();
+    expect(validateChatUploadFile(fileMetadata('records.csv', 'text/csv'))).toBeNull();
   });
 
   it('allows standard files when browsers report generic MIME', () => {

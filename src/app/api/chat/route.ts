@@ -26,6 +26,8 @@ type ChatAttachmentRef = {
   pagesTotal?: number;
   contextTruncated?: boolean;
   extractionWarnings?: string[];
+  coverageStatus?: 'complete' | 'partial' | 'failed' | 'unverified';
+  fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -338,6 +340,8 @@ export async function POST(req: NextRequest) {
         pagesTotal: attachment.pagesTotal,
         contextTruncated: attachment.contextTruncated,
         extractionWarnings: attachment.extractionWarnings,
+        coverageStatus: attachment.coverageStatus,
+        fullDocumentReviewStatus: attachment.fullDocumentReviewStatus,
       })),
       persistUserMessage: persistUserMessage !== false,
       retryOfAssistantMessageId: retryOfAssistantMessageId

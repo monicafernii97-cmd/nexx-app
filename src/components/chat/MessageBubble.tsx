@@ -70,6 +70,8 @@ type UserAttachmentMetadata = {
     pagesTotal?: number;
     contextTruncated?: boolean;
     extractionWarnings?: string[];
+    coverageStatus?: string;
+    fullDocumentReviewStatus?: string;
 };
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
@@ -217,6 +219,10 @@ function getUserAttachments(metadata: unknown) {
             extractionWarnings: Array.isArray(record.extractionWarnings)
                 ? record.extractionWarnings.filter((warning): warning is string => typeof warning === 'string').slice(0, 3)
                 : undefined,
+            coverageStatus: typeof record.coverageStatus === 'string' ? record.coverageStatus : undefined,
+            fullDocumentReviewStatus: typeof record.fullDocumentReviewStatus === 'string'
+                ? record.fullDocumentReviewStatus
+                : undefined,
         }];
     }).slice(0, 5);
 }
@@ -230,7 +236,10 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                 const coverageText = attachment.pagesTotal !== undefined
                     ? `${attachment.pagesProcessed ?? 0}/${attachment.pagesTotal} pages explicitly accounted for`
                     : 'Page-by-page coverage verification pending';
-                const hasWarning = attachment.analysisMode === 'full_document_review' ||
+                const fullReviewPending = attachment.analysisMode === 'full_document_review' && (
+                    attachment.coverageStatus !== 'complete' || attachment.fullDocumentReviewStatus !== 'ready'
+                );
+                const hasWarning = fullReviewPending ||
                     attachment.status === 'partial' ||
                     attachment.contextTruncated ||
                     Boolean(attachment.extractionWarnings?.length);
@@ -260,7 +269,9 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                         {hasWarning && (
                             <div className="mt-1 flex items-start gap-1 text-[11px] leading-4 text-amber-500">
                                 <WarningCircle size={13} className="mt-0.5 shrink-0" />
-                                <span>Extraction is usable, but complete source coverage has not been verified.</span>
+                                <span>{attachment.coverageStatus === 'complete'
+                                    ? 'Every source page is accounted for; exhaustive review synthesis is still being prepared.'
+                                    : 'Extraction is usable, but complete source coverage has not been verified.'}</span>
                             </div>
                         )}
                     </div>

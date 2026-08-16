@@ -35,6 +35,8 @@ export type ChatAttachmentRef = {
   pagesTotal?: number;
   contextTruncated?: boolean;
   extractionWarnings?: string[];
+  coverageStatus?: 'complete' | 'partial' | 'failed' | 'unverified';
+  fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
 };
 
 export function getChatUploadExtension(filename: string) {

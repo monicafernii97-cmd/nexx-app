@@ -46,6 +46,11 @@ describe('mistralOcr', () => {
     expect(shouldTryMistralOcrForPdf({ parserFailed: true })).toBe(true);
 
     expect(shouldTryMistralOcrForPdf({ nativeTextLength: 500, nativeSucceeded: true })).toBe(false);
+    expect(shouldTryMistralOcrForPdf({
+      nativeTextLength: 500,
+      nativeSucceeded: true,
+      hasLowTextPages: true,
+    })).toBe(true);
     vi.stubEnv('LEGAL_HIGH_QUALITY_PROCESSING', 'true');
     expect(shouldTryMistralOcrForPdf({ nativeTextLength: 500, nativeSucceeded: true })).toBe(true);
   });
@@ -106,6 +111,13 @@ describe('mistralOcr', () => {
     expect(result.ocrTablesDetected).toBe(1);
     expect(result.estimatedOcrCostUsd).toBe(0.008);
     expect(result.ocrProviderRequestId).toBe('req-123');
+    expect(result.pages).toHaveLength(2);
+    expect(result.pages?.[0]).toMatchObject({
+      pageNumber: 1,
+      sourcePageIndex: 0,
+      canonicalSource: 'ocr',
+      status: 'succeeded',
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];

@@ -827,6 +827,7 @@ export default defineSchema({
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         uploadedFileId: v.id('uploadedFiles'),
+        coverageManifestId: v.optional(v.id('documentCoverageManifests')),
         generationNumber: v.number(),
         status: documentMemoryGenerationStatusValidator,
         sourceFileHash: v.optional(v.string()),
@@ -869,6 +870,68 @@ export default defineSchema({
         .index('by_clerk_status', ['clerkUserId', 'status'])
         .index('by_case_status', ['caseId', 'status'])
         .index('by_org_status', ['orgId', 'status']),
+
+    documentCoverageManifests: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        clerkUserId: v.string(),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        version: v.string(),
+        unitKind: v.union(v.literal('page'), v.literal('text')),
+        expectedUnits: v.number(),
+        attemptedUnits: v.number(),
+        succeededUnits: v.number(),
+        lowConfidenceUnits: v.number(),
+        verifiedBlankUnits: v.number(),
+        failedUnits: v.number(),
+        omittedUnits: v.number(),
+        nextUnitIndex: v.number(),
+        status: v.union(
+            v.literal('complete'),
+            v.literal('partial'),
+            v.literal('failed'),
+            v.literal('unverified')
+        ),
+        warnings: v.array(v.string()),
+        verifiedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_generation', ['memoryGenerationId'])
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_file_status', ['uploadedFileId', 'status']),
+
+    documentSourceUnitCoverage: defineTable({
+        manifestId: v.id('documentCoverageManifests'),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        pageId: v.optional(v.id('documentPages')),
+        clerkUserId: v.string(),
+        unitKind: v.union(v.literal('page'), v.literal('text')),
+        unitIndex: v.number(),
+        unitLabel: v.string(),
+        status: v.union(
+            v.literal('succeeded'),
+            v.literal('low_confidence'),
+            v.literal('verified_blank'),
+            v.literal('failed'),
+            v.literal('omitted')
+        ),
+        extractionMethod: v.optional(v.string()),
+        nativeTextChars: v.number(),
+        canonicalTextChars: v.number(),
+        ocrApplied: v.boolean(),
+        confidence: v.optional(v.object({
+            average: v.optional(v.number()),
+            minimum: v.optional(v.number()),
+        })),
+        warnings: v.array(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_manifest_unit', ['manifestId', 'unitIndex'])
+        .index('by_generation_unit', ['memoryGenerationId', 'unitIndex'])
+        .index('by_file_unit', ['uploadedFileId', 'unitIndex']),
 
     documentExtractionAttempts: defineTable({
         orgId: v.optional(v.string()),
@@ -960,6 +1023,13 @@ export default defineSchema({
         ocrMarkdown: v.optional(v.string()),
         canonicalText: v.optional(v.string()),
         canonicalSource: v.optional(documentCanonicalSourceValidator),
+        sourceUnitStatus: v.optional(v.union(
+            v.literal('succeeded'),
+            v.literal('low_confidence'),
+            v.literal('verified_blank'),
+            v.literal('failed'),
+            v.literal('omitted')
+        )),
         headerText: v.optional(v.string()),
         footerText: v.optional(v.string()),
         textLength: v.number(),
@@ -1652,6 +1722,23 @@ export default defineSchema({
         openaiTextFileId: v.optional(v.string()),
         vectorStoreId: v.optional(v.string()),
         activeMemoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
+        activeCoverageManifestId: v.optional(v.id('documentCoverageManifests')),
+        coverageStatus: v.optional(v.union(
+            v.literal('complete'),
+            v.literal('partial'),
+            v.literal('failed'),
+            v.literal('unverified')
+        )),
+        coverageExpectedUnits: v.optional(v.number()),
+        coverageAccountedUnits: v.optional(v.number()),
+        coverageVerifiedAt: v.optional(v.number()),
+        fullDocumentReviewStatus: v.optional(v.union(
+            v.literal('not_started'),
+            v.literal('building'),
+            v.literal('ready'),
+            v.literal('partial'),
+            v.literal('failed')
+        )),
         latestGenerationNumber: v.optional(v.number()),
         extractionError: v.optional(v.string()),
         indexingError: v.optional(v.string()),

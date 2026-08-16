@@ -639,6 +639,7 @@ type AttachmentContext = {
     pagesProcessed?: number;
     pagesTotal?: number;
     coverageStatus?: DocumentCoverageStatus;
+    fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
     documentChunks?: DocumentChunkContext[];
 };
 
@@ -2894,6 +2895,7 @@ export const processChatGenerationJob = internalAction({
                             filename: attachment.filename,
                             status: attachment.status,
                             coverageStatus: attachment.coverageStatus,
+                            fullDocumentReviewStatus: attachment.fullDocumentReviewStatus,
                             pagesProcessed: attachment.pagesProcessed,
                             pagesTotal: attachment.pagesTotal,
                             contextTruncated: attachment.contextTruncated,

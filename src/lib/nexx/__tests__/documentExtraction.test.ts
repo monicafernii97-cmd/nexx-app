@@ -55,7 +55,9 @@ describe('extractDocumentText', () => {
 
     expect(result.text).toBe('Readable fallback court order text.');
     expect(result.detectedType).toBe('pdf');
-    expect(result.method).toBe('pdf_file_input');
+    expect(result.method).toBe('pdf_file_input_unpaged');
+    expect(result.coverage).toBeUndefined();
+    expect(result.warnings).toContain('SOURCE_PAGE_COVERAGE_UNAVAILABLE');
     expect(result.warnings).toContain('PDF_LOCAL_TEXT_EXTRACTION_FAILED');
     expect(mocks.filesCreate).toHaveBeenCalledTimes(1);
     expect(mocks.responsesCreate).toHaveBeenCalledTimes(1);

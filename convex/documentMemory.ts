@@ -7,7 +7,27 @@ const DOCUMENT_MEMORY_RESET_BATCH_LIMIT = 100;
 
 const pageArtifactValidator = v.object({
   pageNumber: v.number(),
+  sourcePageIndex: v.optional(v.number()),
   text: v.string(),
+  nativeText: v.optional(v.string()),
+  ocrMarkdown: v.optional(v.string()),
+  canonicalSource: v.optional(v.union(v.literal('native'), v.literal('ocr'), v.literal('hybrid'))),
+  sourceUnitStatus: v.optional(v.union(
+    v.literal('succeeded'),
+    v.literal('low_confidence'),
+    v.literal('verified_blank'),
+    v.literal('failed'),
+    v.literal('omitted'),
+  )),
+  confidence: v.optional(v.object({
+    average: v.optional(v.number()),
+    minimum: v.optional(v.number()),
+  })),
+  dimensions: v.optional(v.object({
+    width: v.number(),
+    height: v.number(),
+    dpi: v.optional(v.number()),
+  })),
   textLength: v.number(),
   startChar: v.optional(v.number()),
   endChar: v.optional(v.number()),
@@ -253,7 +273,7 @@ export const insertDocumentPageBatch = internalMutation({
     if (!uploadedFile) throw new Error('Uploaded file not found');
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
-    const canonicalSource = canonicalSourceForUploadedFile(uploadedFile);
+    const fallbackCanonicalSource = canonicalSourceForUploadedFile(uploadedFile);
     const inserted: Array<{
       pageNumber: number;
       pageId: Id<'documentPages'>;
@@ -270,15 +290,18 @@ export const insertDocumentPageBatch = internalMutation({
         conversationId: uploadedFile.conversationId,
         caseId: uploadedFile.caseId,
         pageNumber: page.pageNumber,
-        sourcePageIndex: page.pageNumber - 1,
+        sourcePageIndex: page.sourcePageIndex ?? page.pageNumber - 1,
         startChar: page.startChar,
         endChar: page.endChar,
         text: page.text,
         textLength: page.textLength,
-        nativeText: canonicalSource === 'native' ? page.text : undefined,
-        ocrMarkdown: canonicalSource === 'ocr' ? page.text : undefined,
+        nativeText: page.nativeText ?? (fallbackCanonicalSource === 'native' ? page.text : undefined),
+        ocrMarkdown: page.ocrMarkdown ?? (fallbackCanonicalSource === 'ocr' ? page.text : undefined),
         canonicalText: page.text,
-        canonicalSource,
+        canonicalSource: page.canonicalSource ?? fallbackCanonicalSource,
+        sourceUnitStatus: page.sourceUnitStatus,
+        dimensions: page.dimensions,
+        confidence: page.confidence,
         extractionMethod: uploadedFile.extractionMethod,
         warnings: page.warnings,
         isSynthetic: page.isSynthetic,

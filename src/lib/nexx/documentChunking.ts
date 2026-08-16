@@ -1,3 +1,5 @@
+import type { CanonicalExtractedPage } from './documentExtractionTypes';
+
 export const DOCUMENT_CHUNKING_VERSION = 'document-chunking-v2-legal-artifacts';
 
 const SYNTHETIC_PAGE_TARGET_CHARS = 12_000;
@@ -32,7 +34,21 @@ export type DocumentRetrievalMetadata = {
 
 export type DocumentMemoryPageArtifact = {
   pageNumber: number;
+  sourcePageIndex?: number;
   text: string;
+  nativeText?: string;
+  ocrMarkdown?: string;
+  canonicalSource?: 'native' | 'ocr' | 'hybrid';
+  sourceUnitStatus?: 'succeeded' | 'low_confidence' | 'verified_blank' | 'failed' | 'omitted';
+  confidence?: {
+    average?: number;
+    minimum?: number;
+  };
+  dimensions?: {
+    width: number;
+    height: number;
+    dpi?: number;
+  };
   textLength: number;
   startChar: number;
   endChar: number;
@@ -273,6 +289,35 @@ function buildSyntheticPages(text: string) {
   return pages;
 }
 
+function buildSourcePages(text: string, extractedPages: CanonicalExtractedPage[]) {
+  let searchOffset = 0;
+  return [...extractedPages]
+    .sort((a, b) => a.pageNumber - b.pageNumber)
+    .map((page): DocumentMemoryPageArtifact => {
+      const canonicalText = normalizeExtractedText(page.canonicalText);
+      const locatedAt = canonicalText ? text.indexOf(canonicalText, searchOffset) : -1;
+      const startChar = locatedAt >= 0 ? locatedAt : searchOffset;
+      const endChar = startChar + canonicalText.length;
+      searchOffset = Math.max(searchOffset, endChar);
+      return {
+        pageNumber: page.pageNumber,
+        sourcePageIndex: page.sourcePageIndex,
+        text: canonicalText,
+        nativeText: page.nativeText,
+        ocrMarkdown: page.ocrMarkdown,
+        canonicalSource: page.canonicalSource,
+        sourceUnitStatus: page.status,
+        confidence: page.confidence,
+        dimensions: page.dimensions,
+        textLength: canonicalText.length,
+        startChar,
+        endChar,
+        isSynthetic: false,
+        warnings: page.warnings,
+      };
+    });
+}
+
 function splitPageIntoBlockArtifacts(page: DocumentMemoryPageArtifact, initialBlockIndex: number, initialTableIndex: number) {
   const blocks: DocumentMemoryBlockArtifact[] = [];
   const tables: DocumentMemoryTableArtifact[] = [];
@@ -427,7 +472,10 @@ function buildChunksFromBlocks(blocks: DocumentMemoryBlockArtifact[]) {
   return chunks;
 }
 
-export function buildDocumentMemoryArtifacts(text: string): DocumentMemoryArtifacts {
+export function buildDocumentMemoryArtifacts(
+  text: string,
+  options: { pages?: CanonicalExtractedPage[] } = {},
+): DocumentMemoryArtifacts {
   const normalizedText = normalizeExtractedText(text);
   if (!normalizedText) {
     return {
@@ -440,9 +488,14 @@ export function buildDocumentMemoryArtifacts(text: string): DocumentMemoryArtifa
     };
   }
 
-  const pages = buildSyntheticPages(normalizedText);
+  const pages = options.pages?.length
+    ? buildSourcePages(normalizedText, options.pages)
+    : buildSyntheticPages(normalizedText);
   const { blocks, tables } = buildBlocksAndTables(pages);
   const chunks = buildChunksFromBlocks(blocks);
+  const warnings = options.pages?.length
+    ? Array.from(new Set(options.pages.flatMap((page) => page.warnings)))
+    : ['PAGE_BOUNDARIES_UNAVAILABLE'];
 
   return {
     chunkingVersion: DOCUMENT_CHUNKING_VERSION,
@@ -450,6 +503,6 @@ export function buildDocumentMemoryArtifacts(text: string): DocumentMemoryArtifa
     blocks,
     tables,
     chunks,
-    warnings: ['PAGE_BOUNDARIES_UNAVAILABLE'],
+    warnings,
   };
 }

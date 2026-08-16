@@ -207,9 +207,20 @@ async function writeDocumentMemoryArtifacts(
     memoryGenerationId: Id<'documentMemoryGenerations'>;
     generationNumber: number;
   };
+  let coverageManifestId: Id<'documentCoverageManifests'> | undefined;
   let generationMarkedFailed = false;
 
   try {
+    if (extraction.coverage?.unitKind === 'page' && extraction.coverage.expectedUnits > 0) {
+      coverageManifestId = (await ctx.runMutation(internal.documentMemoryGenerations.createCoverageManifest, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        unitKind: 'page',
+        expectedUnits: extraction.coverage.expectedUnits,
+        warnings: extraction.coverage.warnings,
+      }) as { coverageManifestId: Id<'documentCoverageManifests'> }).coverageManifestId;
+    }
+
     await ctx.runMutation(internal.documentMemoryGenerations.recordExtractionAttempt, {
       uploadedFileId,
       memoryGenerationId: generation.memoryGenerationId,
@@ -226,8 +237,10 @@ async function writeDocumentMemoryArtifacts(
       status: artifacts.pages.length > 0 && artifacts.chunks.length > 0 ? 'succeeded' : 'empty',
       startedAt: extractionStartedAt,
       finishedAt: Date.now(),
-      pageCountAttempted: extraction.pagesTotal ?? artifacts.pages.length,
-      pageCountSucceeded: extraction.pagesOcrProcessed ?? artifacts.pages.length,
+      pageCountAttempted: extraction.coverage?.attemptedUnits ?? extraction.pagesTotal ?? artifacts.pages.length,
+      pageCountSucceeded: extraction.coverage
+        ? extraction.coverage.succeededUnits + extraction.coverage.verifiedBlankUnits
+        : extraction.pagesOcrProcessed ?? artifacts.pages.length,
       averageConfidence: extraction.ocrAverageConfidence,
       minConfidence: extraction.ocrMinConfidence,
       warnings: extraction.warnings ?? [],
@@ -248,6 +261,45 @@ async function writeDocumentMemoryArtifacts(
         pages,
       }) as { pages: StoredDocumentPageRef[] };
       storedPageRefs.push(...result.pages);
+    }
+
+    if (coverageManifestId && extraction.coverage) {
+      const pageArtifactBySourceIndex = new Map(
+        artifacts.pages.map((page) => [page.sourcePageIndex ?? page.pageNumber - 1, page]),
+      );
+      const pageIdByPageNumber = new Map(storedPageRefs.map((page) => [page.pageNumber, page.pageId]));
+      const coverageUnits = Array.from(
+        { length: extraction.coverage.expectedUnits },
+        (_, unitIndex) => {
+          const page = pageArtifactBySourceIndex.get(unitIndex);
+          return {
+            pageId: page ? pageIdByPageNumber.get(page.pageNumber) : undefined,
+            unitIndex,
+            unitLabel: `Page ${unitIndex + 1}`,
+            status: page?.sourceUnitStatus ?? 'omitted' as const,
+            extractionMethod: extraction.method,
+            nativeTextChars: page?.nativeText?.length ?? 0,
+            canonicalTextChars: page?.text.length ?? 0,
+            ocrApplied: page?.canonicalSource === 'ocr' || page?.canonicalSource === 'hybrid',
+            confidence: page?.confidence,
+            warnings: page?.warnings ?? ['SOURCE_PAGE_OMITTED'],
+          };
+        },
+      );
+      for (const units of chunkArray(coverageUnits, batchSize)) {
+        await ctx.runMutation(internal.documentMemoryGenerations.insertCoverageUnitBatch, {
+          uploadedFileId,
+          memoryGenerationId: generation.memoryGenerationId,
+          coverageManifestId,
+          unitKind: 'page',
+          units,
+        });
+      }
+      await ctx.runMutation(internal.documentMemoryGenerations.finalizeCoverageManifest, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        coverageManifestId,
+      });
     }
 
     const storedBlockRefs: StoredDocumentBlockRef[] = [];
@@ -309,6 +361,7 @@ async function writeDocumentMemoryArtifacts(
       pageCount: artifacts.pages.length,
       chunkCount: artifacts.chunks.length,
       chunkingVersion: artifacts.chunkingVersion,
+      coverageManifestId,
       warnings: artifacts.warnings,
     }) as { activated: boolean; failedChecks: string[] };
 
@@ -698,7 +751,9 @@ export const processStoredUpload = internalAction({
       let memoryIndexingError: string | undefined;
       let activeMemoryGenerationId: Id<'documentMemoryGenerations'> | undefined;
       try {
-        const documentMemory = buildDocumentMemoryArtifacts(extractedText);
+        const documentMemory = buildDocumentMemoryArtifacts(extractedText, {
+          pages: extraction.pages,
+        });
         const generation = await writeDocumentMemoryArtifacts(
           ctx,
           context,

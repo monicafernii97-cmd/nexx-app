@@ -131,6 +131,19 @@ const attachmentRefValidator = v.object({
     pagesTotal: v.optional(v.number()),
     contextTruncated: v.optional(v.boolean()),
     extractionWarnings: v.optional(v.array(v.string())),
+    coverageStatus: v.optional(v.union(
+        v.literal('complete'),
+        v.literal('partial'),
+        v.literal('failed'),
+        v.literal('unverified')
+    )),
+    fullDocumentReviewStatus: v.optional(v.union(
+        v.literal('not_started'),
+        v.literal('building'),
+        v.literal('ready'),
+        v.literal('partial'),
+        v.literal('failed')
+    )),
 });
 
 /**
@@ -252,9 +265,11 @@ function buildUploadedFileContext(
         return null;
     }
 
-    const hasKnownPageShortfall = uploadedFile.pagesTotal !== undefined &&
-        uploadedFile.pagesOcrProcessed !== undefined &&
-        uploadedFile.pagesOcrProcessed < uploadedFile.pagesTotal;
+    const pagesProcessed = uploadedFile.coverageAccountedUnits ?? uploadedFile.pagesOcrProcessed;
+    const pagesTotal = uploadedFile.coverageExpectedUnits ?? uploadedFile.pagesTotal;
+    const hasKnownPageShortfall = pagesTotal !== undefined &&
+        pagesProcessed !== undefined &&
+        pagesProcessed < pagesTotal;
 
     return {
         uploadedFileId: uploadedFile._id,
@@ -275,11 +290,14 @@ function buildUploadedFileContext(
         contextTruncated: uploadedFile.contextTruncated,
         indexingError: uploadedFile.indexingError,
         extractionError: uploadedFile.extractionError,
-        pagesProcessed: uploadedFile.pagesOcrProcessed,
-        pagesTotal: uploadedFile.pagesTotal,
-        coverageStatus: (uploadedFile.status === 'partial' || hasKnownPageShortfall || uploadedFile.contextTruncated)
-            ? 'partial' as const
-            : 'unverified' as const,
+        pagesProcessed,
+        pagesTotal,
+        coverageStatus: uploadedFile.coverageStatus === 'complete'
+            ? 'complete' as const
+            : (uploadedFile.status === 'partial' || hasKnownPageShortfall || uploadedFile.coverageStatus === 'partial')
+                ? 'partial' as const
+                : 'unverified' as const,
+        fullDocumentReviewStatus: uploadedFile.fullDocumentReviewStatus,
     };
 }
 
@@ -876,10 +894,12 @@ export const acceptChatTurn = mutation({
                 status: uploadedFile.status as 'ready' | 'partial',
                 analysisMode: uploadSession.intent === 'court_order' ? 'full_document_review' as const : attachment.analysisMode,
                 extractionMethod: uploadedFile.extractionMethod,
-                pagesProcessed: uploadedFile.pagesOcrProcessed,
-                pagesTotal: uploadedFile.pagesTotal,
+                pagesProcessed: uploadedFile.coverageAccountedUnits ?? uploadedFile.pagesOcrProcessed,
+                pagesTotal: uploadedFile.coverageExpectedUnits ?? uploadedFile.pagesTotal,
                 contextTruncated: uploadedFile.contextTruncated,
                 extractionWarnings: uploadedFile.extractionWarnings,
+                coverageStatus: uploadedFile.coverageStatus,
+                fullDocumentReviewStatus: uploadedFile.fullDocumentReviewStatus,
             });
         }
 
@@ -1098,6 +1118,8 @@ export const acceptChatTurn = mutation({
                         pagesTotal: attachment.pagesTotal,
                         contextTruncated: attachment.contextTruncated,
                         extractionWarnings: attachment.extractionWarnings,
+                        coverageStatus: attachment.coverageStatus,
+                        fullDocumentReviewStatus: attachment.fullDocumentReviewStatus,
                     })),
                 },
                 requestId: `${args.requestId}-user`,

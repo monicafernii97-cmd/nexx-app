@@ -48,6 +48,34 @@ const extractionAttemptStatusValidator = v.union(
   v.literal('cancelled'),
 );
 
+const coverageUnitKindValidator = v.union(v.literal('page'), v.literal('text'));
+const coverageUnitStatusValidator = v.union(
+  v.literal('succeeded'),
+  v.literal('low_confidence'),
+  v.literal('verified_blank'),
+  v.literal('failed'),
+  v.literal('omitted'),
+);
+
+const coverageUnitValidator = v.object({
+  pageId: v.optional(v.id('documentPages')),
+  unitIndex: v.number(),
+  unitLabel: v.string(),
+  status: coverageUnitStatusValidator,
+  extractionMethod: v.optional(v.string()),
+  nativeTextChars: v.number(),
+  canonicalTextChars: v.number(),
+  ocrApplied: v.boolean(),
+  confidence: v.optional(v.object({
+    average: v.optional(v.number()),
+    minimum: v.optional(v.number()),
+  })),
+  warnings: v.array(v.string()),
+});
+
+const COVERAGE_MANIFEST_VERSION = 'source-unit-coverage-v1';
+const COVERAGE_BATCH_LIMIT = 50;
+
 function sourceHashForFile(file: {
   sha256Hash?: string;
   storageSha256?: string;
@@ -494,6 +522,199 @@ export const failGeneration = internalMutation({
   },
 });
 
+export const createCoverageManifest = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    unitKind: coverageUnitKindValidator,
+    expectedUnits: v.number(),
+    warnings: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    assertPositiveInteger('expectedUnits', args.expectedUnits);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    const generation = await ctx.db.get(args.memoryGenerationId);
+    if (!uploadedFile || !generation || generation.uploadedFileId !== args.uploadedFileId) {
+      throw new Error('Document memory generation not found for coverage manifest');
+    }
+    if (generation.status !== 'building') {
+      throw new Error(`Cannot create coverage manifest for ${generation.status} generation`);
+    }
+    const existing = await ctx.db
+      .query('documentCoverageManifests')
+      .withIndex('by_generation', (q) => q.eq('memoryGenerationId', args.memoryGenerationId))
+      .unique();
+    if (existing) return { coverageManifestId: existing._id };
+
+    const now = Date.now();
+    const coverageManifestId = await ctx.db.insert('documentCoverageManifests', {
+      uploadedFileId: args.uploadedFileId,
+      memoryGenerationId: args.memoryGenerationId,
+      clerkUserId: uploadedFile.clerkUserId,
+      conversationId: uploadedFile.conversationId,
+      caseId: uploadedFile.caseId,
+      version: COVERAGE_MANIFEST_VERSION,
+      unitKind: args.unitKind,
+      expectedUnits: args.expectedUnits,
+      attemptedUnits: 0,
+      succeededUnits: 0,
+      lowConfidenceUnits: 0,
+      verifiedBlankUnits: 0,
+      failedUnits: 0,
+      omittedUnits: 0,
+      nextUnitIndex: 0,
+      status: 'unverified',
+      warnings: args.warnings ?? [],
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(args.memoryGenerationId, { coverageManifestId });
+    return { coverageManifestId };
+  },
+});
+
+export const insertCoverageUnitBatch = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    coverageManifestId: v.id('documentCoverageManifests'),
+    unitKind: coverageUnitKindValidator,
+    units: v.array(coverageUnitValidator),
+  },
+  handler: async (ctx, args) => {
+    if (args.units.length === 0 || args.units.length > COVERAGE_BATCH_LIMIT) {
+      throw new Error(`Coverage batch must contain between 1 and ${COVERAGE_BATCH_LIMIT} units`);
+    }
+    const manifest = await ctx.db.get(args.coverageManifestId);
+    if (
+      !manifest ||
+      manifest.uploadedFileId !== args.uploadedFileId ||
+      manifest.memoryGenerationId !== args.memoryGenerationId ||
+      manifest.unitKind !== args.unitKind ||
+      manifest.status !== 'unverified'
+    ) {
+      throw new Error('Coverage manifest is not writable for this generation');
+    }
+    const sorted = [...args.units].sort((a, b) => a.unitIndex - b.unitIndex);
+    sorted.forEach((unit, offset) => {
+      if (unit.unitIndex !== manifest.nextUnitIndex + offset) {
+        throw new Error('Coverage units must be contiguous and appended in source order');
+      }
+      if (unit.unitIndex >= manifest.expectedUnits) {
+        throw new Error('Coverage unit exceeds the manifest expected unit count');
+      }
+      assertNonNegativeInteger('nativeTextChars', unit.nativeTextChars);
+      assertNonNegativeInteger('canonicalTextChars', unit.canonicalTextChars);
+      assertOptionalConfidence('confidence.average', unit.confidence?.average);
+      assertOptionalConfidence('confidence.minimum', unit.confidence?.minimum);
+    });
+
+    for (const unit of sorted) {
+      if (unit.pageId) {
+        const page = await ctx.db.get(unit.pageId);
+        if (
+          !page ||
+          page.uploadedFileId !== args.uploadedFileId ||
+          page.memoryGenerationId !== args.memoryGenerationId ||
+          page.sourcePageIndex !== unit.unitIndex
+        ) {
+          throw new Error(`Coverage unit ${unit.unitIndex} does not match its persisted source page`);
+        }
+      }
+      await ctx.db.insert('documentSourceUnitCoverage', {
+        manifestId: args.coverageManifestId,
+        uploadedFileId: args.uploadedFileId,
+        memoryGenerationId: args.memoryGenerationId,
+        pageId: unit.pageId,
+        clerkUserId: manifest.clerkUserId,
+        unitKind: args.unitKind,
+        unitIndex: unit.unitIndex,
+        unitLabel: unit.unitLabel,
+        status: unit.status,
+        extractionMethod: unit.extractionMethod,
+        nativeTextChars: unit.nativeTextChars,
+        canonicalTextChars: unit.canonicalTextChars,
+        ocrApplied: unit.ocrApplied,
+        confidence: unit.confidence,
+        warnings: unit.warnings,
+        createdAt: Date.now(),
+      });
+    }
+
+    const count = (status: typeof sorted[number]['status']) => sorted.filter((unit) => unit.status === status).length;
+    await ctx.db.patch(args.coverageManifestId, {
+      attemptedUnits: manifest.attemptedUnits + sorted.length,
+      succeededUnits: manifest.succeededUnits + count('succeeded'),
+      lowConfidenceUnits: manifest.lowConfidenceUnits + count('low_confidence'),
+      verifiedBlankUnits: manifest.verifiedBlankUnits + count('verified_blank'),
+      failedUnits: manifest.failedUnits + count('failed'),
+      omittedUnits: manifest.omittedUnits + count('omitted'),
+      nextUnitIndex: manifest.nextUnitIndex + sorted.length,
+      updatedAt: Date.now(),
+    });
+    return { inserted: sorted.length };
+  },
+});
+
+export const finalizeCoverageManifest = internalMutation({
+  args: {
+    uploadedFileId: v.id('uploadedFiles'),
+    memoryGenerationId: v.id('documentMemoryGenerations'),
+    coverageManifestId: v.id('documentCoverageManifests'),
+  },
+  handler: async (ctx, args) => {
+    const manifest = await ctx.db.get(args.coverageManifestId);
+    if (
+      !manifest ||
+      manifest.uploadedFileId !== args.uploadedFileId ||
+      manifest.memoryGenerationId !== args.memoryGenerationId
+    ) {
+      throw new Error('Coverage manifest not found for generation');
+    }
+    const accountedUnits = manifest.succeededUnits + manifest.lowConfidenceUnits +
+      manifest.verifiedBlankUnits + manifest.failedUnits + manifest.omittedUnits;
+    const hasCompleteAccounting = manifest.attemptedUnits === manifest.expectedUnits &&
+      manifest.nextUnitIndex === manifest.expectedUnits &&
+      accountedUnits === manifest.expectedUnits;
+    const isComplete = hasCompleteAccounting &&
+      manifest.failedUnits === 0 &&
+      manifest.lowConfidenceUnits === 0 &&
+      manifest.omittedUnits === 0;
+    const status = isComplete
+      ? 'complete' as const
+      : manifest.attemptedUnits === 0
+        ? 'failed' as const
+        : 'partial' as const;
+    const now = Date.now();
+    await ctx.db.patch(args.coverageManifestId, {
+      status,
+      verifiedAt: isComplete ? now : undefined,
+      warnings: Array.from(new Set([
+        ...manifest.warnings,
+        ...(!hasCompleteAccounting ? ['SOURCE_UNIT_ACCOUNTING_INCOMPLETE'] : []),
+        ...(manifest.failedUnits > 0 ? ['SOURCE_UNITS_FAILED'] : []),
+        ...(manifest.lowConfidenceUnits > 0 ? ['SOURCE_UNITS_LOW_CONFIDENCE'] : []),
+        ...(manifest.omittedUnits > 0 ? ['SOURCE_UNITS_OMITTED'] : []),
+      ])),
+      updatedAt: now,
+    });
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
+    const generation = await ctx.db.get(args.memoryGenerationId);
+    if (uploadedFile && generation && uploadedFile.latestGenerationNumber === generation.generationNumber) {
+      await ctx.db.patch(args.uploadedFileId, {
+        activeCoverageManifestId: args.coverageManifestId,
+        coverageStatus: status,
+        coverageExpectedUnits: manifest.expectedUnits,
+        coverageAccountedUnits: accountedUnits,
+        coverageVerifiedAt: isComplete ? now : undefined,
+        fullDocumentReviewStatus: 'not_started',
+        updatedAt: now,
+      });
+    }
+    return { status, accountedUnits, expectedUnits: manifest.expectedUnits };
+  },
+});
+
 export const validateAndActivateGeneration = internalMutation({
   args: {
     uploadedFileId: v.id('uploadedFiles'),
@@ -501,6 +722,7 @@ export const validateAndActivateGeneration = internalMutation({
     pageCount: v.number(),
     chunkCount: v.number(),
     chunkingVersion: v.string(),
+    coverageManifestId: v.optional(v.id('documentCoverageManifests')),
     warnings: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
@@ -542,6 +764,32 @@ export const validateAndActivateGeneration = internalMutation({
       checks.push('page_coverage');
     } else {
       failedChecks.push('page_coverage');
+    }
+
+    const coverageManifest = args.coverageManifestId
+      ? await ctx.db.get(args.coverageManifestId)
+      : null;
+    if (args.coverageManifestId) {
+      const expectedPages = generation.counts.pagesExpected;
+      const hasRealSourcePageCoverage =
+        generation.coverageManifestId === args.coverageManifestId &&
+        coverageManifest?.uploadedFileId === args.uploadedFileId &&
+        coverageManifest.memoryGenerationId === args.memoryGenerationId &&
+        coverageManifest.unitKind === 'page' &&
+        coverageManifest.status === 'complete' &&
+        coverageManifest.expectedUnits === args.pageCount &&
+        expectedPages === args.pageCount &&
+        generationPages.every((page) => !page.isSynthetic) &&
+        hasContiguousIntegerCoverage(
+          generationPages.map((page) => page.sourcePageIndex ?? -1),
+          0,
+          args.pageCount,
+        );
+      if (hasRealSourcePageCoverage) {
+        checks.push('source_unit_coverage');
+      } else {
+        failedChecks.push('source_unit_coverage');
+      }
     }
 
     const generationChunks = await ctx.db
@@ -722,6 +970,15 @@ export const validateAndActivateGeneration = internalMutation({
     });
     await ctx.db.patch(args.uploadedFileId, {
       activeMemoryGenerationId: args.memoryGenerationId,
+      activeCoverageManifestId: coverageManifest?._id,
+      coverageStatus: coverageManifest?.status ?? 'unverified',
+      coverageExpectedUnits: coverageManifest?.expectedUnits,
+      coverageAccountedUnits: coverageManifest
+        ? coverageManifest.succeededUnits + coverageManifest.lowConfidenceUnits +
+          coverageManifest.verifiedBlankUnits + coverageManifest.failedUnits + coverageManifest.omittedUnits
+        : undefined,
+      coverageVerifiedAt: coverageManifest?.verifiedAt,
+      fullDocumentReviewStatus: coverageManifest?.status === 'complete' ? 'not_started' : undefined,
       latestGenerationNumber: generation.generationNumber,
       pageCount: args.pageCount,
       chunkCount: args.chunkCount,

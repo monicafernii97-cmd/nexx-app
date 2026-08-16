@@ -1,4 +1,5 @@
 import type { ExtractionErrorCode } from './documentTypeDetection';
+import type { CanonicalExtractedPage } from './documentExtractionTypes';
 
 const DEFAULT_MISTRAL_OCR_MODEL = 'mistral-ocr-4-0';
 const DEFAULT_MISTRAL_OCR_ENDPOINT = 'https://api.mistral.ai/v1/ocr';
@@ -37,6 +38,7 @@ export type MistralOcrExtractionResult = {
   ocrBlocksDetected?: number;
   ocrTablesDetected?: number;
   ocrProviderRequestId?: string;
+  pages?: CanonicalExtractedPage[];
 };
 
 type MistralOcrPage = {
@@ -123,6 +125,35 @@ function buildPageText(page: MistralOcrPage) {
   return segments.join('\n\n');
 }
 
+function buildCanonicalPages(pages: MistralOcrPage[]): CanonicalExtractedPage[] {
+  return pages.map((page, index): CanonicalExtractedPage => {
+    const pageNumber = typeof page.index === 'number' ? page.index + 1 : index + 1;
+    const canonicalText = normalizeText(page.markdown ?? page.text ?? '');
+    const average = page.confidence_scores?.average_page_confidence_score;
+    const minimum = page.confidence_scores?.minimum_page_confidence_score;
+    const lowConfidence =
+      (typeof minimum === 'number' && minimum < LOW_CONFIDENCE_THRESHOLD) ||
+      (typeof average === 'number' && average < LOW_CONFIDENCE_THRESHOLD);
+    const warnings = [
+      ...(lowConfidence ? ['MISTRAL_OCR_LOW_CONFIDENCE_PAGE'] : []),
+      ...(!canonicalText ? ['MISTRAL_OCR_EMPTY_PAGE'] : []),
+    ];
+
+    return {
+      pageNumber,
+      sourcePageIndex: pageNumber - 1,
+      ocrMarkdown: canonicalText || undefined,
+      canonicalText,
+      canonicalSource: 'ocr',
+      status: !canonicalText ? 'failed' : lowConfidence ? 'low_confidence' : 'succeeded',
+      confidence: average !== undefined || minimum !== undefined
+        ? { average, minimum }
+        : undefined,
+      warnings,
+    };
+  }).sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
 export function getMistralOcrConfig(env: NodeJS.ProcessEnv = process.env): MistralOcrConfig {
   const maxFileMb = parsePositiveFloat(env.MISTRAL_OCR_MAX_FILE_MB, DEFAULT_MAX_FILE_MB);
   const apiKey = env.MISTRAL_API_KEY?.trim();
@@ -147,11 +178,13 @@ export function shouldTryMistralOcrForPdf(args: {
   nativeTextLength?: number;
   nativeSucceeded?: boolean;
   parserFailed?: boolean;
+  hasLowTextPages?: boolean;
   config?: MistralOcrConfig;
 }) {
   const config = args.config ?? getMistralOcrConfig();
   if (!isMistralOcrConfigured(config)) return false;
   if (args.parserFailed) return true;
+  if (args.hasLowTextPages) return true;
   if ((args.nativeTextLength ?? 0) < 80) return true;
   return Boolean(args.nativeSucceeded && config.legalHighQualityProcessing);
 }
@@ -231,6 +264,7 @@ export async function extractPdfTextWithMistralOcr(args: {
 
     const json = await response.json() as MistralOcrResponse;
     const pages = Array.isArray(json.pages) ? json.pages : [];
+    const canonicalPages = buildCanonicalPages(pages);
     const rawProviderText = normalizeText(
       pages
         .map((page) => normalizeText(page.markdown ?? page.text ?? ''))
@@ -256,7 +290,7 @@ export async function extractPdfTextWithMistralOcr(args: {
         method: 'mistral_ocr_4',
         ocrAttempted: true,
         pagesOcrProcessed: usagePages,
-        pagesTotal: pages.length,
+        pagesTotal: Math.max(usagePages, pages.length),
         warnings: ['MISTRAL_OCR_EMPTY', ...warnings],
         ocrProvider: 'mistral',
         ocrModel: json.model ?? config.model,
@@ -269,6 +303,7 @@ export async function extractPdfTextWithMistralOcr(args: {
         ocrBlocksDetected: blocksDetected,
         ocrTablesDetected: tablesDetected,
         ocrProviderRequestId: providerRequestId,
+        pages: canonicalPages,
       };
     }
 
@@ -277,7 +312,7 @@ export async function extractPdfTextWithMistralOcr(args: {
       method: 'mistral_ocr_4',
       ocrAttempted: true,
       pagesOcrProcessed: usagePages,
-      pagesTotal: pages.length,
+      pagesTotal: Math.max(usagePages, pages.length),
       warnings,
       ocrProvider: 'mistral',
       ocrModel: json.model ?? config.model,
@@ -290,6 +325,7 @@ export async function extractPdfTextWithMistralOcr(args: {
       ocrBlocksDetected: blocksDetected,
       ocrTablesDetected: tablesDetected,
       ocrProviderRequestId: providerRequestId,
+      pages: canonicalPages,
     };
   } catch (error) {
     return {

@@ -54,6 +54,10 @@ type UploadSessionSnapshot = {
   pagesTotal?: number;
   indexingError?: string;
   extractionError?: string;
+  coverageStatus?: 'complete' | 'partial' | 'failed' | 'unverified';
+  coverageExpectedUnits?: number;
+  coverageAccountedUnits?: number;
+  fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
 };
 
 export class ChatUploadError extends Error {
@@ -243,10 +247,12 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot, intent: ChatUp
     status: snapshot.status,
     analysisMode: analysisModeForUploadIntent(intent),
     extractionMethod: snapshot.extractionMethod,
-    pagesProcessed: snapshot.pagesOcrProcessed,
-    pagesTotal: snapshot.pagesTotal,
+    pagesProcessed: snapshot.coverageAccountedUnits ?? snapshot.pagesOcrProcessed,
+    pagesTotal: snapshot.coverageExpectedUnits ?? snapshot.pagesTotal,
     contextTruncated: snapshot.contextTruncated,
     extractionWarnings: snapshot.extractionWarnings,
+    coverageStatus: snapshot.coverageStatus,
+    fullDocumentReviewStatus: snapshot.fullDocumentReviewStatus,
   };
 
   return {

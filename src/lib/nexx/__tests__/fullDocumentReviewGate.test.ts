@@ -25,15 +25,40 @@ describe('full court-order review intent and coverage gate', () => {
       filename: 'order.pdf',
       status: 'ready',
       coverageStatus: 'complete',
+      fullDocumentReviewStatus: 'ready',
       pagesProcessed: 62,
       pagesTotal: 62,
     }])).toBe(false);
+
+    expect(requiresVerifiedCoverage('full_document_review', [{
+      filename: 'order.pdf',
+      status: 'ready',
+      coverageStatus: 'complete',
+      fullDocumentReviewStatus: 'building',
+      pagesProcessed: 62,
+      pagesTotal: 62,
+    }])).toBe(true);
 
     expect(requiresVerifiedCoverage('focused_question', [{
       filename: 'order.pdf',
       status: 'partial',
       coverageStatus: 'partial',
     }])).toBe(false);
+  });
+
+  it('distinguishes verified page coverage from pending exhaustive synthesis', () => {
+    const message = buildCoverageGateMessage([{
+      filename: 'Signed Final Order.pdf',
+      status: 'ready',
+      coverageStatus: 'complete',
+      fullDocumentReviewStatus: 'not_started',
+      pagesProcessed: 62,
+      pagesTotal: 62,
+    }]);
+
+    expect(message).toContain('62 of 62 pages explicitly accounted for');
+    expect(message).toContain('page coverage is verified');
+    expect(message).toContain('exhaustive document-understanding record is not ready');
   });
 
   it('produces a filename-specific and truthful gate receipt', () => {

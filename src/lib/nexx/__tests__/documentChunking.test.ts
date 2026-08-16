@@ -103,4 +103,53 @@ describe('buildDocumentMemoryArtifacts', () => {
     expect(result.chunks).toHaveLength(0);
     expect(result.warnings).toContain('EMPTY_DOCUMENT_TEXT');
   });
+
+  it('preserves real source-page boundaries instead of synthesizing 12k-character pages', () => {
+    const result = buildDocumentMemoryArtifacts(
+      '[Page 1]\n\nBeginning clause.\n\n[Page 2]\n\nMiddle clause.\n\n[Page 3]\n\nEnding clause.',
+      {
+        pages: [
+          {
+            pageNumber: 1,
+            sourcePageIndex: 0,
+            nativeText: 'Beginning clause.',
+            canonicalText: 'Beginning clause.',
+            canonicalSource: 'native',
+            status: 'succeeded',
+            warnings: [],
+          },
+          {
+            pageNumber: 2,
+            sourcePageIndex: 1,
+            ocrMarkdown: 'Middle clause.',
+            canonicalText: 'Middle clause.',
+            canonicalSource: 'ocr',
+            status: 'succeeded',
+            warnings: [],
+          },
+          {
+            pageNumber: 3,
+            sourcePageIndex: 2,
+            nativeText: 'Ending clause.',
+            canonicalText: 'Ending clause.',
+            canonicalSource: 'native',
+            status: 'succeeded',
+            warnings: [],
+          },
+        ],
+      },
+    );
+
+    expect(result.pages.map((page) => ({
+      pageNumber: page.pageNumber,
+      sourcePageIndex: page.sourcePageIndex,
+      isSynthetic: page.isSynthetic,
+      canonicalSource: page.canonicalSource,
+    }))).toEqual([
+      { pageNumber: 1, sourcePageIndex: 0, isSynthetic: false, canonicalSource: 'native' },
+      { pageNumber: 2, sourcePageIndex: 1, isSynthetic: false, canonicalSource: 'ocr' },
+      { pageNumber: 3, sourcePageIndex: 2, isSynthetic: false, canonicalSource: 'native' },
+    ]);
+    expect(result.chunks.flatMap((chunk) => chunk.warnings)).not.toContain('PAGE_BOUNDARIES_UNAVAILABLE');
+  });
 });

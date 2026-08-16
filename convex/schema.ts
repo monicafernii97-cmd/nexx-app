@@ -933,6 +933,78 @@ export default defineSchema({
         .index('by_generation_unit', ['memoryGenerationId', 'unitIndex'])
         .index('by_file_unit', ['uploadedFileId', 'unitIndex']),
 
+    documentUnderstandingRuns: defineTable({
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        coverageManifestId: v.id('documentCoverageManifests'),
+        uploadSessionId: v.optional(v.id('chatUploadSessions')),
+        processingLockId: v.optional(v.string()),
+        uploadCompletionStatus: v.optional(v.union(v.literal('ready'), v.literal('partial'))),
+        uploadIndexingError: v.optional(v.string()),
+        clerkUserId: v.string(),
+        status: v.union(
+            v.literal('queued'),
+            v.literal('mapping'),
+            v.literal('reducing'),
+            v.literal('verifying'),
+            v.literal('ready'),
+            v.literal('partial'),
+            v.literal('failed')
+        ),
+        version: v.string(),
+        model: v.string(),
+        totalChunks: v.number(),
+        nextChunkIndex: v.number(),
+        currentLevel: v.number(),
+        nextNodeIndex: v.number(),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        finishedAt: v.optional(v.number()),
+    })
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_generation_status', ['memoryGenerationId', 'status'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
+    documentUnderstandingNodes: defineTable({
+        runId: v.id('documentUnderstandingRuns'),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        level: v.number(),
+        nodeIndex: v.number(),
+        sourceChunkStart: v.number(),
+        sourceChunkEnd: v.number(),
+        sourceChunkCount: v.number(),
+        pageStart: v.optional(v.number()),
+        pageEnd: v.optional(v.number()),
+        payloadJson: v.string(),
+        createdAt: v.number(),
+    })
+        .index('by_run_level_node', ['runId', 'level', 'nodeIndex'])
+        .index('by_generation', ['memoryGenerationId']),
+
+    documentUnderstandingRecords: defineTable({
+        runId: v.id('documentUnderstandingRuns'),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        coverageManifestId: v.id('documentCoverageManifests'),
+        version: v.string(),
+        model: v.string(),
+        structuredJson: v.string(),
+        renderedReviewMarkdown: v.string(),
+        sourceChunkIds: v.array(v.id('documentChunks')),
+        sourceChunkIndexes: v.array(v.number()),
+        verificationStatus: v.union(v.literal('verified'), v.literal('failed')),
+        verificationChecks: v.array(v.string()),
+        totalChunks: v.number(),
+        coveredChunks: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_file_created', ['uploadedFileId', 'createdAt'])
+        .index('by_generation', ['memoryGenerationId'])
+        .index('by_run', ['runId']),
+
     documentExtractionAttempts: defineTable({
         orgId: v.optional(v.string()),
         accountId: v.optional(v.string()),
@@ -1739,6 +1811,8 @@ export default defineSchema({
             v.literal('partial'),
             v.literal('failed')
         )),
+        activeUnderstandingRunId: v.optional(v.id('documentUnderstandingRuns')),
+        activeUnderstandingRecordId: v.optional(v.id('documentUnderstandingRecords')),
         latestGenerationNumber: v.optional(v.number()),
         extractionError: v.optional(v.string()),
         indexingError: v.optional(v.string()),

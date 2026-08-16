@@ -823,6 +823,32 @@ export const processStoredUpload = internalAction({
         };
       }
 
+      // A successful extraction/index is not the same thing as a complete read.
+      // Keep the upload in its processing state until the durable understanding
+      // pipeline has mapped and reduced every canonical chunk and verified every
+      // finding citation against source text.
+      if (activeMemoryGenerationId && !memoryIndexingError) {
+        await ctx.runMutation(internal.documentUnderstanding.startRun, {
+          uploadedFileId,
+          memoryGenerationId: activeMemoryGenerationId,
+          uploadSessionId: args.uploadSessionId,
+          processingLockId: lockId,
+          uploadCompletionStatus: indexingError ? 'partial' : 'ready',
+          uploadIndexingError: indexingError,
+        });
+        console.info('[ChatUpload] exhaustive understanding queued', {
+          uploadSessionId: args.uploadSessionId,
+          uploadedFileId,
+          activeMemoryGenerationId,
+        });
+        return {
+          ok: true,
+          uploadedFileId,
+          status: 'processing',
+          partial: Boolean(indexingError),
+        };
+      }
+
       await ctx.runMutation(internal.chatUploads.completeProcessing, {
         uploadSessionId: args.uploadSessionId,
         lockId,

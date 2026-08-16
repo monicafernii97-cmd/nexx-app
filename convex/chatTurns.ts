@@ -24,6 +24,11 @@ import {
     buildDocumentChunkSearchQuery,
     retrieveRelevantDocumentChunks,
 } from '../src/lib/nexx/documentChunkRetrieval';
+import { fuzzyTextContains } from '../src/lib/nexx/legalDocumentAnswer';
+import {
+    parseUnderstandingForRetrieval,
+    selectUnderstandingSourceIndexes,
+} from '../src/lib/nexx/documentUnderstandingRetrieval';
 import {
     canUseDocumentMemoryCandidate,
     resolveDocumentMemorySource,
@@ -51,7 +56,7 @@ import {
     fixedWindowStartMs,
     userSubscriptionTier,
 } from './lib/chatRateLimitPolicy';
-import { normalizeReviewFlagMessage, sanitizeAuditMetadata } from './lib/documentTelemetry';
+import { normalizeReviewFlagMessage, requiresZdrForClassification, sanitizeAuditMetadata } from './lib/documentTelemetry';
 import { routeModeValidator } from './lib/routeModeValidator';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
@@ -276,6 +281,8 @@ function buildUploadedFileContext(
         uploadSessionId,
         storageId: uploadedFile.storageId,
         storageSha256: uploadedFile.storageSha256,
+        activeMemoryGenerationId: uploadedFile.activeMemoryGenerationId,
+        zdrRequired: requiresZdrForClassification(uploadedFile.confidentialityLevel ?? 'normal'),
         filename: uploadedFile.filename,
         mimeType: uploadedFile.mimeType,
         byteSize: byteSize ?? 0,
@@ -483,6 +490,7 @@ async function getRelevantDocumentChunkContexts(
         message: string;
         detection: DocumentReferenceDetection;
         accessScope: DocumentAccessScope;
+        understandingJson?: string;
     }
 ) {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
@@ -508,22 +516,55 @@ async function getRelevantDocumentChunkContexts(
             )
             .take(MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE)
         : [];
+    const understanding = parseUnderstandingForRetrieval(args.understandingJson);
+    const understandingIndexes = understanding && generationId
+        ? selectUnderstandingSourceIndexes({ payload: understanding, message: args.message })
+        : [];
+    const understandingChunks: Doc<'documentChunks'>[] = [];
+    for (const chunkIndex of understandingIndexes) {
+        const chunk = await ctx.db
+            .query('documentChunks')
+            .withIndex('by_generation_chunk', (q) =>
+                q.eq('memoryGenerationId', generationId).eq('chunkIndex', chunkIndex)
+            )
+            .first();
+        if (chunk && chunkMatchesActiveDocumentMemory(chunk, uploadedFile)) understandingChunks.push(chunk);
+    }
     const continuityChunks = await getContinuityChunksForSearchHits(ctx, {
         uploadedFile,
-        searchChunks,
+        searchChunks: mergeDocumentChunkDocs([
+            ...searchChunks.slice(0, MAX_RETRIEVED_CHUNKS_PER_FILE),
+            ...understandingChunks,
+        ]),
         generationId,
     });
 
-    const chunks = mergeDocumentChunkDocs([...searchChunks, ...continuityChunks])
+    const chunks = mergeDocumentChunkDocs([...understandingChunks, ...searchChunks, ...continuityChunks])
         .filter((chunk) => chunkMatchesActiveDocumentMemory(chunk, uploadedFile));
     const chunksById = new Map(chunks.map((chunk) => [chunk._id.toString(), chunk]));
 
-    return retrieveRelevantDocumentChunks({
+    const retrieved = retrieveRelevantDocumentChunks({
         message: args.message,
         detection: args.detection,
         maxChunks: MAX_RETRIEVED_CHUNKS_PER_FILE,
         chunks: chunks.map(documentChunkCandidate),
-    })
+    });
+    const understandingIds = new Set(understandingChunks.map((chunk) => chunk._id.toString()));
+    const guided = understandingChunks.map((chunk) => ({
+        ...documentChunkCandidate(chunk),
+        retrievalScore: 250,
+        retrievalReasons: ['understanding_map' as const],
+        retrievalBuckets: [],
+        filingRetrievalBuckets: [],
+    }));
+    const merged = new Map([...retrieved, ...guided].map((chunk) => [chunk.chunkId, chunk]));
+    return Array.from(merged.values())
+        .map((chunk) => understandingIds.has(chunk.chunkId)
+            ? { ...chunk, retrievalScore: Math.max(chunk.retrievalScore, 250), retrievalReasons: Array.from(new Set([...chunk.retrievalReasons, 'understanding_map' as const])) }
+            : chunk)
+        .sort((a, b) => b.retrievalScore - a.retrievalScore || a.chunkIndex - b.chunkIndex)
+        .slice(0, MAX_RETRIEVED_CHUNKS_PER_FILE)
+        .sort((a, b) => a.chunkIndex - b.chunkIndex)
         .filter((chunk) => {
             const chunkDoc = chunksById.get(chunk.chunkId);
             if (!chunkDoc || !chunkMatchesActiveDocumentMemory(chunkDoc, uploadedFile)) return false;
@@ -535,6 +576,57 @@ async function getRelevantDocumentChunkContexts(
             uploadedFileId: chunk.uploadedFileId as Id<'uploadedFiles'>,
         }));
 }
+
+/** Hydrate semantic vector hits plus adjacent clauses after re-checking document access. */
+export const hydrateSemanticDocumentChunks = internalQuery({
+    args: {
+        turnId: v.id('chatTurns'),
+        uploadedFileId: v.id('uploadedFiles'),
+        hits: v.array(v.object({ chunkId: v.id('documentChunks'), score: v.number() })),
+    },
+    handler: async (ctx, args) => {
+        const [turn, uploadedFile] = await Promise.all([ctx.db.get(args.turnId), ctx.db.get(args.uploadedFileId)]);
+        if (!turn || !uploadedFile?.activeMemoryGenerationId) return [];
+        const [user, conversation] = await Promise.all([ctx.db.get(turn.userId), ctx.db.get(turn.conversationId)]);
+        if (!user?.clerkId || !conversation || conversation.userId !== turn.userId) return [];
+        const granted = await hasActiveUserChatGrant(ctx, {
+            clerkUserId: user.clerkId,
+            uploadedFileId: uploadedFile._id,
+            caseId: conversation.caseId,
+        });
+        const accessScope: DocumentAccessScope = {
+            clerkUserId: user.clerkId,
+            conversationId: conversation._id.toString(),
+            caseId: conversation.caseId?.toString(),
+            grantedUploadedFileIds: granted ? [uploadedFile._id.toString()] : [],
+        };
+        if (!canUseDocumentMemoryCandidate(uploadedFileAccessCandidate(uploadedFile), accessScope)) return [];
+
+        const byId = new Map<string, { chunk: Doc<'documentChunks'>; score: number; anchor: boolean }>();
+        for (const hit of args.hits.slice(0, 8)) {
+            const chunk = await ctx.db.get(hit.chunkId);
+            if (!chunk || !chunkMatchesActiveDocumentMemory(chunk, uploadedFile)) continue;
+            byId.set(chunk._id.toString(), { chunk, score: hit.score, anchor: true });
+            const neighbors = await ctx.db.query('documentChunks')
+                .withIndex('by_generation_chunk', (q) => q
+                    .eq('memoryGenerationId', uploadedFile.activeMemoryGenerationId)
+                    .gte('chunkIndex', Math.max(0, chunk.chunkIndex - 1))
+                    .lte('chunkIndex', chunk.chunkIndex + 1))
+                .take(3);
+            for (const neighbor of neighbors) {
+                if (!chunkMatchesActiveDocumentMemory(neighbor, uploadedFile) || byId.has(neighbor._id.toString())) continue;
+                byId.set(neighbor._id.toString(), { chunk: neighbor, score: hit.score - 0.05, anchor: false });
+            }
+        }
+        return Array.from(byId.values()).slice(0, 24).map(({ chunk, score, anchor }) => ({
+            ...documentChunkCandidate(chunk),
+            retrievalScore: Math.max(0, Math.round(180 + score * 100) - (anchor ? 0 : 20)),
+            retrievalReasons: anchor ? ['semantic_similarity'] : ['semantic_similarity', 'neighbor_context'],
+            retrievalBuckets: [],
+            filingRetrievalBuckets: [],
+        }));
+    },
+});
 
 function uniqueRecentUploadedFileIds(ids: Id<'uploadedFiles'>[]) {
     return Array.from(new Set(ids.map((id) => id.toString())))
@@ -1437,6 +1529,11 @@ export const getGenerationContext = internalQuery({
                         understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
                             ? understandingRecord.renderedReviewMarkdown
                             : undefined,
+                    fullDocumentReviewStructuredJson:
+                        understandingRecord?.verificationStatus === 'verified' &&
+                        understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
+                            ? understandingRecord.structuredJson
+                            : undefined,
                     fullDocumentReviewRecordId: understandingRecord?._id,
                     fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
@@ -1444,6 +1541,7 @@ export const getGenerationContext = internalQuery({
                         message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
+                        understandingJson: understandingRecord?.structuredJson,
                     }),
                 });
             }
@@ -1621,10 +1719,16 @@ export const getGenerationContext = internalQuery({
                     : null;
                 availableDocumentContexts.push({
                     ...context,
+                    isActiveDocument: documentState?.activeUploadedFileId?.toString() === uploadedFile._id.toString(),
                     fullDocumentReviewMarkdown:
                         understandingRecord?.verificationStatus === 'verified' &&
                         understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
                             ? understandingRecord.renderedReviewMarkdown
+                            : undefined,
+                    fullDocumentReviewStructuredJson:
+                        understandingRecord?.verificationStatus === 'verified' &&
+                        understandingRecord.memoryGenerationId === uploadedFile.activeMemoryGenerationId
+                            ? understandingRecord.structuredJson
                             : undefined,
                     fullDocumentReviewRecordId: understandingRecord?._id,
                     fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
@@ -1633,6 +1737,7 @@ export const getGenerationContext = internalQuery({
                         message: contextualFollowUpMessage,
                         detection: documentReference,
                         accessScope,
+                        understandingJson: understandingRecord?.structuredJson,
                     }),
                 });
             }
@@ -2000,6 +2105,63 @@ export const recordRetrievalRun = internalMutation({
     },
 });
 
+export const resolveFullReviewEvidence = internalQuery({
+    args: {
+        turnId: v.id('chatTurns'),
+        candidates: v.array(v.object({
+            sourceId: v.string(),
+            candidateChunkIds: v.array(v.id('documentChunks')),
+            quotedText: v.string(),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return [];
+        const [conversation, user, attachmentRows] = await Promise.all([
+            ctx.db.get(turn.conversationId),
+            ctx.db.get(turn.userId),
+            ctx.db.query('messageAttachments').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+        ]);
+        if (!conversation || !user?.clerkId) return [];
+        const attachedFileIds = new Set(attachmentRows.map((row) => row.uploadedFileId.toString()));
+        const results: Array<{
+            sourceId: string;
+            chunkId: Id<'documentChunks'>;
+            quotedText: string;
+            citationVerifierStatus: 'verified';
+        }> = [];
+
+        for (const candidate of args.candidates.slice(0, 50)) {
+            for (const chunkId of candidate.candidateChunkIds.slice(0, 50)) {
+                const chunk = await ctx.db.get(chunkId);
+                const uploadedFile = chunk ? await ctx.db.get(chunk.uploadedFileId) : null;
+                if (
+                    !chunk ||
+                    !uploadedFile ||
+                    !attachedFileIds.has(uploadedFile._id.toString()) ||
+                    (uploadedFile.clerkUserId !== user.clerkId && !(await hasActiveUserChatGrant(ctx, {
+                        clerkUserId: user.clerkId,
+                        uploadedFileId: uploadedFile._id,
+                        caseId: conversation.caseId,
+                    }))) ||
+                    !chunkMatchesActiveDocumentMemory(chunk, uploadedFile) ||
+                    !fuzzyTextContains(chunk.text, candidate.quotedText)
+                ) {
+                    continue;
+                }
+                results.push({
+                    sourceId: candidate.sourceId,
+                    chunkId: chunk._id,
+                    quotedText: candidate.quotedText,
+                    citationVerifierStatus: 'verified',
+                });
+                break;
+            }
+        }
+        return results;
+    },
+});
+
 export const recordDocumentAnswerEvidence = internalMutation({
     args: {
         turnId: v.id('chatTurns'),
@@ -2209,7 +2371,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
                 const citationKey = `${citation.sourceId}:${citation.chunkId.toString()}`;
                 if (seenCitationKeys.has(citationKey) || seenCitationKeys.size >= 50) continue;
                 const verified = verifiedChunks.get(citation.chunkId.toString());
-                if (!verified) continue;
+                if (!verified || !fuzzyTextContains(verified.chunk.text, citation.quotedText)) continue;
                 seenCitationKeys.add(citationKey);
                 await ctx.db.insert('chatAnswerSources', {
                     orgId: verified.chunk.orgId,

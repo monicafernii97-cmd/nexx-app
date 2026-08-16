@@ -95,12 +95,17 @@ import {
 } from '../src/lib/nexx/responseLifecycle';
 import { verifyPlainTextDocumentGrounding } from '../src/lib/nexx/plainTextGrounding';
 import { canonicalConversationMemoryPage } from '../src/lib/nexx/conversationMemoryPolicy';
+import { createDocumentQueryEmbedding } from '../src/lib/nexx/documentEmbeddings';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
+import { understandingSourceIndex, type DocumentUnderstandingPayload } from '../src/lib/nexx/documentUnderstanding';
+import { appendResponseContinuation, isOutputTokenIncompleteReason } from '../src/lib/nexx/responseContinuation';
 
 const DEGRADED_MESSAGE =
     'I saved your message, but the response did not finish. Please retry this turn in a moment.';
 const PROVIDER_TIMEOUT_MS = 80_000;
+const STANDARD_MAX_OUTPUT_TOKENS = 16_000;
+const COMPLEX_MAX_OUTPUT_TOKENS = 24_000;
 
 let cachedOpenAI: OpenAI | null = null;
 
@@ -622,6 +627,8 @@ type AttachmentContext = {
     uploadSessionId?: Id<'chatUploadSessions'>;
     storageId?: Id<'_storage'>;
     storageSha256?: string;
+    activeMemoryGenerationId?: Id<'documentMemoryGenerations'>;
+    zdrRequired?: boolean;
     filename: string;
     mimeType: string;
     byteSize: number;
@@ -641,9 +648,11 @@ type AttachmentContext = {
     coverageStatus?: DocumentCoverageStatus;
     fullDocumentReviewStatus?: 'not_started' | 'building' | 'ready' | 'partial' | 'failed';
     fullDocumentReviewMarkdown?: string;
+    fullDocumentReviewStructuredJson?: string;
     fullDocumentReviewRecordId?: Id<'documentUnderstandingRecords'>;
     fullDocumentReviewSourceChunkIds?: Id<'documentChunks'>[];
     documentChunks?: DocumentChunkContext[];
+    isActiveDocument?: boolean;
 };
 
 type DocumentChunkContext = {
@@ -832,8 +841,8 @@ function hasActiveDocumentContext(context: GenerationContext) {
 function documentRetrievalRunCounts(attachments: AttachmentContext[]) {
     const chunks = attachments.flatMap((attachment) => attachment.documentChunks ?? []);
     return {
-        vectorResultCount: 0,
-        keywordResultCount: chunks.length,
+        vectorResultCount: chunks.filter((chunk) => chunk.retrievalReasons.includes('semantic_similarity')).length,
+        keywordResultCount: chunks.filter((chunk) => chunk.retrievalReasons.some((reason) => reason !== 'semantic_similarity' && reason !== 'neighbor_context')).length,
         exactMatchResultCount: chunks.filter((chunk) => chunk.retrievalReasons.includes('exact_term')).length,
     };
 }
@@ -932,6 +941,58 @@ function mergeAttachmentContext(existing: AttachmentContext, incoming: Attachmen
     };
 }
 
+async function enrichContextWithSemanticDocumentChunks(
+    ctx: ActionCtx,
+    context: GenerationContext,
+    client: OpenAI,
+) {
+    const candidates = Array.from(new Map(
+        [...(context.attachmentContexts ?? []), ...(context.availableDocumentContexts ?? [])]
+            .filter((attachment) => attachment.activeMemoryGenerationId)
+            .filter((attachment) => !attachment.zdrRequired || process.env.OPENAI_ZDR_CONFIRMED === 'true')
+            .map((attachment) => [attachment.uploadedFileId.toString(), attachment])
+    ).values()).slice(0, 5);
+    if (candidates.length === 0 || !context.turn._id) return context;
+    try {
+        const embedding = await createDocumentQueryEmbedding(client, context.turn.message);
+        if (!embedding) return context;
+        const semanticByFileId = new Map<string, DocumentChunkContext[]>();
+        for (const attachment of candidates) {
+            const hits = await ctx.vectorSearch('documentChunks', 'by_embedding', {
+                vector: embedding,
+                limit: 8,
+                filter: (q) => q.eq('memoryGenerationId', attachment.activeMemoryGenerationId!),
+            });
+            const rawChunks = await ctx.runQuery(internal.chatTurns.hydrateSemanticDocumentChunks, {
+                turnId: context.turn._id,
+                uploadedFileId: attachment.uploadedFileId,
+                hits: hits.map((hit) => ({ chunkId: hit._id, score: hit._score })),
+            });
+            const chunks: DocumentChunkContext[] = rawChunks.map((chunk) => ({
+                ...chunk,
+                chunkId: chunk.chunkId as Id<'documentChunks'>,
+                uploadedFileId: chunk.uploadedFileId as Id<'uploadedFiles'>,
+            }));
+            semanticByFileId.set(attachment.uploadedFileId.toString(), chunks);
+        }
+        const enrich = (attachment: AttachmentContext) => {
+            const semantic = semanticByFileId.get(attachment.uploadedFileId.toString()) ?? [];
+            if (semantic.length === 0) return attachment;
+            return mergeAttachmentContext(attachment, { ...attachment, documentChunks: semantic });
+        };
+        return {
+            ...context,
+            attachmentContexts: context.attachmentContexts?.map(enrich),
+            availableDocumentContexts: context.availableDocumentContexts?.map(enrich),
+        };
+    } catch (error) {
+        console.warn('[ChatWorker] Semantic document retrieval unavailable; using canonical lexical retrieval', {
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return context;
+    }
+}
+
 function buildDocumentSourcePackets(attachments: AttachmentContext[]): LegalDocumentSourcePacket[] {
     const packets: LegalDocumentSourcePacket[] = [];
     const seenChunkIds = new Set<string>();
@@ -962,6 +1023,38 @@ function buildDocumentSourcePackets(attachments: AttachmentContext[]): LegalDocu
     }
 
     return packets;
+}
+
+function fullReviewEvidenceCandidates(attachments: AttachmentContext[]) {
+    const candidates: Array<{
+        sourceId: string;
+        candidateChunkIds: Id<'documentChunks'>[];
+        quotedText: string;
+    }> = [];
+    for (const attachment of attachments) {
+        if (!attachment.fullDocumentReviewStructuredJson || !attachment.fullDocumentReviewSourceChunkIds) continue;
+        try {
+            const payload = JSON.parse(attachment.fullDocumentReviewStructuredJson) as DocumentUnderstandingPayload;
+            for (const finding of payload.findings ?? []) {
+                const candidateChunkIds = (finding.sourceIds ?? [])
+                    .map(understandingSourceIndex)
+                    .filter((index): index is number => index !== null)
+                    .map((index) => attachment.fullDocumentReviewSourceChunkIds?.[index])
+                    .filter((chunkId): chunkId is Id<'documentChunks'> => Boolean(chunkId));
+                if (candidateChunkIds.length === 0) continue;
+                candidates.push({
+                    sourceId: `dur_${String(candidates.length + 1).padStart(3, '0')}`,
+                    candidateChunkIds,
+                    quotedText: finding.quote,
+                });
+                if (candidates.length >= 50) return candidates;
+            }
+        } catch {
+            // The DUR record was already verified at persistence time. If a legacy
+            // row is malformed, keep the review visible but omit interactive evidence.
+        }
+    }
+    return candidates;
 }
 
 function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets: LegalDocumentSourcePacket[]) {
@@ -1022,12 +1115,19 @@ function selectAttachmentContextsForPrompt(
     }
 
     const availableDocuments = context.availableDocumentContexts ?? [];
+    const activeDocument = availableDocuments.find((document) => document.isActiveDocument);
     const explicitStoredDocumentRequest = explicitlyRequestsStoredDocument(
         context.turn.message,
         documentReference,
         routeMode,
     );
     const activeDocumentFollowUp = isShortActiveDocumentFollowUp(context, documentReference);
+    const continuedActiveIssue = Boolean(activeDocument && activeFollowUpContextSummary(
+        context.turn.message,
+        context.recentMessages,
+        routeMode,
+        context.activeLegalIssueState,
+    ));
     const shouldLoadStoredDocuments =
         availableDocuments.length > 0 &&
         shouldForceStoredDocumentGrounding({
@@ -1038,7 +1138,9 @@ function selectAttachmentContextsForPrompt(
             isActiveDocumentFollowUp: activeDocumentFollowUp,
         });
 
-    if (!shouldLoadStoredDocuments) return selected;
+    if (!shouldLoadStoredDocuments && !continuedActiveIssue) return selected;
+
+    if (activeDocument && continuedActiveIssue) addAttachment(activeDocument, selected.length < 3);
 
     for (const attachment of availableDocuments) {
         addAttachment(attachment, selected.length < 3);
@@ -1172,6 +1274,60 @@ type StreamingResponsesClient = {
     ) => Promise<AsyncIterable<ResponseStreamEvent>>;
 };
 
+async function continueIncompletePlainTextResponse(args: {
+    responses: StreamingResponsesClient;
+    model: string;
+    responseId: string;
+    existingText: string;
+    incompleteReason?: string;
+    lifecyclePolicy: ReturnType<typeof responseLifecyclePolicy>;
+    ctx: ActionCtx;
+    jobId: Id<'chatGenerationJobs'>;
+    leaseOwner: string;
+    routeMode: RouteMode;
+}) {
+    let text = args.existingText;
+    let responseId = args.responseId;
+    let incompleteReason = args.incompleteReason;
+    for (let continuationCount = 1; continuationCount <= 2; continuationCount += 1) {
+        if (!isOutputTokenIncompleteReason(incompleteReason)) break;
+        const stream = await args.responses.create({
+            model: args.model,
+            previous_response_id: responseId,
+            input: 'Continue the answer exactly where it stopped. Do not repeat prior text. Finish every remaining requested section and do not add backend metadata.',
+            max_output_tokens: STANDARD_MAX_OUTPUT_TOKENS,
+            text: { format: { type: 'text' }, verbosity: args.lifecyclePolicy.verbosity },
+            stream: true,
+        }, { timeout: PROVIDER_TIMEOUT_MS, maxRetries: 0 });
+        let continuation = '';
+        let completed = false;
+        incompleteReason = undefined;
+        for await (const event of stream) {
+            if (event.type === 'response.output_text.delta') continuation += event.delta ?? '';
+            else if (event.type === 'response.completed') {
+                responseId = event.response?.id ?? responseId;
+                completed = true;
+            } else if (event.type === 'response.incomplete') {
+                responseId = event.response?.id ?? responseId;
+                const response = event.response as { incomplete_details?: { reason?: string } } | undefined;
+                incompleteReason = response?.incomplete_details?.reason;
+            } else if (event.type === 'response.failed' || event.type === 'error') {
+                throw new Error('Provider continuation failed.');
+            }
+        }
+        text = appendResponseContinuation(text, continuation);
+        await saveDraft(args.ctx, args.jobId, args.leaseOwner, text, {
+            uiKind: ASSISTANT_ANSWER_UI_KIND,
+            phase: completed ? 'validating_answer' : 'continuing_answer',
+            routeMode: args.routeMode,
+            continuationCount,
+            incompleteReason,
+        });
+        if (completed) return { text, responseId, completed: true };
+    }
+    return { text, responseId, completed: false, incompleteReason };
+}
+
 function documentMetadataMatchesType(document: AttachmentContext, requestedType: DocumentType) {
     const metadata = `${document.filename} ${document.detectedType ?? ''}`
         .toLowerCase()
@@ -1209,9 +1365,13 @@ function buildInput(
         routeMode
     );
     const documentReference = routerResult.documentReference ?? detectDocumentReference(context.turn.message);
-    const allowStoredFileSearch =
+    const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
+    // Canonical chunks have stable provenance and local citation verification.
+    // Hosted file-search results do not, so never mix the two legal evidence paths.
+    const allowStoredFileSearch = attachmentContexts.length === 0 && (
         !responseLifecyclePolicy(routeMode).preserveProviderProse ||
-        explicitlyRequestsStoredDocument(context.turn.message, documentReference, routeMode);
+        explicitlyRequestsStoredDocument(context.turn.message, documentReference, routeMode)
+    );
     const effectiveRouterResult = {
         ...routerResult,
         toolPlan: {
@@ -1227,7 +1387,6 @@ function buildInput(
         })
     );
     const artifactPrompt = buildArtifactPrompt();
-    const attachmentContexts = selectAttachmentContextsForPrompt(context, routerResult, routeMode);
     const documentSourcePackets = buildDocumentSourcePackets(attachmentContexts);
     const issuePacks = detectedFamilyLawIssuePacks(
         context.turn.message,
@@ -1851,7 +2010,7 @@ function deterministicRenderedFallback(
         draftText ? `You can say:\n\n"${draftText}"` : '',
     ].filter((section) => section.trim().length > 0);
 
-    return truncateAtSentenceBoundary(Array.from(new Set(sections)).join('\n\n'), 4_000) ||
+    return truncateAtSentenceBoundary(Array.from(new Set(sections)).join('\n\n'), 12_000) ||
         'Here is the safest practical next step based on the information available.';
 }
 
@@ -2038,7 +2197,7 @@ function verifyAndRepairRenderedResponse(
                 repairCount: 1,
                 fallbackStage: 'minimal' as const,
                 semanticDuplicateCount: repeatedLegalPropositions(fallbackMessage, 0.9).length,
-                lengthTruncated: fallbackMessage.length >= 3_990,
+                lengthTruncated: fallbackMessage.length >= 11_990,
                 finalPassed: fallbackVerification.passed,
                 finalLength: fallbackMessage.length,
             },
@@ -2181,6 +2340,13 @@ async function generateWithFallbacks({
         storedRouteMode
     );
     const routeMode = (storedRouteMode ?? routerResult.mode) as RouteMode;
+    const shouldRunSemanticDocumentRetrieval =
+        (context.attachmentContexts?.length ?? 0) > 0 ||
+        Boolean(routerResult.documentReference?.referencesDocument) ||
+        Boolean(followUpSummary && context.conversationDocumentState?.activeUploadedFileId);
+    if (shouldRunSemanticDocumentRetrieval) {
+        context = await enrichContextWithSemanticDocumentChunks(ctx, context, client);
+    }
     const model = context.turn.model ?? 'gpt-5.4';
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
@@ -2285,6 +2451,7 @@ async function generateWithFallbacks({
                     },
                     input: step.input,
                     tools: step.tools,
+                    max_output_tokens: highComplexityTurn ? COMPLEX_MAX_OUTPUT_TOKENS : STANDARD_MAX_OUTPUT_TOKENS,
                     text: usePlainText
                         ? {
                             format: { type: 'text' },
@@ -2302,6 +2469,7 @@ async function generateWithFallbacks({
             let safeDraftWritten = false;
             let lastDraftSavedAt = 0;
             let completedCleanly = false;
+            let incompleteReason: string | undefined;
 
             for await (const event of streamResponse) {
                 const streamEvent = event as {
@@ -2340,12 +2508,10 @@ async function generateWithFallbacks({
                         `Provider stream failed${streamEvent.response?.status ? ` with status ${streamEvent.response.status}` : ''}`,
                     );
                 } else if (streamEvent.type === 'response.incomplete') {
-                    throw new Error(
-                        `Provider stream incomplete${streamEvent.response?.incomplete_details?.reason
-                            ? `: ${streamEvent.response.incomplete_details.reason}`
-                            : ''
-                        }`,
-                    );
+                    lastResponse = streamEvent.response;
+                    responseId = streamEvent.response?.id;
+                    incompleteReason = streamEvent.response?.incomplete_details?.reason;
+                    break;
                 } else if (streamEvent.type === 'error') {
                     throw new Error(
                         streamEvent.error?.message ??
@@ -2355,8 +2521,26 @@ async function generateWithFallbacks({
                 }
             }
 
+            if (!completedCleanly && usePlainText && responseId && structuredBuffer.trim() && isOutputTokenIncompleteReason(incompleteReason)) {
+                const continuation = await continueIncompletePlainTextResponse({
+                    responses,
+                    model: step.model,
+                    responseId,
+                    existingText: structuredBuffer,
+                    incompleteReason,
+                    lifecyclePolicy,
+                    ctx,
+                    jobId,
+                    leaseOwner,
+                    routeMode,
+                });
+                structuredBuffer = continuation.text;
+                responseId = continuation.responseId;
+                completedCleanly = continuation.completed;
+            }
+
             if (!completedCleanly) {
-                throw new Error('Provider stream ended before completion');
+                throw new Error(`Provider stream ended before completion${incompleteReason ? `: ${incompleteReason}` : ''}`);
             }
 
             const rawText = structuredBuffer || extractOutputText(lastResponse);
@@ -2929,7 +3113,7 @@ export const processChatGenerationJob = internalAction({
                 const content = fullReviewAttachments
                     .map((attachment) => attachment.fullDocumentReviewMarkdown!.trim())
                     .join('\n\n');
-                await ctx.runMutation(internal.chatTurns.completeAssistant, {
+                const completion = await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
                     leaseOwner,
                     content,
@@ -2945,6 +3129,32 @@ export const processChatGenerationJob = internalAction({
                         })),
                     }),
                 });
+                const reviewCitations = await ctx.runQuery(internal.chatTurns.resolveFullReviewEvidence, {
+                    turnId: lease.turnId,
+                    candidates: fullReviewEvidenceCandidates(fullReviewAttachments),
+                });
+                if (completion?.assistantMessageId && reviewCitations.length > 0) {
+                    try {
+                        await ctx.runMutation(internal.chatTurns.recordDocumentAnswerEvidence, {
+                            turnId: lease.turnId,
+                            assistantMessageId: completion.assistantMessageId,
+                            usedChunkIds: Array.from(new Set(reviewCitations.map((citation) => citation.chunkId.toString())))
+                                .map((chunkId) => chunkId as Id<'documentChunks'>),
+                            verifiedCitations: reviewCitations,
+                            sources: fullReviewAttachments.map((attachment) => ({
+                                uploadedFileId: attachment.uploadedFileId,
+                                filename: attachment.filename,
+                                source: attachment.source ?? 'current_turn',
+                                status: attachment.status,
+                                extractionMethod: attachment.extractionMethod,
+                                contextCharCount: attachment.chatContextCharCount ?? attachment.chatContextText?.length,
+                                contextTruncated: attachment.contextTruncated,
+                            })),
+                        });
+                    } catch (evidenceError) {
+                        console.error('[ChatWorker] Failed to persist full-review evidence', evidenceError);
+                    }
+                }
                 if (lease.turnId) {
                     await ctx.scheduler.runAfter(0, internal.chatWorker.persistConversationMemory, { turnId: lease.turnId });
                 }
@@ -3043,14 +3253,23 @@ export const processChatGenerationJob = internalAction({
                 context.turn.conversationId &&
                 context.turn.userId
             ) {
-                const sourceAnchors = result.attachmentContexts.flatMap((attachment) => {
+                const packetsByChunkId = new Map(result.documentSourcePackets.map((packet) => [packet.chunkId, packet]));
+                const verifiedAnchors = result.citationVerification.verifiedCitations.flatMap((citation) => {
+                    const packet = packetsByChunkId.get(citation.chunkId.toString());
+                    return packet ? [{
+                        uploadedFileId: packet.fileId as Id<'uploadedFiles'>,
+                        pageStart: packet.pageStart,
+                        pageEnd: packet.pageEnd,
+                    }] : [];
+                });
+                const fallbackAnchors = result.attachmentContexts.flatMap((attachment) => {
                     const firstChunk = attachment.documentChunks?.[0];
-                    return [{
-                        uploadedFileId: attachment.uploadedFileId,
-                        pageStart: firstChunk?.pageStart,
-                        pageEnd: firstChunk?.pageEnd,
-                    }];
-                }).slice(0, 16);
+                    return [{ uploadedFileId: attachment.uploadedFileId, pageStart: firstChunk?.pageStart, pageEnd: firstChunk?.pageEnd }];
+                });
+                const sourceAnchors = Array.from(new Map(
+                    (verifiedAnchors.length > 0 ? verifiedAnchors : fallbackAnchors)
+                        .map((anchor) => [`${anchor.uploadedFileId}:${anchor.pageStart ?? ''}:${anchor.pageEnd ?? ''}`, anchor])
+                ).values()).slice(0, 16);
                 const snapshot = buildActiveLegalIssueSnapshot({
                     userQuestion: context.turn.message,
                     controllingConclusion: result.response.legalInterpretation.directAnswer,

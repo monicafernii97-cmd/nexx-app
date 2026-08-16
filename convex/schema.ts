@@ -1243,6 +1243,11 @@ export default defineSchema({
         .index('by_file_generation', ['uploadedFileId', 'memoryGenerationId'])
         .index('by_conversation', ['conversationId'])
         .index('by_case', ['caseId'])
+        .vectorIndex('by_embedding', {
+            vectorField: 'embedding',
+            dimensions: 512,
+            filterFields: ['clerkUserId', 'uploadedFileId', 'memoryGenerationId'],
+        })
         .searchIndex('by_search_text', {
             searchField: 'searchText',
             filterFields: ['clerkUserId', 'caseId', 'uploadedFileId', 'memoryGenerationId'],

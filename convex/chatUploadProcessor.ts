@@ -11,6 +11,7 @@ import { hasCompleteDocumentRetrieval } from './lib/chatUploadReadiness';
 import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/nexx/documentExtraction';
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
+import { DOCUMENT_EMBEDDING_MODEL, embedDocumentMemoryArtifacts, type EmbeddedDocumentMemoryArtifacts } from '../src/lib/nexx/documentEmbeddings';
 import { buildDocumentAliases } from '../src/lib/nexx/documentSelection';
 import { buildPageCoverageReceipt, buildTextCoverageReceipt, type CanonicalExtractedPage } from '../src/lib/nexx/documentExtractionTypes';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
@@ -192,7 +193,7 @@ async function writeDocumentMemoryArtifacts(
   ctx: ActionCtx,
   context: ProcessingContext,
   uploadedFileId: Id<'uploadedFiles'>,
-  artifacts: DocumentMemoryArtifacts,
+  artifacts: DocumentMemoryArtifacts | EmbeddedDocumentMemoryArtifacts,
   extraction: DocumentExtractionResult,
   extractionStartedAt: number,
 ) {
@@ -265,6 +266,18 @@ async function writeDocumentMemoryArtifacts(
       estimatedCostUsd: extraction.estimatedOcrCostUsd,
       requestConfigRedacted: extractionRequestConfigRedacted(extraction),
     });
+    if ('embeddingUsage' in artifacts && artifacts.embeddingUsage) {
+      for (const usage of artifacts.embeddingUsage) {
+        await ctx.runMutation(internal.documentMemoryGenerations.recordEmbeddingUsage, {
+          uploadedFileId,
+          memoryGenerationId: generation.memoryGenerationId,
+          model: DOCUMENT_EMBEDDING_MODEL,
+          inputTokens: usage.inputTokens,
+          providerRequestId: usage.providerRequestId,
+          zdrConfirmed: process.env.OPENAI_ZDR_CONFIRMED === 'true',
+        });
+      }
+    }
 
     const storedPageRefs: StoredDocumentPageRef[] = [];
     for (const pages of chunkArray(artifacts.pages, batchSize)) {
@@ -859,9 +872,26 @@ export const processStoredUpload = internalAction({
       let memoryIndexingError: string | undefined;
       let activeMemoryGenerationId: Id<'documentMemoryGenerations'> | undefined;
       try {
-        const documentMemory = buildDocumentMemoryArtifacts(extractedText, {
+        const canonicalDocumentMemory = buildDocumentMemoryArtifacts(extractedText, {
           pages: extraction.pages,
         });
+        let documentMemory: DocumentMemoryArtifacts | EmbeddedDocumentMemoryArtifacts = canonicalDocumentMemory;
+        try {
+          const providerPolicy = await ctx.runQuery(internal.documentMemoryGenerations.getProviderPolicy, { uploadedFileId });
+          const canUseOpenAiEmbeddings = !providerPolicy?.zdrRequired || process.env.OPENAI_ZDR_CONFIRMED === 'true';
+          if (canUseOpenAiEmbeddings) {
+            documentMemory = await embedDocumentMemoryArtifacts(canonicalDocumentMemory);
+          } else {
+            console.warn('[ChatUpload] semantic chunk indexing skipped because required OpenAI ZDR is not confirmed', {
+              uploadSessionId: args.uploadSessionId,
+            });
+          }
+        } catch (embeddingError) {
+          console.warn('[ChatUpload] semantic chunk indexing unavailable; lexical retrieval remains active', {
+            uploadSessionId: args.uploadSessionId,
+            error: embeddingError instanceof Error ? embeddingError.message : String(embeddingError),
+          });
+        }
         const generation = await writeDocumentMemoryArtifacts(
           ctx,
           context,

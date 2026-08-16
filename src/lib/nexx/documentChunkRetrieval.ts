@@ -19,6 +19,8 @@ export type DocumentChunkRetrievalReason =
   | 'section_match'
   | 'metadata_match'
   | 'neighbor_context'
+  | 'understanding_map'
+  | 'semantic_similarity'
   | 'keyword_overlap'
   | 'early_context';
 

@@ -57,6 +57,7 @@ type DocumentCitationMetadata = {
     pageLabel?: string;
     citationLabel?: string;
     quotePreview: string;
+    sourceTextPreview?: string;
     citationVerifierStatus: 'verified' | 'partial' | 'failed';
 };
 
@@ -170,6 +171,7 @@ function getDocumentCitations(metadata: unknown) {
             pageLabel: typeof record.pageLabel === 'string' ? record.pageLabel : undefined,
             citationLabel: typeof record.citationLabel === 'string' ? record.citationLabel : undefined,
             quotePreview,
+            sourceTextPreview: typeof record.sourceTextPreview === 'string' ? record.sourceTextPreview : undefined,
             citationVerifierStatus: status as DocumentCitationMetadata['citationVerifierStatus'],
         }];
     }).slice(0, 12);
@@ -395,6 +397,14 @@ function DocumentEvidencePanel({
                                         <p className="whitespace-pre-wrap break-words">
                                             &quot;{citation.quotePreview}&quot;
                                         </p>
+                                        {citation.sourceTextPreview && citation.sourceTextPreview !== citation.quotePreview && (
+                                            <div className={`mt-2 rounded border px-2.5 py-2 ${isLight ? 'border-blue-100 bg-blue-50/70' : 'border-white/10 bg-black/10'}`}>
+                                                <div className={`mb-1 text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-blue-600' : 'text-sky-200/70'}`}>
+                                                    Surrounding source passage
+                                                </div>
+                                                <p className="whitespace-pre-wrap break-words">{citation.sourceTextPreview}</p>
+                                            </div>
+                                        )}
                                         <div className="mt-2 flex flex-wrap gap-2">
                                             <button
                                                 type="button"

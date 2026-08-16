@@ -5,6 +5,8 @@ import { internalAction, internalMutation, internalQuery } from './_generated/se
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import {
+  buildDocumentUnderstandingMapPrompt,
+  buildDocumentUnderstandingReducePrompt,
   renderVerifiedDocumentReview,
   verifyDocumentUnderstanding,
   type DocumentUnderstandingFinding,
@@ -306,13 +308,7 @@ export const processRun = internalAction({
         const last = work.chunks[work.chunks.length - 1];
         const source = work.chunks.map((chunk) =>
           `SOURCE_CHUNK_${chunk.chunkIndex} | ${pageCitation(chunk.pageStart, chunk.pageEnd)}\n${chunk.text}`).join('\n\n');
-        const payload = await generateNode([
-          'You are exhaustively reading one contiguous part of a legal document.',
-          'Capture every operative provision, ruling, obligation, prohibition, deadline, amount, finding, party, date, signature, reservation, ambiguity, and important procedural statement in the supplied chunks.',
-          'Do not infer facts that are not written. Every finding must include one or more exact SOURCE_CHUNK_n IDs and a short verbatim quote copied from one cited chunk.',
-          'Use category names that will remain useful in a complete court-order review. Do not omit seemingly routine language.',
-          source,
-        ].join('\n\n'));
+        const payload = await generateNode(buildDocumentUnderstandingMapPrompt(source));
         await ctx.runMutation(internal.documentUnderstanding.persistNode, {
           runId: work.run._id, expectedStatus: 'mapping', level: 0,
           nodeIndex: Math.floor(first.chunkIndex / MAP_CHUNKS),
@@ -327,11 +323,7 @@ export const processRun = internalAction({
         if (work.nodes.length === 0) throw new Error('Reduce phase found no nodes.');
         const first = work.nodes[0];
         const last = work.nodes[work.nodes.length - 1];
-        const payload = await generateNode([
-          'Merge these contiguous legal-document analyses without losing any distinct provision or source citation.',
-          'Deduplicate only genuinely identical findings. Preserve exact SOURCE_CHUNK_n IDs and verbatim supporting quotes. Do not invent or broaden claims.',
-          ...work.nodes.map((node, index) => `NODE_${index}\n${node.payloadJson}`),
-        ].join('\n\n'));
+        const payload = await generateNode(buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson)));
         const consumed = first.nodeIndex + work.nodes.length;
         await ctx.runMutation(internal.documentUnderstanding.persistNode, {
           runId: work.run._id, expectedStatus: 'reducing', level: work.run.currentLevel + 1,
@@ -355,7 +347,13 @@ export const processRun = internalAction({
       await ctx.runMutation(internal.documentUnderstanding.finalizeRun, {
         runId: work.run._id,
         structuredJson: JSON.stringify(payload),
-        renderedReviewMarkdown: renderVerifiedDocumentReview({ filename: work.file.filename, payload, chunks, coverageReceipt: coverageReceipt ?? undefined }),
+        renderedReviewMarkdown: renderVerifiedDocumentReview({
+          filename: work.file.filename,
+          payload,
+          chunks,
+          sourceUrl: `/api/documents/source/${work.file._id}`,
+          coverageReceipt: coverageReceipt ?? undefined,
+        }),
         sourceChunkIds: chunks.map((chunk) => chunk._id),
         sourceChunkIndexes,
         checks: ['coverage_manifest_complete', ...verification.checks],

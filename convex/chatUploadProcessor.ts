@@ -12,6 +12,7 @@ import { extractDocumentText, type DocumentExtractionResult } from '../src/lib/n
 import { detectDocumentType, type DocumentDetectionResult } from '../src/lib/nexx/documentTypeDetection';
 import { buildDocumentMemoryArtifacts, type DocumentMemoryArtifacts } from '../src/lib/nexx/documentChunking';
 import { DOCUMENT_EMBEDDING_MODEL, embedDocumentMemoryArtifacts, type EmbeddedDocumentMemoryArtifacts } from '../src/lib/nexx/documentEmbeddings';
+import { documentProviderPolicy } from '../src/lib/nexx/documentProviderPolicy';
 import { buildDocumentAliases } from '../src/lib/nexx/documentSelection';
 import { buildPageCoverageReceipt, buildTextCoverageReceipt, type CanonicalExtractedPage } from '../src/lib/nexx/documentExtractionTypes';
 import { createVectorStore, deleteVectorStore, uploadTextToVectorStore, uploadToVectorStore } from '../src/lib/nexx/fileSearch';
@@ -613,7 +614,8 @@ async function extractStoredDocument(
     return await extractLegacyDocWithWorker(ctx, context, detection);
   }
 
-  return await extractDocumentText(file, { buffer, detection });
+  const providerPolicy = documentProviderPolicy(context.session.intent, process.env.OPENAI_ZDR_CONFIRMED === 'true');
+  return await extractDocumentText(file, { buffer, detection, allowOpenAiOcr: providerPolicy.allowOpenAiOcr });
 }
 
 async function ensureVectorStore(ctx: ActionCtx, context: ProcessingContext): Promise<string> {
@@ -804,21 +806,29 @@ export const processStoredUpload = internalAction({
       let vectorStoreId: string | undefined;
       let indexingError: string | undefined;
 
+      const { allowHostedOpenAiDocumentStorage } = documentProviderPolicy(
+        context.session.intent,
+        process.env.OPENAI_ZDR_CONFIRMED === 'true',
+      );
       try {
-        const ensuredVectorStoreId = await ensureVectorStore(ctx, context);
-        vectorStoreId = ensuredVectorStoreId;
-        const metadata = {
-          source: 'user_upload' as const,
-          uploadSessionId: String(args.uploadSessionId),
-          originalFilename: context.session.filename,
-        };
-        openaiFileId = await uploadToVectorStore(ensuredVectorStoreId, file, metadata);
-        openaiTextFileId = await uploadTextToVectorStore(
-          ensuredVectorStoreId,
-          context.session.filename,
-          extractedText,
-          metadata,
-        );
+        if (!allowHostedOpenAiDocumentStorage) {
+          extraction.warnings = Array.from(new Set([...(extraction.warnings ?? []), 'HOSTED_FILE_SEARCH_SKIPPED_BY_PRIVACY_POLICY']));
+        } else {
+          const ensuredVectorStoreId = await ensureVectorStore(ctx, context);
+          vectorStoreId = ensuredVectorStoreId;
+          const metadata = {
+            source: 'user_upload' as const,
+            uploadSessionId: String(args.uploadSessionId),
+            originalFilename: context.session.filename,
+          };
+          openaiFileId = await uploadToVectorStore(ensuredVectorStoreId, file, metadata);
+          openaiTextFileId = await uploadTextToVectorStore(
+            ensuredVectorStoreId,
+            context.session.filename,
+            extractedText,
+            metadata,
+          );
+        }
       } catch (error) {
         indexingError = error instanceof Error ? error.message : String(error);
         console.warn('[ChatUpload] indexing partial failure', {

@@ -134,6 +134,8 @@ const attachmentRefValidator = v.object({
     extractionMethod: v.optional(v.string()),
     pagesProcessed: v.optional(v.number()),
     pagesTotal: v.optional(v.number()),
+    pagesOcrProcessed: v.optional(v.number()),
+    lowConfidenceUnits: v.optional(v.number()),
     contextTruncated: v.optional(v.boolean()),
     extractionWarnings: v.optional(v.array(v.string())),
     coverageStatus: v.optional(v.union(
@@ -988,6 +990,10 @@ export const acceptChatTurn = mutation({
                 extractionMethod: uploadedFile.extractionMethod,
                 pagesProcessed: uploadedFile.coverageAccountedUnits ?? uploadedFile.pagesOcrProcessed,
                 pagesTotal: uploadedFile.coverageExpectedUnits ?? uploadedFile.pagesTotal,
+                pagesOcrProcessed: uploadedFile.pagesOcrProcessed,
+                lowConfidenceUnits: uploadedFile.activeCoverageManifestId
+                    ? (await ctx.db.get(uploadedFile.activeCoverageManifestId))?.lowConfidenceUnits
+                    : undefined,
                 contextTruncated: uploadedFile.contextTruncated,
                 extractionWarnings: uploadedFile.extractionWarnings,
                 coverageStatus: uploadedFile.coverageStatus,
@@ -1208,6 +1214,8 @@ export const acceptChatTurn = mutation({
                         extractionMethod: attachment.extractionMethod,
                         pagesProcessed: attachment.pagesProcessed,
                         pagesTotal: attachment.pagesTotal,
+                        pagesOcrProcessed: attachment.pagesOcrProcessed,
+                        lowConfidenceUnits: attachment.lowConfidenceUnits,
                         contextTruncated: attachment.contextTruncated,
                         extractionWarnings: attachment.extractionWarnings,
                         coverageStatus: attachment.coverageStatus,

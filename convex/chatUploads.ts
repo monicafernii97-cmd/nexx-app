@@ -801,6 +801,9 @@ export const getUploadSession = query({
     if (session.uploadedFileId) {
       uploadedFile = await ctx.db.get(session.uploadedFileId);
     }
+    const coverageManifest = uploadedFile?.activeCoverageManifestId
+      ? await ctx.db.get(uploadedFile.activeCoverageManifestId)
+      : null;
 
     return {
       uploadSessionId: session._id,
@@ -826,6 +829,7 @@ export const getUploadSession = query({
       extractionWarnings: uploadedFile?.extractionWarnings,
       ocrAttempted: uploadedFile?.ocrAttempted,
       pagesOcrProcessed: uploadedFile?.pagesOcrProcessed,
+      lowConfidenceUnits: coverageManifest?.lowConfidenceUnits,
       pagesTotal: uploadedFile?.pagesTotal,
       coverageStatus: uploadedFile?.coverageStatus,
       coverageExpectedUnits: uploadedFile?.coverageExpectedUnits,
@@ -1249,6 +1253,10 @@ export const validateAttachmentsForChat = query({
         extractionMethod: uploadedFile.extractionMethod,
         pagesProcessed: uploadedFile.coverageAccountedUnits ?? uploadedFile.pagesOcrProcessed,
         pagesTotal: uploadedFile.coverageExpectedUnits ?? uploadedFile.pagesTotal,
+        pagesOcrProcessed: uploadedFile.pagesOcrProcessed,
+        lowConfidenceUnits: uploadedFile.activeCoverageManifestId
+          ? (await ctx.db.get(uploadedFile.activeCoverageManifestId))?.lowConfidenceUnits
+          : undefined,
         contextTruncated: uploadedFile.contextTruncated,
         extractionWarnings: uploadedFile.extractionWarnings,
         coverageStatus: uploadedFile.coverageStatus,

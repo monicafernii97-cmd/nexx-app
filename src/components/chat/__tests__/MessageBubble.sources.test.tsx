@@ -165,6 +165,9 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).toContain('Respondent shall pay by Friday.');
     expect(container.textContent).toContain('Surrounding source passage');
     expect(container.textContent).toContain('Payment must be received before 5:00 p.m.');
+    expect(container.querySelector('mark')?.textContent).toContain('Respondent shall pay by Friday.');
+    expect(container.querySelector('a[href="/api/documents/source/file_123#page=4"]')?.textContent)
+      .toContain('Open original at page 4');
   });
 
   it('does not render legacy confidence artifacts to the user', async () => {
@@ -371,7 +374,7 @@ describe('MessageBubble document evidence panel', () => {
     roots.push(root);
 
     const deadlineButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Create deadline checklist')
+      button.textContent?.includes('Obligations and deadlines')
     );
     expect(deadlineButton).toBeTruthy();
 
@@ -379,7 +382,9 @@ describe('MessageBubble document evidence panel', () => {
       deadlineButton?.click();
     });
 
-    expect(onSuggestedPrompt).toHaveBeenCalledWith('Create a deadline checklist from this court-order analysis.');
+    expect(onSuggestedPrompt).toHaveBeenCalledWith(
+      'List every obligation, trigger, deadline, exception, and consequence in the active court order with page citations.'
+    );
   });
 
   it('renders draft-ready artifacts as polished draft text and filing notes instead of raw JSON', async () => {
@@ -430,6 +435,8 @@ describe('MessageBubble document evidence panel', () => {
         analysisMode: 'full_document_review',
         pagesProcessed: 8,
         pagesTotal: 62,
+        pagesOcrProcessed: 11,
+        lowConfidenceUnits: 2,
         contextTruncated: true,
       }],
     });
@@ -438,6 +445,8 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).toContain('Signed Final Order.pdf');
     expect(container.textContent).toContain('Full document review');
     expect(container.textContent).toContain('8/62 pages explicitly accounted for');
+    expect(container.textContent).toContain('OCR used on 11 pages');
+    expect(container.textContent).toContain('2 low-confidence passages');
     expect(container.textContent).toContain('complete source coverage has not been verified');
     expect(container.getAttribute('aria-label')).toBeNull();
     expect(container.querySelector('[aria-label="Uploaded document status"]')).not.toBeNull();

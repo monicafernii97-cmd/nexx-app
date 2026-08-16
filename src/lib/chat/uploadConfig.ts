@@ -34,6 +34,8 @@ export type ChatAttachmentRef = {
   extractionMethod?: string;
   pagesProcessed?: number;
   pagesTotal?: number;
+  pagesOcrProcessed?: number;
+  lowConfidenceUnits?: number;
   contextTruncated?: boolean;
   extractionWarnings?: string[];
   coverageStatus?: 'complete' | 'partial' | 'failed' | 'unverified';

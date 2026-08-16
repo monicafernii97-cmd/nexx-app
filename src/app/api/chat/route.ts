@@ -24,6 +24,8 @@ type ChatAttachmentRef = {
   extractionMethod?: string;
   pagesProcessed?: number;
   pagesTotal?: number;
+  pagesOcrProcessed?: number;
+  lowConfidenceUnits?: number;
   contextTruncated?: boolean;
   extractionWarnings?: string[];
   coverageStatus?: 'complete' | 'partial' | 'failed' | 'unverified';
@@ -338,6 +340,8 @@ export async function POST(req: NextRequest) {
         extractionMethod: attachment.extractionMethod,
         pagesProcessed: attachment.pagesProcessed,
         pagesTotal: attachment.pagesTotal,
+        pagesOcrProcessed: attachment.pagesOcrProcessed,
+        lowConfidenceUnits: attachment.lowConfidenceUnits,
         contextTruncated: attachment.contextTruncated,
         extractionWarnings: attachment.extractionWarnings,
         coverageStatus: attachment.coverageStatus,

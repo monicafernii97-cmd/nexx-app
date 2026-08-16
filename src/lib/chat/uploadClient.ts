@@ -51,6 +51,7 @@ type UploadSessionSnapshot = {
   extractionWarnings?: string[];
   ocrAttempted?: boolean;
   pagesOcrProcessed?: number;
+  lowConfidenceUnits?: number;
   pagesTotal?: number;
   indexingError?: string;
   extractionError?: string;
@@ -253,6 +254,8 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot, intent: ChatUp
     extractionMethod: snapshot.extractionMethod,
     pagesProcessed: snapshot.coverageAccountedUnits ?? snapshot.pagesOcrProcessed,
     pagesTotal: snapshot.coverageExpectedUnits ?? snapshot.pagesTotal,
+    pagesOcrProcessed: snapshot.pagesOcrProcessed,
+    lowConfidenceUnits: snapshot.lowConfidenceUnits,
     contextTruncated: snapshot.contextTruncated,
     extractionWarnings: snapshot.extractionWarnings,
     coverageStatus: snapshot.coverageStatus,

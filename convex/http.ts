@@ -135,4 +135,50 @@ http.route({
   }),
 });
 
+http.route({
+  path: '/document-source',
+  method: 'GET',
+  handler: httpAction(async (ctx, request) => {
+    const uploadedFileId = new URL(request.url).searchParams.get('uploadedFileId');
+    if (!uploadedFileId || !(await ctx.auth.getUserIdentity())) {
+      return new Response('Authentication required', { status: 401, headers: { 'Cache-Control': 'no-store' } });
+    }
+    try {
+      const info = await ctx.runQuery(internal.uploadedFiles.getAuthorizedSourceFileInternal, {
+        uploadedFileId: uploadedFileId as Id<'uploadedFiles'>,
+      });
+      if (!info) return new Response('Source document not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+      const upstream = await fetch(info.storageUrl, { cache: 'no-store' });
+      if (!upstream.ok || !upstream.body) {
+        return new Response('Source document could not be retrieved', { status: 502, headers: { 'Cache-Control': 'no-store' } });
+      }
+      return new Response(upstream.body, {
+        headers: {
+          'Content-Type': info.mimeType,
+          ...(info.byteLength > 0 ? { 'Content-Length': String(info.byteLength) } : {}),
+          'Content-Disposition': inlineContentDisposition(info.filename),
+          'Cache-Control': 'private, no-store, max-age=0',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/invalid|validation|valid id/i.test(message)) {
+        return new Response('Invalid source document id', { status: 400, headers: { 'Cache-Control': 'no-store' } });
+      }
+      console.error(JSON.stringify({ level: 'error', event: 'document_source_failed', uploadedFileId }));
+      return new Response('Source document could not be retrieved', { status: 502, headers: { 'Cache-Control': 'no-store' } });
+    }
+  }),
+});
+
+function inlineContentDisposition(filename: string) {
+  const fallback = filename.replace(/["\\\r\n]/g, '_');
+  const encoded = encodeURIComponent(filename)
+    .replace(/['()]/g, (value) => `%${value.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/\*/g, '%2A');
+  return `inline; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
 export default http;

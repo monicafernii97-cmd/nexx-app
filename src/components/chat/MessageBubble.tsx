@@ -69,6 +69,8 @@ type UserAttachmentMetadata = {
     extractionMethod?: string;
     pagesProcessed?: number;
     pagesTotal?: number;
+    pagesOcrProcessed?: number;
+    lowConfidenceUnits?: number;
     contextTruncated?: boolean;
     extractionWarnings?: string[];
     coverageStatus?: string;
@@ -217,6 +219,8 @@ function getUserAttachments(metadata: unknown) {
             extractionMethod: typeof record.extractionMethod === 'string' ? record.extractionMethod : undefined,
             pagesProcessed: typeof record.pagesProcessed === 'number' ? record.pagesProcessed : undefined,
             pagesTotal: typeof record.pagesTotal === 'number' ? record.pagesTotal : undefined,
+            pagesOcrProcessed: typeof record.pagesOcrProcessed === 'number' ? record.pagesOcrProcessed : undefined,
+            lowConfidenceUnits: typeof record.lowConfidenceUnits === 'number' ? record.lowConfidenceUnits : undefined,
             contextTruncated: typeof record.contextTruncated === 'boolean' ? record.contextTruncated : undefined,
             extractionWarnings: Array.isArray(record.extractionWarnings)
                 ? record.extractionWarnings.filter((warning): warning is string => typeof warning === 'string').slice(0, 3)
@@ -238,6 +242,14 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                 const coverageText = attachment.pagesTotal !== undefined
                     ? `${attachment.pagesProcessed ?? 0}/${attachment.pagesTotal} pages explicitly accounted for`
                     : 'Page-by-page coverage verification pending';
+                const processingDetails = [
+                    typeof attachment.pagesOcrProcessed === 'number'
+                        ? `OCR used on ${attachment.pagesOcrProcessed} page${attachment.pagesOcrProcessed === 1 ? '' : 's'}`
+                        : undefined,
+                    typeof attachment.lowConfidenceUnits === 'number'
+                        ? `${attachment.lowConfidenceUnits} low-confidence passage${attachment.lowConfidenceUnits === 1 ? '' : 's'}`
+                        : undefined,
+                ].filter(Boolean).join(' · ');
                 const fullReviewPending = attachment.analysisMode === 'full_document_review' && (
                     attachment.coverageStatus !== 'complete' || attachment.fullDocumentReviewStatus !== 'ready'
                 );
@@ -268,6 +280,7 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                             {attachment.analysisMode === 'full_document_review' ? 'Full document review' : 'Document attachment'}
                             {' · '}{coverageText}
                         </div>
+                        {processingDetails && <div className="mt-1 text-[11px] leading-4 opacity-80">{processingDetails}</div>}
                         {hasWarning && (
                             <div className="mt-1 flex items-start gap-1 text-[11px] leading-4 text-amber-500">
                                 <WarningCircle size={13} className="mt-0.5 shrink-0" />
@@ -289,6 +302,20 @@ function getSourceLabel(source: DocumentSourceMetadata['source']) {
     if (source === 'shared_memory') return 'Shared document';
     if (source === 'conversation_memory') return 'Saved in this chat';
     return 'Uploaded document';
+}
+
+function HighlightedSourcePassage({ passage, quote }: { passage: string; quote: string }) {
+    const normalizedQuote = quote.replace(/^['"“”]+|['"“”]+$/g, '').trim();
+    if (!normalizedQuote) return <p className="whitespace-pre-wrap break-words">{passage}</p>;
+    const index = passage.toLocaleLowerCase().indexOf(normalizedQuote.toLocaleLowerCase());
+    if (index < 0) return <p className="whitespace-pre-wrap break-words">{passage}</p>;
+    return (
+        <p className="whitespace-pre-wrap break-words">
+            {passage.slice(0, index)}
+            <mark className="rounded bg-amber-200 px-0.5 text-amber-950">{passage.slice(index, index + normalizedQuote.length)}</mark>
+            {passage.slice(index + normalizedQuote.length)}
+        </p>
+    );
 }
 
 function DocumentEvidencePanel({
@@ -402,7 +429,7 @@ function DocumentEvidencePanel({
                                                 <div className={`mb-1 text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-blue-600' : 'text-sky-200/70'}`}>
                                                     Surrounding source passage
                                                 </div>
-                                                <p className="whitespace-pre-wrap break-words">{citation.sourceTextPreview}</p>
+                                                <HighlightedSourcePassage passage={citation.sourceTextPreview} quote={citation.quotePreview} />
                                             </div>
                                         )}
                                         <div className="mt-2 flex flex-wrap gap-2">
@@ -414,6 +441,15 @@ function DocumentEvidencePanel({
                                                 <Copy size={12} weight="regular" />
                                                 {copiedCitationId === citation.id ? 'Copied' : 'Copy quote'}
                                             </button>
+                                            <a
+                                                href={`/api/documents/source/${encodeURIComponent(citation.uploadedFileId)}${citation.pageStart ? `#page=${citation.pageStart}` : ''}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-bold transition-colors ${isLight ? 'bg-blue-50 text-blue-700 hover:bg-blue-100' : 'bg-white/10 text-sky-100 hover:bg-white/15'}`}
+                                            >
+                                                <FileText size={12} weight="regular" />
+                                                Open original{citation.pageStart ? ` at page ${citation.pageStart}` : ''}
+                                            </a>
                                         </div>
                                     </div>
                                 )}
@@ -503,28 +539,24 @@ function AnalysisStatusCard({ isLight, routeMode }: { isLight: boolean; routeMod
 
 const COURT_ORDER_FOLLOW_UPS = [
     {
-        label: 'Create deadline checklist',
-        prompt: 'Create a deadline checklist from this court-order analysis.',
+        label: 'Full order summary',
+        prompt: 'Give me the complete hierarchical summary of the active court order, grounded in the verified document record.',
     },
     {
-        label: 'Draft AppClose message',
-        prompt: 'Draft a concise AppClose message for the most important notice or compliance item in this order.',
+        label: 'Obligations and deadlines',
+        prompt: 'List every obligation, trigger, deadline, exception, and consequence in the active court order with page citations.',
     },
     {
-        label: 'Explain possession schedule',
-        prompt: 'Explain the possession schedule provisions from this order in plain English.',
+        label: 'Custody / possession schedule',
+        prompt: 'Explain the complete custody and possession schedule in the active court order, including holidays and overrides, with page citations.',
     },
     {
-        label: 'Extract only deadlines',
-        prompt: 'Extract only the deadlines, triggers, and recurring obligations from this order.',
+        label: 'Compare with this conversation',
+        prompt: 'Compare the active court order with the facts and issues discussed in this conversation. Identify what applies and cite the controlling provisions.',
     },
     {
-        label: 'Create compliance calendar',
-        prompt: 'Create a compliance calendar from the deadlines and recurring obligations in this order.',
-    },
-    {
-        label: 'Find enforcement risks',
-        prompt: 'Find the enforcement risks and ambiguous provisions in this order.',
+        label: 'Ask a specific question',
+        prompt: 'Help me frame a specific question about the active court order before answering it.',
     },
 ] as const;
 

@@ -194,6 +194,18 @@ async function writeDocumentMemoryArtifacts(
   extractionStartedAt: number,
 ) {
   const batchSize = 40;
+  const effectiveCoverage = extraction.coverage ?? {
+    unitKind: 'text' as const,
+    expectedUnits: 1,
+    attemptedUnits: 1,
+    succeededUnits: 1,
+    lowConfidenceUnits: 0,
+    verifiedBlankUnits: 0,
+    failedUnits: 0,
+    omittedUnits: 0,
+    status: 'complete' as const,
+    warnings: ['TEXT_SOURCE_UNIT_COVERAGE'],
+  };
   const generation = await ctx.runMutation(internal.documentMemoryGenerations.createGeneration, {
     uploadedFileId,
     reason: 'initial_upload',
@@ -211,13 +223,13 @@ async function writeDocumentMemoryArtifacts(
   let generationMarkedFailed = false;
 
   try {
-    if (extraction.coverage?.unitKind === 'page' && extraction.coverage.expectedUnits > 0) {
+    if (effectiveCoverage.expectedUnits > 0) {
       coverageManifestId = (await ctx.runMutation(internal.documentMemoryGenerations.createCoverageManifest, {
         uploadedFileId,
         memoryGenerationId: generation.memoryGenerationId,
-        unitKind: 'page',
-        expectedUnits: extraction.coverage.expectedUnits,
-        warnings: extraction.coverage.warnings,
+        unitKind: effectiveCoverage.unitKind,
+        expectedUnits: effectiveCoverage.expectedUnits,
+        warnings: effectiveCoverage.warnings,
       }) as { coverageManifestId: Id<'documentCoverageManifests'> }).coverageManifestId;
     }
 
@@ -237,10 +249,8 @@ async function writeDocumentMemoryArtifacts(
       status: artifacts.pages.length > 0 && artifacts.chunks.length > 0 ? 'succeeded' : 'empty',
       startedAt: extractionStartedAt,
       finishedAt: Date.now(),
-      pageCountAttempted: extraction.coverage?.attemptedUnits ?? extraction.pagesTotal ?? artifacts.pages.length,
-      pageCountSucceeded: extraction.coverage
-        ? extraction.coverage.succeededUnits + extraction.coverage.verifiedBlankUnits
-        : extraction.pagesOcrProcessed ?? artifacts.pages.length,
+      pageCountAttempted: effectiveCoverage.attemptedUnits,
+      pageCountSucceeded: effectiveCoverage.succeededUnits + effectiveCoverage.verifiedBlankUnits,
       averageConfidence: extraction.ocrAverageConfidence,
       minConfidence: extraction.ocrMinConfidence,
       warnings: extraction.warnings ?? [],
@@ -263,13 +273,13 @@ async function writeDocumentMemoryArtifacts(
       storedPageRefs.push(...result.pages);
     }
 
-    if (coverageManifestId && extraction.coverage) {
+    if (coverageManifestId && effectiveCoverage.unitKind === 'page') {
       const pageArtifactBySourceIndex = new Map(
         artifacts.pages.map((page) => [page.sourcePageIndex ?? page.pageNumber - 1, page]),
       );
       const pageIdByPageNumber = new Map(storedPageRefs.map((page) => [page.pageNumber, page.pageId]));
       const coverageUnits = Array.from(
-        { length: extraction.coverage.expectedUnits },
+        { length: effectiveCoverage.expectedUnits },
         (_, unitIndex) => {
           const page = pageArtifactBySourceIndex.get(unitIndex);
           return {
@@ -295,6 +305,28 @@ async function writeDocumentMemoryArtifacts(
           units,
         });
       }
+      await ctx.runMutation(internal.documentMemoryGenerations.finalizeCoverageManifest, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        coverageManifestId,
+      });
+    } else if (coverageManifestId && effectiveCoverage.unitKind === 'text') {
+      await ctx.runMutation(internal.documentMemoryGenerations.insertCoverageUnitBatch, {
+        uploadedFileId,
+        memoryGenerationId: generation.memoryGenerationId,
+        coverageManifestId,
+        unitKind: 'text',
+        units: [{
+          unitIndex: 0,
+          unitLabel: 'Document text',
+          status: 'succeeded',
+          extractionMethod: extraction.method,
+          nativeTextChars: extraction.text?.length ?? 0,
+          canonicalTextChars: extraction.text?.length ?? 0,
+          ocrApplied: Boolean(extraction.ocrAttempted),
+          warnings: effectiveCoverage.warnings,
+        }],
+      });
       await ctx.runMutation(internal.documentMemoryGenerations.finalizeCoverageManifest, {
         uploadedFileId,
         memoryGenerationId: generation.memoryGenerationId,

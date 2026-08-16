@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes } from '@phosphor-icons/react';
+import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes, WarningCircle } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, useCallback, useMemo, useId } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -58,6 +58,18 @@ type DocumentCitationMetadata = {
     citationLabel?: string;
     quotePreview: string;
     citationVerifierStatus: 'verified' | 'partial' | 'failed';
+};
+
+type UserAttachmentMetadata = {
+    uploadedFileId: string;
+    filename: string;
+    status: 'ready' | 'partial';
+    analysisMode?: string;
+    extractionMethod?: string;
+    pagesProcessed?: number;
+    pagesTotal?: number;
+    contextTruncated?: boolean;
+    extractionWarnings?: string[];
 };
 
 // ── Shared action button (declared OUTSIDE render to satisfy react-hooks/static-components) ──
@@ -175,6 +187,87 @@ function getMetadataBoolean(metadata: unknown, key: string) {
 function shouldShowDocumentEvidence(metadata: unknown) {
     return getMetadataBoolean(metadata, 'showDocumentSources') ||
         getMetadataString(metadata, 'sourceDisplayMode') === 'expanded';
+}
+
+function getUserAttachments(metadata: unknown) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
+    const rawAttachments = (metadata as Record<string, unknown>).attachments;
+    if (!Array.isArray(rawAttachments)) return [];
+
+    return rawAttachments.flatMap((attachment): UserAttachmentMetadata[] => {
+        if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return [];
+        const record = attachment as Record<string, unknown>;
+        if (
+            typeof record.uploadedFileId !== 'string' ||
+            typeof record.filename !== 'string' ||
+            (record.status !== 'ready' && record.status !== 'partial')
+        ) {
+            return [];
+        }
+
+        return [{
+            uploadedFileId: record.uploadedFileId,
+            filename: record.filename,
+            status: record.status,
+            analysisMode: typeof record.analysisMode === 'string' ? record.analysisMode : undefined,
+            extractionMethod: typeof record.extractionMethod === 'string' ? record.extractionMethod : undefined,
+            pagesProcessed: typeof record.pagesProcessed === 'number' ? record.pagesProcessed : undefined,
+            pagesTotal: typeof record.pagesTotal === 'number' ? record.pagesTotal : undefined,
+            contextTruncated: typeof record.contextTruncated === 'boolean' ? record.contextTruncated : undefined,
+            extractionWarnings: Array.isArray(record.extractionWarnings)
+                ? record.extractionWarnings.filter((warning): warning is string => typeof warning === 'string').slice(0, 3)
+                : undefined,
+        }];
+    }).slice(0, 5);
+}
+
+function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAttachmentMetadata[]; isLight: boolean }) {
+    if (attachments.length === 0) return null;
+
+    return (
+        <div className="mt-2 w-full space-y-2" aria-label="Uploaded document status">
+            {attachments.map((attachment) => {
+                const coverageText = attachment.pagesTotal !== undefined
+                    ? `${attachment.pagesProcessed ?? 0}/${attachment.pagesTotal} pages explicitly accounted for`
+                    : 'Page-by-page coverage verification pending';
+                const hasWarning = attachment.analysisMode === 'full_document_review' ||
+                    attachment.status === 'partial' ||
+                    attachment.contextTruncated ||
+                    Boolean(attachment.extractionWarnings?.length);
+
+                return (
+                    <div
+                        key={attachment.uploadedFileId}
+                        className={`rounded-xl border px-3 py-2 text-left ${isLight
+                            ? 'border-gray-200 bg-white text-gray-700'
+                            : 'border-white/10 bg-white/[0.06] text-white/75'
+                            }`}
+                    >
+                        <div className="flex items-center gap-2 text-xs font-semibold">
+                            <FileText size={15} weight="duotone" />
+                            <span className="min-w-0 truncate">{attachment.filename}</span>
+                            <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${attachment.status === 'ready'
+                                ? 'bg-emerald-500/15 text-emerald-500'
+                                : 'bg-amber-500/15 text-amber-500'
+                                }`}>
+                                {attachment.status}
+                            </span>
+                        </div>
+                        <div className="mt-1 text-[11px] leading-4 opacity-80">
+                            {attachment.analysisMode === 'full_document_review' ? 'Full document review' : 'Document attachment'}
+                            {' · '}{coverageText}
+                        </div>
+                        {hasWarning && (
+                            <div className="mt-1 flex items-start gap-1 text-[11px] leading-4 text-amber-500">
+                                <WarningCircle size={13} className="mt-0.5 shrink-0" />
+                                <span>Extraction is usable, but complete source coverage has not been verified.</span>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
 }
 
 function getSourceLabel(source: DocumentSourceMetadata['source']) {
@@ -743,6 +836,7 @@ export default function MessageBubble({
         ? sanitizedAssistantContent ?? ''
         : content;
     const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && visibleContent.includes('Court Order Analysis');
+    const userAttachments = useMemo(() => getUserAttachments(metadata), [metadata]);
 
     useEffect(() => {
         return () => {
@@ -868,6 +962,7 @@ export default function MessageBubble({
                                 }`}>
                                 {content}
                             </div>
+                            <UserAttachmentReceipt attachments={userAttachments} isLight={isLight} />
                             {/* User action bar */}
                             <div className={`${actionBarClass} mt-1`}>
                                 <ActionButton onClick={handleCopy} label={copied ? 'Copied' : 'Copy message'} isLight={isLight}>

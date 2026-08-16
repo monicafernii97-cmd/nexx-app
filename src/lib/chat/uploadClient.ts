@@ -14,6 +14,7 @@ import {
   type StorageUploadDiagnosticEvent,
 } from './uploadErrors';
 import { shouldPersistUploadProgressDiagnostic } from './uploadShared';
+import { analysisModeForUploadIntent } from './documentAnalysisMode';
 
 type ConvexClientLike = {
   mutation: ConvexReactClient['mutation'];
@@ -230,7 +231,7 @@ function assertReadyUpload(snapshot: UploadSessionSnapshot): asserts snapshot is
   }
 }
 
-function buildChatUploadResponse(snapshot: UploadSessionSnapshot): ChatUploadResponse {
+function buildChatUploadResponse(snapshot: UploadSessionSnapshot, intent: ChatUploadIntent): ChatUploadResponse {
   assertReadyUpload(snapshot);
   const attachmentRef: ChatAttachmentRef = {
     uploadedFileId: snapshot.uploadedFileId,
@@ -240,6 +241,12 @@ function buildChatUploadResponse(snapshot: UploadSessionSnapshot): ChatUploadRes
     mimeType: snapshot.mimeType,
     byteSize: snapshot.byteSize,
     status: snapshot.status,
+    analysisMode: analysisModeForUploadIntent(intent),
+    extractionMethod: snapshot.extractionMethod,
+    pagesProcessed: snapshot.pagesOcrProcessed,
+    pagesTotal: snapshot.pagesTotal,
+    contextTruncated: snapshot.contextTruncated,
+    extractionWarnings: snapshot.extractionWarnings,
   };
 
   return {
@@ -692,5 +699,5 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     uploadSessionId,
     uploadAttemptId,
     storageId,
-  });
+  }, args.intent);
 }

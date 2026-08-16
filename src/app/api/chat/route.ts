@@ -6,6 +6,7 @@ import { resolveTurnRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 import type { RouteMode } from '@/lib/types';
+import { isDocumentAnalysisMode, type DocumentAnalysisMode } from '@/lib/chat/documentAnalysisMode';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_REQUEST_ID_LENGTH = 256;
@@ -19,6 +20,12 @@ type ChatAttachmentRef = {
   mimeType: string;
   byteSize: number;
   status: 'ready' | 'partial';
+  analysisMode?: DocumentAnalysisMode;
+  extractionMethod?: string;
+  pagesProcessed?: number;
+  pagesTotal?: number;
+  contextTruncated?: boolean;
+  extractionWarnings?: string[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,7 +43,8 @@ function isChatAttachmentRef(value: unknown): value is ChatAttachmentRef {
     typeof value.byteSize === 'number' &&
     Number.isFinite(value.byteSize) &&
     value.byteSize > 0 &&
-    (value.status === 'ready' || value.status === 'partial')
+    (value.status === 'ready' || value.status === 'partial') &&
+    (value.analysisMode === undefined || isDocumentAnalysisMode(value.analysisMode))
   );
 }
 
@@ -263,6 +271,7 @@ export async function POST(req: NextRequest) {
     activeMode: activeRouteMode,
     hasActiveDocumentContext,
   });
+  const analysisMode = sanitizedAttachments.find((attachment) => attachment.analysisMode)?.analysisMode;
   console.info('[Chat] Accepting chat turn', {
     requestId: turnRequestId,
     conversationIdPresent: Boolean(conversationId),
@@ -271,6 +280,7 @@ export async function POST(req: NextRequest) {
     hasActiveDocumentContext,
     attachmentStatuses: sanitizedAttachments.map((attachment) => attachment.status),
     routeMode: routerResult.mode,
+    analysisMode,
   });
   const routeModeToFeature: Record<
     string,
@@ -310,6 +320,7 @@ export async function POST(req: NextRequest) {
       message,
       mode: resolvedMode,
       routeMode: routerResult.mode,
+      analysisMode,
       model,
       temperature: routerResult.temperature,
       userContextJson,
@@ -321,6 +332,12 @@ export async function POST(req: NextRequest) {
         mimeType: attachment.mimeType,
         byteSize: attachment.byteSize,
         status: attachment.status,
+        analysisMode: attachment.analysisMode,
+        extractionMethod: attachment.extractionMethod,
+        pagesProcessed: attachment.pagesProcessed,
+        pagesTotal: attachment.pagesTotal,
+        contextTruncated: attachment.contextTruncated,
+        extractionWarnings: attachment.extractionWarnings,
       })),
       persistUserMessage: persistUserMessage !== false,
       retryOfAssistantMessageId: retryOfAssistantMessageId

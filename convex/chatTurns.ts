@@ -84,6 +84,14 @@ function compactConversationSummaryJson(value: string) {
     }
 }
 
+const documentAnalysisModeValidator = v.union(
+    v.literal('full_document_review'),
+    v.literal('obligations_and_deadlines'),
+    v.literal('custody_and_possession'),
+    v.literal('compare_with_conversation'),
+    v.literal('focused_question')
+);
+
 const documentEvidenceSourceValidator = v.object({
     uploadedFileId: v.id('uploadedFiles'),
     filename: v.string(),
@@ -117,6 +125,12 @@ const attachmentRefValidator = v.object({
     mimeType: v.string(),
     byteSize: v.number(),
     status: v.union(v.literal('ready'), v.literal('partial')),
+    analysisMode: v.optional(documentAnalysisModeValidator),
+    extractionMethod: v.optional(v.string()),
+    pagesProcessed: v.optional(v.number()),
+    pagesTotal: v.optional(v.number()),
+    contextTruncated: v.optional(v.boolean()),
+    extractionWarnings: v.optional(v.array(v.string())),
 });
 
 /**
@@ -238,6 +252,10 @@ function buildUploadedFileContext(
         return null;
     }
 
+    const hasKnownPageShortfall = uploadedFile.pagesTotal !== undefined &&
+        uploadedFile.pagesOcrProcessed !== undefined &&
+        uploadedFile.pagesOcrProcessed < uploadedFile.pagesTotal;
+
     return {
         uploadedFileId: uploadedFile._id,
         uploadSessionId,
@@ -257,6 +275,11 @@ function buildUploadedFileContext(
         contextTruncated: uploadedFile.contextTruncated,
         indexingError: uploadedFile.indexingError,
         extractionError: uploadedFile.extractionError,
+        pagesProcessed: uploadedFile.pagesOcrProcessed,
+        pagesTotal: uploadedFile.pagesTotal,
+        coverageStatus: (uploadedFile.status === 'partial' || hasKnownPageShortfall || uploadedFile.contextTruncated)
+            ? 'partial' as const
+            : 'unverified' as const,
     };
 }
 
@@ -811,6 +834,7 @@ export const acceptChatTurn = mutation({
         message: v.string(),
         mode: v.optional(turnModeValidator),
         routeMode: v.optional(routeModeValidator),
+        analysisMode: v.optional(documentAnalysisModeValidator),
         model: v.optional(v.string()),
         temperature: v.optional(v.number()),
         userContextJson: v.optional(v.string()),
@@ -828,8 +852,12 @@ export const acceptChatTurn = mutation({
 
         for (const attachment of attachments) {
             const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
+            const uploadSession = await ctx.db.get(attachment.uploadSessionId);
             if (
                 !uploadedFile ||
+                !uploadSession ||
+                uploadSession.clerkUserId !== user.clerkId ||
+                uploadSession.conversationId !== args.conversationId ||
                 uploadedFile.clerkUserId !== user.clerkId ||
                 uploadedFile.conversationId !== args.conversationId ||
                 uploadedFile.uploadSessionId !== attachment.uploadSessionId ||
@@ -846,8 +874,16 @@ export const acceptChatTurn = mutation({
                 mimeType: uploadedFile.mimeType,
                 byteSize: uploadedFile.byteSize ?? attachment.byteSize,
                 status: uploadedFile.status as 'ready' | 'partial',
+                analysisMode: uploadSession.intent === 'court_order' ? 'full_document_review' as const : attachment.analysisMode,
+                extractionMethod: uploadedFile.extractionMethod,
+                pagesProcessed: uploadedFile.pagesOcrProcessed,
+                pagesTotal: uploadedFile.pagesTotal,
+                contextTruncated: uploadedFile.contextTruncated,
+                extractionWarnings: uploadedFile.extractionWarnings,
             });
         }
+
+        const analysisMode = validatedAttachments.find((attachment) => attachment.analysisMode)?.analysisMode ?? args.analysisMode;
 
         const existingTurn = await ctx.db
             .query('chatTurns')
@@ -1021,6 +1057,7 @@ export const acceptChatTurn = mutation({
             mode,
             status: 'accepted',
             routeMode,
+            analysisMode,
             retryOfAssistantMessageId: args.retryOfAssistantMessageId,
             editOfUserMessageId: args.editOfUserMessageId,
             attempt: 0,
@@ -1055,6 +1092,12 @@ export const acceptChatTurn = mutation({
                         mimeType: attachment.mimeType,
                         byteSize: attachment.byteSize,
                         status: attachment.status,
+                        analysisMode: attachment.analysisMode,
+                        extractionMethod: attachment.extractionMethod,
+                        pagesProcessed: attachment.pagesProcessed,
+                        pagesTotal: attachment.pagesTotal,
+                        contextTruncated: attachment.contextTruncated,
+                        extractionWarnings: attachment.extractionWarnings,
                     })),
                 },
                 requestId: `${args.requestId}-user`,
@@ -1074,6 +1117,7 @@ export const acceptChatTurn = mutation({
                     mimeType: attachment.mimeType,
                     byteSize: attachment.byteSize,
                     status: attachment.status,
+                    analysisMode: attachment.analysisMode,
                     createdAt: now,
                 });
             }
@@ -1123,6 +1167,7 @@ export const acceptChatTurn = mutation({
                 requestId: args.requestId,
                 mode,
                 routeMode,
+                analysisMode,
                 attachmentCount: validatedAttachments.length,
                 persistedUserMessage: shouldPersistUserMessage,
             },

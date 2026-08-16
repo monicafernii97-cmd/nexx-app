@@ -220,6 +220,8 @@ describe('uploadClient direct storage flow', () => {
         storageId: 'storage-1',
         filename: 'order.pdf',
         status: 'ready',
+        analysisMode: 'full_document_review',
+        extractionMethod: 'text',
       },
     });
     expect(onProgress).toHaveBeenCalledWith(100);

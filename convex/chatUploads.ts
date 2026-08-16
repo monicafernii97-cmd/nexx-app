@@ -1173,8 +1173,12 @@ export const validateAttachmentsForChat = query({
     const sanitized = [];
     for (const attachment of args.attachments) {
       const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
+      const uploadSession = await ctx.db.get(attachment.uploadSessionId);
       if (
         !uploadedFile ||
+        !uploadSession ||
+        uploadSession.clerkUserId !== clerkUserId ||
+        uploadSession.conversationId !== args.conversationId ||
         uploadedFile.clerkUserId !== clerkUserId ||
         uploadedFile.conversationId !== args.conversationId ||
         uploadedFile.uploadSessionId !== attachment.uploadSessionId ||
@@ -1204,6 +1208,12 @@ export const validateAttachmentsForChat = query({
         mimeType: uploadedFile.mimeType,
         byteSize: uploadedFile.byteSize ?? attachment.byteSize,
         status: uploadedFile.status as 'ready' | 'partial',
+        analysisMode: uploadSession.intent === 'court_order' ? 'full_document_review' as const : undefined,
+        extractionMethod: uploadedFile.extractionMethod,
+        pagesProcessed: uploadedFile.pagesOcrProcessed,
+        pagesTotal: uploadedFile.pagesTotal,
+        contextTruncated: uploadedFile.contextTruncated,
+        extractionWarnings: uploadedFile.extractionWarnings,
       });
     }
 

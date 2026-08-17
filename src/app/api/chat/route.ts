@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   const invalidModeTargets =
     (resolvedMode === 'send' && (hasRetryTarget || hasEditTarget || persistUserMessage === false)) ||
     (resolvedMode === 'retry' && (!hasRetryTarget || hasEditTarget || persistUserMessage !== false)) ||
-    (resolvedMode === 'edit' && (!hasEditTarget || hasRetryTarget || persistUserMessage !== false));
+    (resolvedMode === 'edit' && (!hasEditTarget || hasRetryTarget || persistUserMessage !== true));
   if (invalidModeTargets) {
     return Response.json({ error: 'Chat action does not match its target message.' }, { status: 400 });
   }
@@ -361,7 +361,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!accepted.duplicate && persistUserMessage !== false && isPlaceholderTitle(conversation.title)) {
+    if (!accepted.duplicate && resolvedMode === 'send' && persistUserMessage !== false && isPlaceholderTitle(conversation.title)) {
       try {
         await convex.mutation(api.conversations.updateTitle, {
           id: typedConversationId,

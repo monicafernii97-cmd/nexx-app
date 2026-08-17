@@ -116,11 +116,10 @@ describe('toProviderInputMessages', () => {
       ])
     ).toEqual([
       { role: 'user', content: 'Analyze the uploaded order.' },
-      { role: 'assistant', content: 'Prior answer.' },
     ]);
   });
 
-  it('does not forward draft, failed, or deleted messages to the provider', () => {
+  it('does not forward draft, failed, degraded, deleted, or superseded messages', () => {
     expect(
       toProviderInputMessages([
         {
@@ -153,10 +152,16 @@ describe('toProviderInputMessages', () => {
           content: 'Degraded but sendable answer.',
           status: 'degraded',
         },
+        {
+          turnId: 'turn-6',
+          role: 'assistant',
+          content: 'Superseded answer.',
+          status: 'committed',
+          superseded: true,
+        },
       ])
     ).toEqual([
       { role: 'user', content: 'Committed user message.' },
-      { role: 'assistant', content: 'Degraded but sendable answer.' },
     ]);
   });
 });

@@ -47,6 +47,8 @@ describe('conversation memory edit and retry policy', () => {
         { role: 'assistant', content: 'rejected answer', status: 'deleted', turnNumber: 3, roleOrder: 1 },
         { role: 'assistant', content: 'streaming draft', status: 'draft', turnNumber: 3, roleOrder: 1 },
         { role: 'assistant', content: 'failed answer', status: 'failed', turnNumber: 3, roleOrder: 1 },
+        { role: 'assistant', content: 'superseded answer', status: 'committed', superseded: true, turnNumber: 3, roleOrder: 1 },
+        { role: 'assistant', content: 'degraded answer', status: 'degraded', turnNumber: 3, roleOrder: 1 },
         { role: 'user', content: 'edited request', status: 'committed', turnNumber: 4, roleOrder: 0 },
         { role: 'user', content: 'too old', status: 'committed', turnNumber: 2, roleOrder: 0 },
         { role: 'assistant', content: 'too new', status: 'committed', turnNumber: 5, roleOrder: 1 },

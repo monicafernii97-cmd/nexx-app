@@ -102,6 +102,10 @@ describe('legal interpretation response shape', () => {
   it('validates the new NexxAssistantResponse legalInterpretation field', () => {
     expect(validateAssistantResponse({
       message: 'No - Father\'s Day starts Friday.',
+      agenticOutcome: {
+        status: 'complete', completed: ['Answered'], missing: [], blockedReason: null,
+        retryable: false, nextBestAction: null, correction: null,
+      },
       artifacts: {
         draftReady: null,
         timelineReady: null,

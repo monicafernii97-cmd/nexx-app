@@ -251,7 +251,7 @@ async function insertOpenReviewFlagOnce(
 }
 
 const DEGRADED_MESSAGE =
-    'I saved your message, but NEXX could not finish the response right now. Please retry this turn in a moment.';
+    'Your message is saved. I could not finish the answer right now. Try this response again; I will reuse the work already completed.';
 const EMPTY_ARTIFACTS_JSON = JSON.stringify({
     draftReady: null,
     timelineReady: null,
@@ -658,6 +658,13 @@ function metadataFromJson(metadataJson?: string) {
     }
 }
 
+function agenticOutcomeFromMetadata(metadata: Record<string, unknown>) {
+    const value = metadata.agenticOutcome;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : undefined;
+}
+
 /** Load normalized aliases for a stored document before ranking it for recall. */
 async function getDocumentAliases(ctx: QueryCtx, uploadedFileId: Id<'uploadedFiles'>) {
     const aliases = await ctx.db
@@ -868,6 +875,15 @@ async function saveDegradedAssistantForTurn(
         degraded: true,
         errorCode,
         errorMessage,
+        agenticOutcome: {
+            status: 'temporarily_blocked',
+            completed: ['Saved the user message'],
+            missing: ['Completed assistant answer'],
+            blockedReason: errorMessage,
+            retryable: true,
+            nextBestAction: { kind: 'retry', label: 'Try again', prompt: 'Retry this response using saved state.' },
+            correction: null,
+        },
     };
     let assistantMessageId = turn.assistantMessageId;
     let shouldIncrementMessageCount = false;
@@ -1028,7 +1044,7 @@ export const acceptChatTurn = mutation({
         }
 
         const mode = (args.mode ?? 'send') as ChatRegenerationMode;
-        const shouldPersistUserMessage = mode === 'send';
+        const shouldPersistUserMessage = mode !== 'retry';
         if (args.persistUserMessage !== undefined && args.persistUserMessage !== shouldPersistUserMessage) {
             throw new Error('Chat turn persistence does not match the requested mode.');
         }
@@ -1043,7 +1059,7 @@ export const acceptChatTurn = mutation({
                 retryOfAssistantMessageId: args.retryOfAssistantMessageId?.toString(),
                 editOfUserMessageId: args.editOfUserMessageId?.toString(),
             })
-            : { promptMessage: args.message, deleteMessageIds: [] as string[] };
+            : { promptMessage: args.message, supersedeMessageIds: [] as string[] };
         if (mode !== 'send') {
             regenerationMessages = await ctx.db
                 .query('messages')
@@ -1088,20 +1104,9 @@ export const acceptChatTurn = mutation({
             };
         }
 
-        if (regenerationPlan.editedUserMessageId) {
-            const editedMessage = regenerationMessages.find(
-                (candidate) => candidate._id.toString() === regenerationPlan.editedUserMessageId
-            );
-            if (!editedMessage) throw new Error('The message selected for editing is no longer available.');
-            await ctx.db.patch(editedMessage._id, {
-                content: effectiveMessage,
-                version: (editedMessage.version ?? 1) + 1,
-                updatedAt: now,
-            });
-        }
-        const deletedMessageIds = new Set(regenerationPlan.deleteMessageIds);
+        const supersededMessageIds = new Set(regenerationPlan.supersedeMessageIds);
 
-        if (mode !== 'send' && (regenerationPlan.editedUserMessageId || deletedMessageIds.size > 0)) {
+        if (mode !== 'send' && (regenerationPlan.editedUserMessageId || supersededMessageIds.size > 0)) {
             const existingSummary = await ctx.db
                 .query('conversationSummaries')
                 .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
@@ -1109,23 +1114,16 @@ export const acceptChatTurn = mutation({
             const changesSummarizedHistory = shouldInvalidateConversationSummary({
                 summaryTurnCount: existingSummary?.turnCount,
                 editedMessageId: regenerationPlan.editedUserMessageId,
-                deletedMessageIds,
+                deletedMessageIds: supersededMessageIds,
                 messages: regenerationMessages.map((candidate) => ({
                     id: candidate._id.toString(),
                     turnNumber: candidate.turnNumber ?? 0,
                 })),
             });
             if (existingSummary && changesSummarizedHistory) {
-                // A free-form summary cannot be patched safely after an edit/retry.
-                // Delete it now; the completed regeneration turn forces a rebuild
-                // from the surviving canonical message history.
+                // A free-form summary cannot be patched safely after a branch changes.
+                // Rebuild from the active, non-superseded history after completion.
                 await ctx.db.delete(existingSummary._id);
-            }
-        }
-
-        for (const candidate of regenerationMessages) {
-            if (deletedMessageIds.has(candidate._id.toString())) {
-                await ctx.db.delete(candidate._id);
             }
         }
 
@@ -1189,6 +1187,12 @@ export const acceptChatTurn = mutation({
             updatedAt: now,
         });
 
+        for (const candidate of regenerationMessages) {
+            if (supersededMessageIds.has(candidate._id.toString())) {
+                await ctx.db.patch(candidate._id, { supersededByTurnId: turnId, updatedAt: now });
+            }
+        }
+
         let userMessageId: Id<'messages'> | undefined;
         if (shouldPersistUserMessage) {
             userMessageId = await ctx.db.insert('messages', {
@@ -1203,6 +1207,7 @@ export const acceptChatTurn = mutation({
                 version: 1,
                 metadata: {
                     requestId: args.requestId,
+                    editedFromMessageId: regenerationPlan.editedUserMessageId,
                     attachments: validatedAttachments.map((attachment) => ({
                         uploadedFileId: attachment.uploadedFileId,
                         uploadSessionId: attachment.uploadSessionId,
@@ -1227,6 +1232,11 @@ export const acceptChatTurn = mutation({
                 updatedAt: now,
                 mode: routeMode,
             });
+
+            if (regenerationPlan.editedUserMessageId) {
+                const editedMessageId = regenerationPlan.editedUserMessageId as Id<'messages'>;
+                await ctx.db.patch(editedMessageId, { supersededByMessageId: userMessageId, updatedAt: now });
+            }
 
             for (const attachment of validatedAttachments) {
                 await ctx.db.insert('messageAttachments', {
@@ -1274,7 +1284,7 @@ export const acceptChatTurn = mutation({
         await ctx.db.patch(args.conversationId, {
             nextTurnNumber: turnNumber + 1,
             lastMessageAt: now,
-            messageCount: Math.max(0, (conversation.messageCount ?? 0) - deletedMessageIds.size) + (shouldPersistUserMessage ? 1 : 0),
+            messageCount: (conversation.messageCount ?? 0) + (shouldPersistUserMessage ? 1 : 0),
             routeMode,
         });
 
@@ -1479,7 +1489,12 @@ export const getGenerationContext = internalQuery({
         const routeMode = turn.routeMode ?? conversation.routeMode as RouteMode | undefined;
         const contextualFollowUpMessage = buildContextualDocumentFollowUpMessage(
             turn.message,
-            recentMessages.filter((m) => m.status !== 'deleted'),
+            recentMessages.filter((message) =>
+                message.status !== 'deleted' &&
+                message.status !== 'degraded' &&
+                !message.supersededByMessageId &&
+                !message.supersededByTurnId
+            ),
             routeMode,
             4_000,
             summarizeActiveLegalIssue(activeLegalIssueState ? {
@@ -1770,7 +1785,11 @@ export const getGenerationContext = internalQuery({
             documentAmbiguity,
             attachmentContexts,
             availableDocumentContexts,
-            recentMessages: recentMessages.filter((m) => m.status !== 'deleted'),
+            recentMessages: recentMessages.filter((message) =>
+                message.status !== 'deleted' &&
+                !message.supersededByMessageId &&
+                !message.supersededByTurnId
+            ),
         };
     },
 });
@@ -1841,6 +1860,7 @@ export const getConversationMemoryPage = internalQuery({
                 role: message.role,
                 content: compactConversationMemoryContent(message.content),
                 status: message.status,
+                superseded: Boolean(message.supersededByTurnId || message.supersededByMessageId),
                 turnNumber: message.turnNumber ?? 0,
                 roleOrder: message.roleOrder ?? (message.role === 'user' ? 0 : 1),
             })),
@@ -2510,6 +2530,7 @@ export const saveAssistantDraft = internalMutation({
                 turnNumber: turn.turnNumber,
                 roleOrder: 1,
                 version: 1,
+                retryOfMessageId: turn.retryOfAssistantMessageId,
                 requestId: `${turn.requestId}-assistant-draft`,
                 metadata,
                 createdAt: now,
@@ -2605,6 +2626,7 @@ export const completeAssistant = internalMutation({
         degraded: v.optional(v.boolean()),
         errorCode: v.optional(v.string()),
         errorMessage: v.optional(v.string()),
+        errorRetryable: v.optional(v.boolean()),
         metadataJson: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -2661,6 +2683,7 @@ export const completeAssistant = internalMutation({
                 turnNumber: turn.turnNumber,
                 roleOrder: 1,
                 version: 1,
+                retryOfMessageId: turn.retryOfAssistantMessageId,
                 artifactsJson,
                 requestId: assistantRequestId(turn.requestId),
                 metadata,
@@ -2676,7 +2699,7 @@ export const completeAssistant = internalMutation({
             providerResponseId: args.providerResponseId,
             errorCode: args.errorCode,
             errorMessage: args.errorMessage,
-            errorRetryable: args.degraded ? true : undefined,
+            errorRetryable: args.degraded ? (args.errorRetryable ?? false) : undefined,
             completedAt: now,
             updatedAt: now,
         });
@@ -2703,6 +2726,61 @@ export const completeAssistant = internalMutation({
                     ? (conversation.messageCount ?? 0) + 1
                     : conversation.messageCount,
             });
+        }
+
+        const supersededBranchMessages = await ctx.db
+            .query('messages')
+            .withIndex('by_superseded_turn', (q) => q.eq('supersededByTurnId', turn._id))
+            .take(100);
+        for (const superseded of supersededBranchMessages) {
+            if (!superseded.supersededByMessageId) {
+                await ctx.db.patch(superseded._id, { supersededByMessageId: assistantMessageId, updatedAt: now });
+            }
+        }
+
+        const outcome = agenticOutcomeFromMetadata(metadata);
+        const correction = outcome && outcome.correction && typeof outcome.correction === 'object' && !Array.isArray(outcome.correction)
+            ? outcome.correction as Record<string, unknown>
+            : undefined;
+        const correctionTargetId = typeof correction?.targetMessageId === 'string'
+            ? ctx.db.normalizeId('messages', correction.targetMessageId) ?? undefined
+            : undefined;
+        const finding = correction?.finding;
+        if (correction && correctionTargetId && ['wrong', 'incomplete', 'ambiguous', 'upheld'].includes(String(finding))) {
+            const target = await ctx.db.get(correctionTargetId);
+            if (target && target.conversationId === turn.conversationId && target.role === 'assistant') {
+                const existingCorrection = await ctx.db
+                    .query('chatCorrections')
+                    .withIndex('by_correction_turn', (q) => q.eq('correctionTurnId', turn._id))
+                    .first();
+                if (!existingCorrection) {
+                    await ctx.db.insert('chatCorrections', {
+                        conversationId: turn.conversationId,
+                        userId: turn.userId,
+                        targetMessageId: target._id,
+                        correctionMessageId: assistantMessageId,
+                        correctionTurnId: turn._id,
+                        finding: finding as 'wrong' | 'incomplete' | 'ambiguous' | 'upheld',
+                        summary: typeof correction.summary === 'string'
+                            ? correction.summary.slice(0, 2_000)
+                            : 'Reassessed the prior answer.',
+                        invalidatedFactIdsJson: Array.isArray(correction.invalidatedFactIds)
+                            ? JSON.stringify(correction.invalidatedFactIds.slice(0, 50))
+                            : undefined,
+                        invalidatedArtifactIdsJson: Array.isArray(correction.invalidatedArtifactIds)
+                            ? JSON.stringify(correction.invalidatedArtifactIds.slice(0, 50))
+                            : undefined,
+                        createdAt: now,
+                    });
+                }
+                if (finding !== 'upheld') {
+                    await ctx.db.patch(target._id, {
+                        supersededByTurnId: turn._id,
+                        supersededByMessageId: assistantMessageId,
+                        updatedAt: now,
+                    });
+                }
+            }
         }
 
         if (conversation && user?.clerkId) {

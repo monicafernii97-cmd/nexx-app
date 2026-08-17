@@ -9,7 +9,7 @@ const messages = [
 ];
 
 describe('buildChatRegenerationPlan', () => {
-  it('uses the canonical preceding user message and removes the retried branch', () => {
+  it('uses the canonical preceding user message and versions the retried branch', () => {
     expect(buildChatRegenerationPlan({
       mode: 'retry',
       message: 'untrusted replacement text',
@@ -17,11 +17,11 @@ describe('buildChatRegenerationPlan', () => {
       retryOfAssistantMessageId: 'a1',
     })).toEqual({
       promptMessage: 'First question',
-      deleteMessageIds: ['a1', 'u2', 'a2'],
+      supersedeMessageIds: ['a1', 'u2', 'a2'],
     });
   });
 
-  it('updates the selected user message and removes only later messages', () => {
+  it('preserves the edited branch as a superseded version', () => {
     expect(buildChatRegenerationPlan({
       mode: 'edit',
       message: 'Edited question',
@@ -30,7 +30,7 @@ describe('buildChatRegenerationPlan', () => {
     })).toEqual({
       promptMessage: 'Edited question',
       editedUserMessageId: 'u1',
-      deleteMessageIds: ['a1', 'u2', 'a2'],
+      supersedeMessageIds: ['u1', 'a1', 'u2', 'a2'],
     });
   });
 

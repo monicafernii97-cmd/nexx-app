@@ -669,7 +669,9 @@ function buildToolPlan(mode: RouteMode): ToolPlan {
   return {
     useFileSearch: [...documentModes, 'court_ready_drafting', 'judge_lens_strategy', 'pattern_analysis'].includes(mode),
     useWebSearch: [...officialResearchModes, 'document_analysis'].includes(mode),
-    useCodeInterpreter: ['pattern_analysis', 'document_analysis', 'packed_case_intake', 'litigation_navigation'].includes(mode),
+    // Code Interpreter is not installed in the hosted Responses call. Keep the
+    // plan truthful until the runtime supplies a container and usable files.
+    useCodeInterpreter: false,
     useLocalCourtRetriever: officialResearchModes.includes(mode),
     needsClarification: false, // Set by the model if needed
   };

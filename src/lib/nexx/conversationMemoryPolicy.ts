@@ -3,6 +3,7 @@ export type ConversationMemoryCandidate = {
   role: string;
   content: string;
   status?: string;
+  superseded?: boolean;
   turnNumber: number;
   roleOrder: number;
 };
@@ -34,9 +35,9 @@ export function canonicalConversationMemoryPage(args: {
     .filter((message) =>
       (
         message.status === undefined ||
-        message.status === 'committed' ||
-        message.status === 'degraded'
+        message.status === 'committed'
       ) &&
+      !message.superseded &&
       (message.role === 'user' || message.role === 'assistant') &&
       message.turnNumber > args.fromTurnExclusive &&
       message.turnNumber <= args.throughTurnInclusive

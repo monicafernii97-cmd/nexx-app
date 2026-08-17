@@ -393,7 +393,7 @@ export default function ConversationPage() {
 
             try {
                 await callChatAPI(newContent, {
-                    persistUserMessage: false,
+                    persistUserMessage: true,
                     mode: 'edit',
                     editOfUserMessageId: messageId,
                 });
@@ -421,11 +421,6 @@ export default function ConversationPage() {
             console.error('Failed to archive:', error);
         }
     };
-
-    // Helper: determine if a message is the latest of its role
-    const lastAssistantId = messages ? [...messages].reverse().find((m) => m.role === 'assistant' && m.status !== 'draft')?._id : undefined;
-    const lastUserId = messages ? [...messages].reverse().find((m) => m.role === 'user')?._id : undefined;
-
 
     return (
         <WorkspaceClient>
@@ -555,28 +550,15 @@ export default function ConversationPage() {
                         theme={theme}
                         metadata={msg.metadata}
                         artifactsJson={msg.artifactsJson}
+                        isSuperseded={Boolean(msg.supersededByTurnId || msg.supersededByMessageId)}
                         onRetry={
                             msg.role === 'assistant' && msg.status !== 'draft' && !isGenerating && !isPending
-                                ? () => {
-                                    // Confirm if retrying an older message (will delete later turns)
-                                    if (msg._id !== lastAssistantId) {
-                                        const ok = window.confirm('Retrying this response will delete all messages after it. Continue?');
-                                        if (!ok) return;
-                                    }
-                                    handleRetry(msg._id as Id<'messages'>);
-                                }
+                                ? () => handleRetry(msg._id as Id<'messages'>)
                                 : undefined
                         }
                         onEdit={
                             msg.role === 'user' && !isGenerating && !isPending
-                                ? (newContent) => {
-                                    // Confirm if editing an older message (will delete later turns)
-                                    if (msg._id !== lastUserId) {
-                                        const ok = window.confirm('Editing this message will delete all messages after it and regenerate. Continue?');
-                                        if (!ok) return;
-                                    }
-                                    handleEdit(msg._id as Id<'messages'>, newContent);
-                                }
+                                ? (newContent) => handleEdit(msg._id as Id<'messages'>, newContent)
                                 : undefined
                         }
                         onAction={
@@ -586,15 +568,6 @@ export default function ConversationPage() {
                                     title: 'Assistant response',
                                     content: content ?? msg.content,
                                 })
-                                : undefined
-                        }
-                        onSuggestedPrompt={
-                            msg.role === 'assistant' && !isGenerating && !isPending
-                                ? (prompt) => {
-                                    void handleSend(prompt).catch((error) => {
-                                        console.error('Suggested prompt failed:', error);
-                                    });
-                                }
                                 : undefined
                         }
                     />

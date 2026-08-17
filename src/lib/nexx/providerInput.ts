@@ -3,6 +3,7 @@ export type InternalRecentMessage = {
   role: 'user' | 'assistant';
   content: string;
   status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
+  superseded?: boolean;
 };
 
 export type ProviderInputMessage = {
@@ -83,8 +84,7 @@ export function toProviderInputMessages(messages: InternalRecentMessage[]): Prov
   return messages
     .filter((message) => (
       message.status === undefined ||
-      message.status === 'committed' ||
-      message.status === 'degraded'
-    ))
+      message.status === 'committed'
+    ) && !message.superseded)
     .map(({ role, content }) => ({ role, content }));
 }

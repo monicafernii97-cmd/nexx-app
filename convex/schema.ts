@@ -253,6 +253,7 @@ export default defineSchema({
         version: v.optional(v.number()),
         retryOfMessageId: v.optional(v.id('messages')),
         supersededByMessageId: v.optional(v.id('messages')),
+        supersededByTurnId: v.optional(v.id('chatTurns')),
         metadata: v.optional(v.any()),
         /** Client-generated ID for idempotent persistence (prevents duplicate inserts on retry). */
         requestId: v.optional(v.string()),
@@ -266,7 +267,24 @@ export default defineSchema({
         .index('by_conversation', ['conversationId'])
         .index('by_conversation_requestId', ['conversationId', 'requestId'])
         .index('by_conversation_turn', ['conversationId', 'turnNumber', 'roleOrder'])
-        .index('by_turn', ['turnId']),
+        .index('by_turn', ['turnId'])
+        .index('by_superseded_turn', ['supersededByTurnId']),
+
+    chatCorrections: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        targetMessageId: v.id('messages'),
+        correctionMessageId: v.id('messages'),
+        correctionTurnId: v.id('chatTurns'),
+        finding: v.union(v.literal('wrong'), v.literal('incomplete'), v.literal('ambiguous'), v.literal('upheld')),
+        summary: v.string(),
+        invalidatedFactIdsJson: v.optional(v.string()),
+        invalidatedArtifactIdsJson: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_target', ['targetMessageId'])
+        .index('by_correction_turn', ['correctionTurnId']),
 
     chatTurns: defineTable({
         conversationId: v.id('conversations'),

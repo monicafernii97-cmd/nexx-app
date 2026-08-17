@@ -8,7 +8,7 @@ export type RegenerationMessage = {
 
 export type ChatRegenerationPlan = {
   promptMessage: string;
-  deleteMessageIds: string[];
+  supersedeMessageIds: string[];
   editedUserMessageId?: string;
 };
 
@@ -35,7 +35,7 @@ export function buildChatRegenerationPlan({
     if (retryOfAssistantMessageId || editOfUserMessageId) {
       throw new Error('A new message cannot target an existing response.');
     }
-    return { promptMessage: message, deleteMessageIds: [] };
+    return { promptMessage: message, supersedeMessageIds: [] };
   }
 
   if (mode === 'retry') {
@@ -55,7 +55,7 @@ export function buildChatRegenerationPlan({
     }
     return {
       promptMessage: precedingUserMessage.content,
-      deleteMessageIds: messages.slice(targetIndex).map((candidate) => candidate.id),
+      supersedeMessageIds: messages.slice(targetIndex).map((candidate) => candidate.id),
     };
   }
 
@@ -69,6 +69,6 @@ export function buildChatRegenerationPlan({
   return {
     promptMessage: message,
     editedUserMessageId: editOfUserMessageId,
-    deleteMessageIds: messages.slice(targetIndex + 1).map((candidate) => candidate.id),
+    supersedeMessageIds: messages.slice(targetIndex).map((candidate) => candidate.id),
   };
 }

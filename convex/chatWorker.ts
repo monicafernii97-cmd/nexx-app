@@ -100,9 +100,20 @@ import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection'
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
 import { understandingSourceIndex, type DocumentUnderstandingPayload } from '../src/lib/nexx/documentUnderstanding';
 import { isOutputTokenIncompleteReason, resumeTokenLimitedResponse, type ResponseContinuationEvent } from '../src/lib/nexx/responseContinuation';
+import {
+    buildReassessmentPrompt,
+    buildSavedWorkFailureMessage,
+    completeAgenticOutcome,
+    finalizeAgenticOutcome,
+    findReassessmentTarget,
+    normalizeProviderFailure,
+    recoveryAgenticOutcome,
+    type ReassessmentTarget,
+} from '../src/lib/nexx/agenticOutcome';
+import { guidancePlaybookPrompt } from '../src/lib/nexx/guidancePlaybooks';
 
 const DEGRADED_MESSAGE =
-    'I saved your message, but the response did not finish. Please retry this turn in a moment.';
+    'Your message is saved. I could not finish the answer right now. Try this response again; I will reuse the work already completed.';
 const PROVIDER_TIMEOUT_MS = 80_000;
 const STANDARD_MAX_OUTPUT_TOKENS = 16_000;
 const COMPLEX_MAX_OUTPUT_TOKENS = 24_000;
@@ -154,6 +165,7 @@ function emptyDeterministicLegalFields(): Pick<
 function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
     return {
         message,
+        agenticOutcome: recoveryAgenticOutcome({ retryable: true, reason: 'the response did not finish.', hasSavedDocument: false }),
         artifacts: emptyArtifacts(),
         documentAnswer: null,
         legalInterpretation: null,
@@ -164,48 +176,7 @@ function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
 
 /** Normalize provider exceptions into retryable worker error metadata. */
 function normalizeProviderError(error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    const lower = message.toLowerCase();
-
-    if (lower.includes('rate limit') || lower.includes('429')) {
-        return {
-            code: 'provider_rate_limit',
-            message: 'The model provider rate-limited this response.',
-            rawMessage: message,
-            retryable: true,
-        };
-    }
-    if (lower.includes('timeout') || lower.includes('timed out')) {
-        return {
-            code: 'provider_timeout',
-            message: 'The model provider timed out while generating this response.',
-            rawMessage: message,
-            retryable: true,
-        };
-    }
-    if (lower.includes('overloaded') || lower.includes('503') || lower.includes('unavailable')) {
-        return {
-            code: 'provider_unavailable',
-            message: 'The model provider was temporarily unavailable.',
-            rawMessage: message,
-            retryable: true,
-        };
-    }
-    if (lower.includes('schema') || lower.includes('json')) {
-        return {
-            code: 'provider_schema_error',
-            message: 'The model provider returned a response that could not be parsed safely.',
-            rawMessage: message,
-            retryable: true,
-        };
-    }
-
-    return {
-        code: 'unknown',
-        message: 'The model provider failed before the response could be completed.',
-        rawMessage: message,
-        retryable: true,
-    };
+    return normalizeProviderFailure(error);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -614,11 +585,14 @@ type GenerationContext = {
     attachmentContexts?: AttachmentContext[];
     availableDocumentContexts?: AttachmentContext[];
     recentMessages: Array<{
+        _id: Id<'messages'>;
         turnId?: Id<'chatTurns'>;
         role: 'user' | 'assistant';
         content: string;
         status?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
         mode?: string;
+        supersededByMessageId?: Id<'messages'>;
+        supersededByTurnId?: Id<'chatTurns'>;
     }>;
 };
 
@@ -759,7 +733,12 @@ function isShortActiveDocumentFollowUp(
     }
 
     return context.recentMessages
-        .filter((message) => message.status !== 'deleted')
+        .filter((message) =>
+            message.status !== 'deleted' &&
+            message.status !== 'degraded' &&
+            !message.supersededByMessageId &&
+            !message.supersededByTurnId
+        )
         .slice(-4)
         .some((message) => isDocumentContextRoute(message.mode as RouteMode | undefined));
 }
@@ -793,10 +772,11 @@ function isHighStakesSubstantiveLegalRoute(routeMode?: RouteMode) {
 function recentLegalContextSummary(messages: GenerationContext['recentMessages']) {
     return messages
         .filter((message) =>
-            message.role === 'user' && (
+            message.role === 'user' &&
+            !message.supersededByMessageId &&
+            !message.supersededByTurnId && (
                 message.status === undefined ||
-                message.status === 'committed' ||
-                message.status === 'degraded'
+                message.status === 'committed'
             )
         )
         .slice(-8)
@@ -1336,6 +1316,7 @@ function buildInput(
     contextPrompt: string,
     officialResearchTargetsInjected: boolean,
     plainTextResponse: boolean,
+    reassessmentTarget?: ReassessmentTarget | null,
 ) {
     const systemPrompt = buildSystemPolicyPrompt();
     const developerPrompt = buildDeveloperBehaviorPrompt(routeMode);
@@ -1375,13 +1356,16 @@ function buildInput(
         documentSourcePackets.map((packet) => packet.text).join(' ')
     );
     const deterministicFieldPrompt = [
-        'Response schema note: include localResourceLookup, legalAuthorities, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
+        'Response schema note: include agenticOutcome, localResourceLookup, legalAuthorities, proSeDraftingReadiness, orderVersion, deadlineAnalysis, and legalBasis in the JSON shape.',
+        'In agenticOutcome, record verified completed work, the exact missing portion, whether the condition is truly retryable, and no more than one nextBestAction. Set correction to null unless this is an explicit reassessment turn.',
         'Set localResourceLookup, legalAuthorities, proSeDraftingReadiness, orderVersion, and deadlineAnalysis to null, and legalBasis to [], unless the answer already has verified source-backed data for those fields.',
         'Do not invent local resources, court fees, filing deadlines, order enforceability, or local-rule authority. Deterministic post-processing may fill those fields after provider parsing.',
         issuePacks.length
             ? `Internal issue-pack hints for this turn: ${issuePacks.map((pack) => pack.label).join('; ')}. Use these only to choose relevant legal tracks, evidence needs, counterarguments, and filing-readiness questions. Do not mention issue packs or internal taxonomy to the user.`
             : undefined,
     ].filter(Boolean).join('\n');
+    const outsideGuidancePrompt = guidancePlaybookPrompt(context.turn.message);
+    const reassessmentPrompt = reassessmentTarget ? buildReassessmentPrompt(reassessmentTarget) : '';
     const plainTextResponsePrompt = plainTextResponse
         ? 'Return only the natural user-facing answer in Markdown. Do not return JSON, an artifacts object, schema fields, or backend metadata.'
         : '';
@@ -1432,6 +1416,7 @@ function buildInput(
             role: message.role,
             content: message.content,
             status: message.status,
+            superseded: Boolean(message.supersededByMessageId || message.supersededByTurnId),
         }));
 
     const hasCurrentTurn =
@@ -1448,6 +1433,7 @@ function buildInput(
             role: 'user',
             content: context.turn.message,
             status: 'committed',
+            superseded: false,
         });
     }
 
@@ -1483,6 +1469,12 @@ function buildInput(
                 ]),
             ...(documentAvailabilityPrompt
                 ? [{ role: 'developer' as const, content: documentAvailabilityPrompt }]
+                : []),
+            ...(outsideGuidancePrompt
+                ? [{ role: 'developer' as const, content: outsideGuidancePrompt }]
+                : []),
+            ...(reassessmentPrompt
+                ? [{ role: 'developer' as const, content: reassessmentPrompt }]
                 : []),
             { role: 'developer', content: contextPrompt },
             ...(attachmentContextPrompt
@@ -1540,6 +1532,15 @@ function formatDocumentAmbiguityDetails(option: StoredDocumentAmbiguity['options
 /** Serialize ambiguity options for future UI affordances without blocking text rendering. */
 function buildDocumentAmbiguityMetadata(ambiguity: StoredDocumentAmbiguity) {
     return JSON.stringify({
+        agenticOutcome: {
+            status: 'needs_input',
+            completed: ['Found the available candidate documents'],
+            missing: ['Which document the user wants analyzed'],
+            blockedReason: ambiguity.reason,
+            retryable: false,
+            nextBestAction: { kind: 'ask', label: null, prompt: 'Ask one focused question identifying the intended document.' },
+            correction: null,
+        },
         documentAmbiguity: {
             requiresClarification: true,
             reason: ambiguity.reason,
@@ -2355,16 +2356,39 @@ async function generateWithFallbacks({
     const lifecyclePolicy = responseLifecyclePolicy(routeMode, {
         highComplexity: highComplexityTurn,
     });
-    const usePlainText = usesPlainTextResponse(routeMode);
+    const reassessmentTarget = findReassessmentTarget(
+        context.turn.message,
+        context.recentMessages.map((message) => ({
+            id: message._id.toString(),
+            role: message.role,
+            content: message.content,
+            status: message.status,
+            superseded: Boolean(message.supersededByMessageId || message.supersededByTurnId),
+        })),
+    );
+    const usePlainText = usesPlainTextResponse(routeMode) && !reassessmentTarget;
     const promptBundle = buildInput(
         context,
         routeMode,
         contextPrompt,
         officialResearchTargetsInjected,
         usePlainText,
+        reassessmentTarget,
     );
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(promptBundle.routerResult, context.conversation?.vectorStoreId);
+    const runtimeCapabilitySnapshot = {
+        availableTools: (hostedTools ?? []).map((tool) => String(tool.type)),
+        uploadedFiles: promptBundle.attachmentContexts.map((attachment) => ({
+            uploadedFileId: attachment.uploadedFileId.toString(),
+            filename: attachment.filename,
+            status: attachment.status,
+            coverageStatus: attachment.coverageStatus,
+            pagesProcessed: attachment.pagesProcessed,
+            pagesTotal: attachment.pagesTotal,
+        })),
+        outputContinuationAvailable: usePlainText,
+    };
     const fileSearchOnlyTools =
         promptBundle.routerResult.toolPlan.useFileSearch && context.conversation?.vectorStoreId
             ? buildHostedTools({
@@ -2805,6 +2829,7 @@ async function generateWithFallbacks({
                     groundingUserMessage
                 );
             }
+            parsedResponse.agenticOutcome = finalizeAgenticOutcome(parsedResponse.agenticOutcome, reassessmentTarget);
 
             console.info('[ChatWorker] Provider attempt completed', {
                 jobId,
@@ -2820,6 +2845,10 @@ async function generateWithFallbacks({
                 responseId,
                 model: step.model,
                 degraded: false,
+                errorCode: undefined,
+                errorMessage: undefined,
+                errorRetryable: undefined,
+                capabilitySnapshot: runtimeCapabilitySnapshot,
                 citationVerification,
                 attachmentContexts: promptBundle.attachmentContexts,
                 documentSourcePackets: promptBundle.documentSourcePackets,
@@ -2834,6 +2863,7 @@ async function generateWithFallbacks({
                 errorMessage: normalized.message,
             });
             lastError = error;
+            if (!normalized.retryable) break;
         }
     }
 
@@ -2844,7 +2874,18 @@ async function generateWithFallbacks({
     )
         ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
         : null;
-    const baseDegradedResponse = degradedResponse();
+    const hasSavedDocument = promptBundle.attachmentContexts.length > 0;
+    const failureMessage = buildSavedWorkFailureMessage({
+        retryable: normalized.retryable,
+        hasSavedDocument,
+        reason: normalized.message,
+    });
+    const baseDegradedResponse = degradedResponse(failureMessage);
+    baseDegradedResponse.agenticOutcome = recoveryAgenticOutcome({
+        retryable: normalized.retryable,
+        reason: normalized.message,
+        hasSavedDocument,
+    });
     const enrichedDegradedResponse = shouldApplyDeterministicLegalEnrichment(routeMode)
         ? enrichDeterministicLegalFields({
             response: baseDegradedResponse,
@@ -2862,6 +2903,8 @@ async function generateWithFallbacks({
         degraded: true,
         errorCode: normalized.code,
         errorMessage: normalized.message,
+        errorRetryable: normalized.retryable,
+        capabilitySnapshot: runtimeCapabilitySnapshot,
         citationVerification: {
             passed: false,
             errors: [normalized.message],
@@ -3043,6 +3086,10 @@ export const processChatGenerationJob = internalAction({
                     degraded: true,
                     errorCode: 'missing_generation_context',
                     errorMessage: 'Unable to load generation context.',
+                    errorRetryable: false,
+                    metadataJson: JSON.stringify({
+                        agenticOutcome: recoveryAgenticOutcome({ retryable: false, reason: 'the saved conversation context was unavailable.', hasSavedDocument: false }),
+                    }),
                 });
                 return null;
             }
@@ -3056,6 +3103,11 @@ export const processChatGenerationJob = internalAction({
                     artifactsJson: JSON.stringify(emptyArtifacts()),
                     degraded: false,
                     metadataJson: JSON.stringify({
+                        agenticOutcome: {
+                            status: 'temporarily_blocked', completed: ['Saved the uploaded document'],
+                            missing: ['Verified page coverage'], blockedReason: 'Document verification is still being prepared.',
+                            retryable: true, nextBestAction: { kind: 'retry', label: 'Try again', prompt: 'Retry after document verification finishes.' }, correction: null,
+                        },
                         analysisMode: context.turn.analysisMode,
                         documentCoverageGate: 'awaiting_verified_coverage',
                         attachments: fullReviewAttachments.map((attachment) => ({
@@ -3084,6 +3136,11 @@ export const processChatGenerationJob = internalAction({
                         artifactsJson: JSON.stringify(emptyArtifacts()),
                         degraded: false,
                         metadataJson: JSON.stringify({
+                            agenticOutcome: {
+                                status: 'temporarily_blocked', completed: ['Saved and extracted the uploaded document'],
+                                missing: ['Verified full-document review'], blockedReason: 'The verified review record is not ready yet.',
+                                retryable: true, nextBestAction: { kind: 'retry', label: 'Try again', prompt: 'Retry after the verified review is ready.' }, correction: null,
+                            },
                             analysisMode: context.turn.analysisMode,
                             documentCoverageGate: 'missing_verified_understanding_record',
                             uploadedFileId: missingRecord.uploadedFileId,
@@ -3101,6 +3158,7 @@ export const processChatGenerationJob = internalAction({
                     artifactsJson: JSON.stringify(emptyArtifacts()),
                     degraded: false,
                     metadataJson: JSON.stringify({
+                        agenticOutcome: completeAgenticOutcome(['Completed the verified full-document review']),
                         analysisMode: context.turn.analysisMode,
                         documentCoverageGate: 'verified_complete',
                         understandingRecords: fullReviewAttachments.map((attachment) => ({
@@ -3196,6 +3254,8 @@ export const processChatGenerationJob = internalAction({
                 artifactsJson: JSON.stringify(result.response.artifacts),
                 metadataJson: JSON.stringify({
                     routeMode: result.routeMode,
+                    agenticOutcome: result.response.agenticOutcome ?? completeAgenticOutcome(),
+                    capabilitySnapshot: result.capabilitySnapshot,
                     localResourceLookup: result.response.localResourceLookup,
                     legalAuthorities: result.response.legalAuthorities,
                     proSeDraftingReadiness: result.response.proSeDraftingReadiness,
@@ -3208,6 +3268,7 @@ export const processChatGenerationJob = internalAction({
                 degraded: result.degraded,
                 errorCode: result.errorCode,
                 errorMessage: result.errorMessage,
+                errorRetryable: result.errorRetryable,
             });
             console.info('[ChatWorker] Job completed', {
                 jobId: args.jobId,
@@ -3406,18 +3467,24 @@ export const processChatGenerationJob = internalAction({
                 errorCode: loggedError.code,
                 errorMessage: loggedError.message,
             });
-            const normalized = {
-                code: 'worker_internal_error',
-                message: 'The response worker failed before completion.',
-            };
+            const normalized = normalizeProviderError(error);
+            const userMessage = buildSavedWorkFailureMessage({
+                retryable: normalized.retryable,
+                hasSavedDocument: false,
+                reason: normalized.message,
+            });
             await ctx.runMutation(internal.chatTurns.completeAssistant, {
                 jobId: args.jobId,
                 leaseOwner,
-                content: DEGRADED_MESSAGE,
+                content: userMessage,
                 artifactsJson: JSON.stringify(emptyArtifacts()),
                 degraded: true,
                 errorCode: normalized.code,
                 errorMessage: normalized.message,
+                errorRetryable: normalized.retryable,
+                metadataJson: JSON.stringify({
+                    agenticOutcome: recoveryAgenticOutcome({ retryable: normalized.retryable, reason: normalized.message, hasSavedDocument: false }),
+                }),
             });
             return null;
         }

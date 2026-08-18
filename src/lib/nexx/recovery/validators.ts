@@ -156,6 +156,23 @@ function validateDeadlineAnalysis(value: unknown) {
     typeof value.explanation === 'string';
 }
 
+function validateAgenticOutcome(value: unknown) {
+  if (!isObject(value)) return false;
+  const nextAction = value.nextBestAction;
+  const correction = value.correction;
+  return ['complete', 'partial', 'needs_input', 'temporarily_blocked', 'unsupported', 'cannot_determine', 'corrected', 'rechecked_upheld'].includes(String(value.status)) &&
+    isStringArray(value.completed) && isStringArray(value.missing) &&
+    isOptionalString(value.blockedReason) && typeof value.retryable === 'boolean' &&
+    (nextAction === null || (isObject(nextAction) &&
+      ['ask', 'retry', 'upload', 'external_steps', 'continue_partial'].includes(String(nextAction.kind)) &&
+      isOptionalString(nextAction.label) && typeof nextAction.prompt === 'string')) &&
+    (correction === null || (isObject(correction) &&
+      typeof correction.targetMessageId === 'string' &&
+      ['wrong', 'incomplete', 'ambiguous', 'upheld'].includes(String(correction.finding)) &&
+      typeof correction.summary === 'string' &&
+      isStringArray(correction.invalidatedFactIds) && isStringArray(correction.invalidatedArtifactIds)));
+}
+
 /**
  * Validate that a parsed object matches the NexxAssistantResponse shape.
  */
@@ -166,6 +183,7 @@ export function validateAssistantResponse(parsed: unknown): boolean {
 
   // Must have a non-empty message string
   if (typeof obj.message !== 'string' || obj.message.length === 0) return false;
+  if (!('agenticOutcome' in obj) || !validateAgenticOutcome(obj.agenticOutcome)) return false;
 
   // Must have an artifacts object
   if (!obj.artifacts || typeof obj.artifacts !== 'object') return false;

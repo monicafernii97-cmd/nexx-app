@@ -139,12 +139,37 @@ export interface NexxArtifacts {
   confidence: LegalConfidence | null;
 }
 
+export type AgenticTurnStatus =
+  | 'complete' | 'partial' | 'needs_input' | 'temporarily_blocked'
+  | 'unsupported' | 'cannot_determine' | 'corrected' | 'rechecked_upheld';
+
+export interface AgenticTurnOutcome {
+  status: AgenticTurnStatus;
+  completed: string[];
+  missing: string[];
+  blockedReason: string | null;
+  retryable: boolean;
+  nextBestAction: {
+    kind: 'ask' | 'retry' | 'upload' | 'external_steps' | 'continue_partial';
+    label: string | null;
+    prompt: string;
+  } | null;
+  correction: {
+    targetMessageId: string;
+    finding: 'wrong' | 'incomplete' | 'ambiguous' | 'upheld';
+    summary: string;
+    invalidatedFactIds: string[];
+    invalidatedArtifactIds: string[];
+  } | null;
+}
+
 // ---------------------------------------------------------------------------
 // Nexx Assistant Response — the structured JSON returned by responses.create
 // ---------------------------------------------------------------------------
 
 export interface NexxAssistantResponse {
   message: string;
+  agenticOutcome?: AgenticTurnOutcome;
   artifacts: NexxArtifacts;
   documentAnswer: LegalDocumentAnswer | null;
   legalInterpretation: LegalInterpretationAnswer | null;

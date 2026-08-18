@@ -14,6 +14,29 @@ const stringArray = {
   items: { type: 'string' },
 } as const;
 
+const agenticTurnOutcomeSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    status: { type: 'string', enum: ['complete', 'partial', 'needs_input', 'temporarily_blocked', 'unsupported', 'cannot_determine', 'corrected', 'rechecked_upheld'] },
+    completed: stringArray,
+    missing: stringArray,
+    blockedReason: nullableString,
+    retryable: { type: 'boolean' },
+    nextBestAction: {
+      type: ['object', 'null'], additionalProperties: false,
+      properties: { kind: { type: 'string', enum: ['ask', 'retry', 'upload', 'external_steps', 'continue_partial'] }, label: nullableString, prompt: { type: 'string' } },
+      required: ['kind', 'label', 'prompt'],
+    },
+    correction: {
+      type: ['object', 'null'], additionalProperties: false,
+      properties: { targetMessageId: { type: 'string' }, finding: { type: 'string', enum: ['wrong', 'incomplete', 'ambiguous', 'upheld'] }, summary: { type: 'string' }, invalidatedFactIds: stringArray, invalidatedArtifactIds: stringArray },
+      required: ['targetMessageId', 'finding', 'summary', 'invalidatedFactIds', 'invalidatedArtifactIds'],
+    },
+  },
+  required: ['status', 'completed', 'missing', 'blockedReason', 'retryable', 'nextBestAction', 'correction'],
+} as const;
+
 const draftReadySchema = {
   type: ['object', 'null'],
   additionalProperties: false,
@@ -799,6 +822,7 @@ export const NEXX_RESPONSE_SCHEMA = {
     additionalProperties: false,
     properties: {
       message: { type: 'string' },
+      agenticOutcome: agenticTurnOutcomeSchema,
       artifacts: {
         type: 'object',
         additionalProperties: false,
@@ -825,6 +849,7 @@ export const NEXX_RESPONSE_SCHEMA = {
     },
     required: [
       'message',
+      'agenticOutcome',
       'artifacts',
       'documentAnswer',
       'legalInterpretation',

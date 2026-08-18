@@ -356,8 +356,7 @@ describe('MessageBubble document evidence panel', () => {
     expect(container.textContent).not.toContain('Older Case Order.pdf');
   });
 
-  it('renders follow-up chips that dispatch prompt text for court-order answers', async () => {
-    const onSuggestedPrompt = vi.fn();
+  it('keeps court-order answers text-first without a button grid', async () => {
     const { container, root } = await renderMessage(
       {
         documentSources: [{
@@ -369,22 +368,29 @@ describe('MessageBubble document evidence panel', () => {
       },
       undefined,
       '# Court Order Analysis\n\n## Executive Summary\nThe order requires payment. [p. 4]',
-      { onSuggestedPrompt }
     );
     roots.push(root);
 
     const deadlineButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Obligations and deadlines')
     );
-    expect(deadlineButton).toBeTruthy();
+    expect(deadlineButton).toBeFalsy();
+  });
 
-    await act(async () => {
-      deadlineButton?.click();
-    });
-
-    expect(onSuggestedPrompt).toHaveBeenCalledWith(
-      'List every obligation, trigger, deadline, exception, and consequence in the active court order with page citations.'
-    );
+  it('renders a quiet correction label from agentic outcome metadata', async () => {
+    const { container, root } = await renderMessage({
+      agenticOutcome: {
+        status: 'corrected',
+        completed: ['Rechecked the order'],
+        missing: [],
+        blockedReason: null,
+        retryable: false,
+        nextBestAction: null,
+        correction: null,
+      },
+    }, undefined, 'You are right. I made a mistake.');
+    roots.push(root);
+    expect(container.textContent).toContain('Correction');
   });
 
   it('renders draft-ready artifacts as polished draft text and filing notes instead of raw JSON', async () => {

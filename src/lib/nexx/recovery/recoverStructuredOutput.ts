@@ -12,6 +12,7 @@ import type { NexxAssistantResponse, RecoveryResult } from '../../types';
 import { validateAssistantResponse } from './validators';
 import { openai } from '../../openaiConversation';
 import { NEXX_RESPONSE_SCHEMA } from '../schemas';
+import { recoveryAgenticOutcome } from '../agenticOutcome';
 
 const EMPTY_ARTIFACTS = {
   draftReady: null,
@@ -102,6 +103,7 @@ export async function recoverStructuredOutput(
   return {
     data: {
       message: 'I was unable to generate a structured response. Please try rephrasing your question.',
+      agenticOutcome: recoveryAgenticOutcome({ retryable: true, reason: 'the answer could not be validated safely.', hasSavedDocument: false }),
       artifacts: EMPTY_ARTIFACTS,
       documentAnswer: null,
       legalInterpretation: null,

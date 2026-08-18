@@ -18,6 +18,7 @@ export type ActualToolCapabilities = {
   createExhibitIndex: boolean;
   linkIncidentToMotion: boolean;
   localCourtRetriever: boolean;
+  codeInterpreter: boolean;
 };
 
 export function actualToolCapabilitiesFromPlan(
@@ -38,6 +39,7 @@ export function actualToolCapabilitiesFromPlan(
     createExhibitIndex: false,
     linkIncidentToMotion: false,
     localCourtRetriever: Boolean(toolPlan.useLocalCourtRetriever && options.localCourtSourcesInjected),
+    codeInterpreter: false,
   };
 }
 

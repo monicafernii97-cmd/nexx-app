@@ -26,6 +26,8 @@ interface MessageBubbleProps {
     onRetry?: () => void;
     /** Called when user saves an edited message — passes new content. */
     onEdit?: (newContent: string) => void;
+    /** Marks an earlier branch version that is no longer active context. */
+    isSuperseded?: boolean;
     /** Structured response view model for adaptive panel rendering. */
     structuredViewModel?: AssistantResponseViewModel;
     /** Detected patterns for intelligence chips. */
@@ -34,8 +36,6 @@ interface MessageBubbleProps {
     procedureInfo?: LocalProcedureInfo;
     /** Handler for contextual actions from AssistantMessageCard. */
     onAction?: (action: ActionType, content?: string) => void;
-    /** Send a suggested follow-up prompt back into the chat. */
-    onSuggestedPrompt?: (prompt: string) => void;
 }
 
 type DocumentSourceMetadata = {
@@ -537,59 +537,8 @@ function AnalysisStatusCard({ isLight, routeMode }: { isLight: boolean; routeMod
     );
 }
 
-const COURT_ORDER_FOLLOW_UPS = [
-    {
-        label: 'Full order summary',
-        prompt: 'Give me the complete hierarchical summary of the active court order, grounded in the verified document record.',
-    },
-    {
-        label: 'Obligations and deadlines',
-        prompt: 'List every obligation, trigger, deadline, exception, and consequence in the active court order with page citations.',
-    },
-    {
-        label: 'Custody / possession schedule',
-        prompt: 'Explain the complete custody and possession schedule in the active court order, including holidays and overrides, with page citations.',
-    },
-    {
-        label: 'Compare with this conversation',
-        prompt: 'Compare the active court order with the facts and issues discussed in this conversation. Identify what applies and cite the controlling provisions.',
-    },
-    {
-        label: 'Ask a specific question',
-        prompt: 'Help me frame a specific question about the active court order before answering it.',
-    },
-] as const;
-
 const REDACTED_ASSISTANT_COPY_TEXT =
     'I couldn\'t display that response correctly. Please retry it.';
-
-function CourtOrderFollowUpChips({
-    isLight,
-    onSuggestedPrompt,
-}: {
-    isLight: boolean;
-    onSuggestedPrompt?: (prompt: string) => void;
-}) {
-    if (!onSuggestedPrompt) return null;
-
-    return (
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="Suggested court order follow-ups">
-            {COURT_ORDER_FOLLOW_UPS.map((followUp) => (
-                <button
-                    key={followUp.label}
-                    type="button"
-                    onClick={() => onSuggestedPrompt(followUp.prompt)}
-                    className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${isLight
-                        ? 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                        : 'border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white'
-                        }`}
-                >
-                    {followUp.label}
-                </button>
-            ))}
-        </div>
-    );
-}
 
 function renderDraftReadyMarkdown(draftReady: unknown) {
     if (!draftReady || typeof draftReady !== 'object' || Array.isArray(draftReady)) {
@@ -840,11 +789,11 @@ export default function MessageBubble({
     artifactsJson,
     onRetry,
     onEdit,
+    isSuperseded = false,
     structuredViewModel,
     detectedPatterns,
     procedureInfo,
     onAction,
-    onSuggestedPrompt,
 }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -888,7 +837,19 @@ export default function MessageBubble({
     const visibleContent = role === 'assistant'
         ? sanitizedAssistantContent ?? ''
         : content;
-    const shouldShowCourtOrderFollowUps = role === 'assistant' && !isStreaming && visibleContent.includes('Court Order Analysis');
+    const agenticOutcome = metadata && typeof metadata === 'object' && !Array.isArray(metadata) &&
+        (metadata as Record<string, unknown>).agenticOutcome &&
+        typeof (metadata as Record<string, unknown>).agenticOutcome === 'object'
+        ? (metadata as Record<string, unknown>).agenticOutcome as Record<string, unknown>
+        : undefined;
+    const agenticStatus = typeof agenticOutcome?.status === 'string' ? agenticOutcome.status : undefined;
+    const outcomeLabel = agenticStatus === 'corrected'
+        ? 'Correction'
+        : agenticStatus === 'partial'
+            ? 'Partial result'
+            : agenticStatus === 'needs_input'
+                ? 'Needs one detail'
+                : undefined;
     const userAttachments = useMemo(() => getUserAttachments(metadata), [metadata]);
 
     useEffect(() => {
@@ -1050,6 +1011,11 @@ export default function MessageBubble({
             </div>
 
             <div className="flex-1 max-w-4xl min-w-0 pr-4">
+                {(outcomeLabel || isSuperseded) && !isStreaming && (
+                    <div className={`mb-2 text-[11px] font-semibold uppercase tracking-wide ${isLight ? 'text-gray-500' : 'text-white/45'}`}>
+                        {isSuperseded ? 'Earlier version' : outcomeLabel}
+                    </div>
+                )}
                 {/* Structured response rendering (AssistantMessageCard) */}
                 {unsafeAssistantContent ? (
                     <>
@@ -1083,9 +1049,6 @@ export default function MessageBubble({
                         {showDocumentEvidencePanel && (
                             <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                         )}
-                        {shouldShowCourtOrderFollowUps && (
-                            <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
-                        )}
                         {visibleContent.trim() && (
                             <div className="mt-3">
                                 <PlayAloudButton text={visibleContent} />
@@ -1108,9 +1071,6 @@ export default function MessageBubble({
                     <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                 )}
 
-                {shouldShowCourtOrderFollowUps && (
-                    <CourtOrderFollowUpChips isLight={isLight} onSuggestedPrompt={onSuggestedPrompt} />
-                )}
 
                 {!isStreaming && visibleContent.trim() && (
                     <div className="mt-3">

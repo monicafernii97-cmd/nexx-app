@@ -388,6 +388,7 @@ export default defineSchema({
         mimeType: v.string(),
         extension: v.string(),
         byteSize: v.number(),
+        clientSha256: v.optional(v.string()),
         storageId: v.optional(v.id('_storage')),
         storageSha256: v.optional(v.string()),
         storageContentType: v.optional(v.string()),
@@ -403,7 +404,8 @@ export default defineSchema({
         lastFailureKind: v.optional(v.string()),
         lastFailureMessageSafe: v.optional(v.string()),
         lastFailureDiagnostics: v.optional(v.any()),
-        lastTransport: v.optional(v.union(v.literal('direct'), v.literal('fallback'))),
+        lastTransport: v.optional(v.union(v.literal('direct'), v.literal('fallback'), v.literal('resumable'))),
+        responseLossReconciledAt: v.optional(v.number()),
         nextStorageRetryAt: v.optional(v.number()),
         status: v.union(
             v.literal('awaiting_storage_upload'),
@@ -457,7 +459,11 @@ export default defineSchema({
         completedAt: v.optional(v.number()),
         failureKind: v.optional(v.string()),
         failureMessageSafe: v.optional(v.string()),
-        transport: v.optional(v.union(v.literal('direct'), v.literal('fallback'))),
+        transport: v.optional(v.union(v.literal('direct'), v.literal('fallback'), v.literal('resumable'))),
+        clientSha256: v.optional(v.string()),
+        reconciledStorageId: v.optional(v.id('_storage')),
+        orphanCleanupAt: v.optional(v.number()),
+        orphanCleanupStorageId: v.optional(v.id('_storage')),
         elapsedMs: v.optional(v.number()),
         loadedBytes: v.optional(v.number()),
         totalBytes: v.optional(v.number()),
@@ -497,6 +503,84 @@ export default defineSchema({
         .index('by_token_hash', ['tokenHash'])
         .index('by_session', ['uploadSessionId'])
         .index('by_status_expires', ['status', 'expiresAt']),
+
+    chatUploadResumableUploads: defineTable({
+        uploadSessionId: v.id('chatUploadSessions'),
+        uploadAttemptId: v.id('chatUploadAttempts'),
+        clerkUserId: v.string(),
+        tokenHash: v.string(),
+        clientSha256: v.string(),
+        expectedByteSize: v.number(),
+        expectedMimeType: v.string(),
+        chunkBytes: v.number(),
+        chunkCount: v.number(),
+        status: v.union(
+            v.literal('issued'),
+            v.literal('uploading'),
+            v.literal('assembling'),
+            v.literal('completed'),
+            v.literal('failed'),
+            v.literal('expired')
+        ),
+        assemblyLeaseId: v.optional(v.string()),
+        assemblyLeaseExpiresAt: v.optional(v.number()),
+        finalStorageId: v.optional(v.id('_storage')),
+        chunksCleanedAt: v.optional(v.number()),
+        failureCode: v.optional(v.string()),
+        expiresAt: v.number(),
+        completedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_token_hash', ['tokenHash'])
+        .index('by_session', ['uploadSessionId'])
+        .index('by_final_storage', ['finalStorageId'])
+        .index('by_status_expires', ['status', 'expiresAt']),
+
+    chatUploadResumableChunks: defineTable({
+        resumableUploadId: v.id('chatUploadResumableUploads'),
+        uploadSessionId: v.id('chatUploadSessions'),
+        chunkIndex: v.number(),
+        expectedByteSize: v.number(),
+        actualByteSize: v.optional(v.number()),
+        sha256: v.optional(v.string()),
+        storageId: v.optional(v.id('_storage')),
+        requestCount: v.number(),
+        status: v.union(v.literal('pending'), v.literal('stored'), v.literal('failed')),
+        failureCode: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_upload_index', ['resumableUploadId', 'chunkIndex'])
+        .index('by_upload', ['resumableUploadId'])
+        .index('by_storage', ['storageId'])
+        .index('by_session', ['uploadSessionId']),
+
+    chatUploadCanaryRuns: defineTable({
+        status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
+        phase: v.union(
+            v.literal('route'),
+            v.literal('generate_url'),
+            v.literal('post'),
+            v.literal('metadata'),
+            v.literal('read'),
+            v.literal('cleanup'),
+            v.literal('complete')
+        ),
+        byteSize: v.number(),
+        expectedSha256: v.string(),
+        actualSha256: v.optional(v.string()),
+        storageId: v.optional(v.id('_storage')),
+        cleanupSucceeded: v.optional(v.boolean()),
+        errorCode: v.optional(v.string()),
+        latencyMs: v.optional(v.number()),
+        startedAt: v.number(),
+        finishedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_status_created', ['status', 'createdAt'])
+        .index('by_created', ['createdAt']),
 
     messageAttachments: defineTable({
         messageId: v.optional(v.id('messages')),

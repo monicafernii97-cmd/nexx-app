@@ -12,6 +12,8 @@ import type { Doc, Id } from './_generated/dataModel';
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation, validateCaseOwnership } from './lib/auth';
 import { CHAT_UPLOAD_CONFIG, validateChatUploadMetadata } from './lib/chatUploadConfig';
 import {
+  expectedChunkByteSize,
+  expectedChunkCount,
   getStorageAttachmentDisposition,
   getStorageAttemptPolicy,
   isValidFallbackTokenHash,
@@ -133,6 +135,7 @@ function toPublicSession(session: Doc<'chatUploadSessions'>, uploadUrl?: string)
     filename: session.filename,
     mimeType: session.mimeType,
     byteSize: session.byteSize,
+    clientSha256: session.clientSha256,
     processingAttempt: session.processingAttempt,
     errorCode: session.errorCode,
     errorMessage: session.errorMessage,
@@ -163,7 +166,8 @@ async function createUploadAttempt(
     issuedAt: number;
     expiresAt: number;
     attemptNo: number;
-    transport: 'direct' | 'fallback';
+    transport: 'direct' | 'fallback' | 'resumable';
+    clientSha256?: string;
   },
 ) {
   const attemptId = await ctx.db.insert('chatUploadAttempts', {
@@ -172,6 +176,7 @@ async function createUploadAttempt(
     attemptNo: args.attemptNo,
     status: 'created',
     transport: args.transport,
+    clientSha256: args.clientSha256,
     ...getUploadUrlParts(args.uploadUrl),
     uploadUrlIssuedAt: args.issuedAt,
     uploadUrlExpiresAt: args.expiresAt,
@@ -191,7 +196,8 @@ function storageRetryState(attemptNo: number) {
     attemptNo,
     maxAttempts: CHAT_UPLOAD_CONFIG.maxStorageAttempts,
     now: Date.now(),
-    retryDelayMs: CHAT_UPLOAD_CONFIG.storageRetryDelayMs,
+    retryBaseDelayMs: CHAT_UPLOAD_CONFIG.storageRetryBaseDelayMs,
+    retryMaxDelayMs: CHAT_UPLOAD_CONFIG.storageRetryMaxDelayMs,
   });
   return {
     retryable: policy.retryable,
@@ -212,6 +218,7 @@ export const startUploadSession = mutation({
     filename: v.string(),
     mimeType: v.string(),
     byteSize: v.number(),
+    clientSha256: v.string(),
     intent: uploadIntentValidator,
   },
   handler: async (ctx, args) => {
@@ -223,6 +230,8 @@ export const startUploadSession = mutation({
 
     const clientUploadKey = args.clientUploadKey.trim();
     if (!clientUploadKey) throw new Error('clientUploadKey is required');
+    const clientSha256 = args.clientSha256.trim().toLowerCase();
+    if (!isValidFallbackTokenHash(clientSha256)) throw new Error('File SHA-256 is invalid.');
 
     const validation = validateChatUploadMetadata({
       filename: args.filename,
@@ -246,6 +255,7 @@ export const startUploadSession = mutation({
         existing.caseId !== caseId ||
         existing.intent !== args.intent ||
         existing.mimeType !== (args.mimeType || 'application/octet-stream')
+        || (existing.clientSha256 && existing.clientSha256 !== clientSha256)
       ) {
         throw new Error('Upload session key already belongs to a different file.');
       }
@@ -278,6 +288,7 @@ export const startUploadSession = mutation({
           expiresAt: uploadUrlExpiresAt,
           attemptNo,
           transport: 'direct',
+          clientSha256,
         });
         await ctx.db.patch(existing._id, {
           status: 'awaiting_storage_upload',
@@ -292,6 +303,7 @@ export const startUploadSession = mutation({
           lastFailureMessageSafe: undefined,
           lastFailureDiagnostics: undefined,
           lastTransport: 'direct',
+          clientSha256,
           nextStorageRetryAt: undefined,
           updatedAt: now,
         });
@@ -315,6 +327,7 @@ export const startUploadSession = mutation({
       mimeType: args.mimeType || 'application/octet-stream',
       extension: validation.extension,
       byteSize: args.byteSize,
+      clientSha256,
       status: 'awaiting_storage_upload',
       uploadUrlIssuedAt: now,
       uploadUrlExpiresAt,
@@ -332,6 +345,7 @@ export const startUploadSession = mutation({
       expiresAt: uploadUrlExpiresAt,
       attemptNo: 1,
       transport: 'direct',
+      clientSha256,
     });
 
     console.info('[ChatUpload] session started', {
@@ -489,6 +503,7 @@ export const recordUploadClientEvent = mutation({
     const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
     const diagnostics = args.diagnostics;
     const now = Date.now();
+    const eventBelongsToCurrentAttempt = !args.uploadAttemptId || session.currentAttemptId === args.uploadAttemptId;
 
     if (args.uploadAttemptId) {
       const attempt = await ctx.db.get(args.uploadAttemptId);
@@ -532,6 +547,7 @@ export const recordUploadClientEvent = mutation({
     const failed = args.eventType === 'storage_post_failed';
     const mayApplyStorageFailure =
       failed &&
+      eventBelongsToCurrentAttempt &&
       !session.storageId &&
       (session.status === 'awaiting_storage_upload' ||
         session.status === 'uploading_to_storage' ||
@@ -540,12 +556,16 @@ export const recordUploadClientEvent = mutation({
     await ctx.db.patch(args.uploadSessionId, {
       status: mayApplyStorageFailure
         ? 'failed_storage_upload'
-        : session.status === 'awaiting_storage_upload'
+        : eventBelongsToCurrentAttempt && session.status === 'awaiting_storage_upload'
           ? 'uploading_to_storage'
           : session.status,
-      lastClientEventAt: now,
-      lastProgressBytes: typeof diagnostics.loadedBytes === 'number' ? diagnostics.loadedBytes : session.lastProgressBytes,
-      lastProgressTotalBytes: typeof diagnostics.totalBytes === 'number' ? diagnostics.totalBytes : session.lastProgressTotalBytes,
+      lastClientEventAt: eventBelongsToCurrentAttempt ? now : session.lastClientEventAt,
+      lastProgressBytes: eventBelongsToCurrentAttempt && typeof diagnostics.loadedBytes === 'number'
+        ? diagnostics.loadedBytes
+        : session.lastProgressBytes,
+      lastProgressTotalBytes: eventBelongsToCurrentAttempt && typeof diagnostics.totalBytes === 'number'
+        ? diagnostics.totalBytes
+        : session.lastProgressTotalBytes,
       lastFailureKind: mayApplyStorageFailure && typeof diagnostics.failureKind === 'string' ? diagnostics.failureKind : session.lastFailureKind,
       lastFailureMessageSafe: mayApplyStorageFailure && typeof diagnostics.failureMessageSafe === 'string' ? diagnostics.failureMessageSafe : session.lastFailureMessageSafe,
       lastFailureDiagnostics: mayApplyStorageFailure ? {
@@ -575,6 +595,114 @@ export const recordUploadClientEvent = mutation({
     });
 
     return true;
+  },
+});
+
+async function storageObjectIsClaimed(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<'_storage'>,
+  allowedSessionId?: Id<'chatUploadSessions'>,
+) {
+  const session = await ctx.db
+    .query('chatUploadSessions')
+    .withIndex('by_storage', (q) => q.eq('storageId', storageId))
+    .first();
+  if (session && session._id !== allowedSessionId) return true;
+  const uploadedFile = await ctx.db
+    .query('uploadedFiles')
+    .withIndex('by_storage', (q) => q.eq('storageId', storageId))
+    .first();
+  if (uploadedFile && uploadedFile.uploadSessionId !== allowedSessionId) return true;
+  const chunk = await ctx.db
+    .query('chatUploadResumableChunks')
+    .withIndex('by_storage', (q) => q.eq('storageId', storageId))
+    .first();
+  if (chunk) return true;
+  const resumable = await ctx.db
+    .query('chatUploadResumableUploads')
+    .withIndex('by_final_storage', (q) => q.eq('finalStorageId', storageId))
+    .first();
+  return Boolean(resumable);
+}
+
+async function directStorageCandidates(
+  ctx: QueryCtx | MutationCtx,
+  args: {
+    session: Doc<'chatUploadSessions'>;
+    attempt: Doc<'chatUploadAttempts'>;
+  },
+) {
+  const lowerBound = args.attempt.uploadUrlIssuedAt - 5_000;
+  const upperBound = Math.min(
+    Date.now(),
+    args.attempt.uploadUrlExpiresAt + CHAT_UPLOAD_CONFIG.directReconciliationWindowMs,
+  );
+  const recent = await ctx.db.system.query('_storage').order('desc').take(1_000);
+  const candidates: StorageMetadata[] = [];
+  for (const metadata of recent) {
+    if (metadata._creationTime < lowerBound || metadata._creationTime > upperBound) continue;
+    if (metadata.sha256 !== args.session.clientSha256) continue;
+    if (metadata.size !== args.session.byteSize) continue;
+    if (
+      metadata.contentType &&
+      args.session.mimeType !== 'application/octet-stream' &&
+      metadata.contentType !== args.session.mimeType
+    ) continue;
+    if (await storageObjectIsClaimed(ctx, metadata._id, args.session._id)) continue;
+    candidates.push(metadata as StorageMetadata);
+  }
+  return candidates;
+}
+
+/** Reconcile a unique direct-storage object after the browser sent the full body but lost the response. */
+export const reconcileDirectUpload = mutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    uploadAttemptId: v.id('chatUploadAttempts'),
+    clientSha256: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+    if (session.storageId) return { reconciled: true as const, storageId: session.storageId };
+    const hash = args.clientSha256.trim().toLowerCase();
+    if (!isValidFallbackTokenHash(hash) || session.clientSha256 !== hash) {
+      throw new Error('File integrity identity does not match the upload session.');
+    }
+    const attempt = await ctx.db.get(args.uploadAttemptId);
+    if (
+      !attempt ||
+      attempt.uploadSessionId !== session._id ||
+      attempt.clerkUserId !== clerkUserId ||
+      attempt.transport !== 'direct' ||
+      attempt.clientSha256 !== hash
+    ) throw new Error('Direct upload attempt was not found.');
+    if (Date.now() - attempt.uploadUrlIssuedAt > CHAT_UPLOAD_CONFIG.directReconciliationWindowMs) {
+      return { reconciled: false as const, reason: 'window_expired' as const };
+    }
+    const candidates = await directStorageCandidates(ctx, { session, attempt });
+    if (candidates.length !== 1) {
+      return {
+        reconciled: false as const,
+        reason: candidates.length === 0 ? 'not_found' as const : 'ambiguous' as const,
+      };
+    }
+    const candidate = candidates[0];
+    await attachStorageToSession(ctx, {
+      session,
+      clerkUserId,
+      uploadAttemptId: attempt._id,
+      storageId: candidate._id,
+    });
+    const now = Date.now();
+    await ctx.db.patch(attempt._id, {
+      reconciledStorageId: candidate._id,
+      updatedAt: now,
+    });
+    await ctx.db.patch(session._id, {
+      responseLossReconciledAt: now,
+      updatedAt: now,
+    });
+    return { reconciled: true as const, storageId: candidate._id };
   },
 });
 
@@ -813,6 +941,7 @@ export const getUploadSession = query({
       filename: session.filename,
       mimeType: session.mimeType,
       byteSize: session.byteSize,
+      clientSha256: session.clientSha256,
       storageId: session.storageId,
       uploadedFileId: session.uploadedFileId,
       processingAttempt: session.processingAttempt,
@@ -1400,6 +1529,524 @@ export const cleanupFallbackUploadTickets = internalMutation({
       }));
     }
     return { expired, deleted };
+  },
+});
+
+export const cleanupResumableUploads = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let expired = 0;
+    let chunksDeleted = 0;
+    let uploadsDeleted = 0;
+    for (const status of ['issued', 'uploading', 'assembling', 'completed', 'failed', 'expired'] as const) {
+      const uploads = await ctx.db
+        .query('chatUploadResumableUploads')
+        .withIndex('by_status_expires', (q) => q.eq('status', status).lt('expiresAt', now))
+        .take(20);
+      for (const upload of uploads) {
+        if (
+          upload.status === 'assembling' &&
+          upload.assemblyLeaseExpiresAt &&
+          upload.assemblyLeaseExpiresAt > now
+        ) continue;
+        if (upload.chunksCleanedAt) {
+          await ctx.db.delete(upload._id);
+          uploadsDeleted += 1;
+          continue;
+        }
+        const chunks = await ctx.db
+          .query('chatUploadResumableChunks')
+          .withIndex('by_upload', (q) => q.eq('resumableUploadId', upload._id))
+          .collect();
+        for (const chunk of chunks) {
+          if (chunk.storageId) await ctx.storage.delete(chunk.storageId);
+          await ctx.db.delete(chunk._id);
+          chunksDeleted += 1;
+        }
+        const nextStatus = upload.status === 'completed' || upload.status === 'failed'
+          ? upload.status
+          : 'expired' as const;
+        if (nextStatus === 'expired' && upload.status !== 'expired') expired += 1;
+        await ctx.db.patch(upload._id, {
+          status: nextStatus,
+          failureCode: nextStatus === 'expired' ? upload.failureCode ?? 'resumable_expired' : upload.failureCode,
+          chunksCleanedAt: now,
+          assemblyLeaseId: undefined,
+          assemblyLeaseExpiresAt: undefined,
+          expiresAt: now + CHAT_UPLOAD_CONFIG.resumableRetentionMs,
+          updatedAt: now,
+        });
+      }
+    }
+    if (expired > 0 || chunksDeleted > 0 || uploadsDeleted > 0) {
+      console.info(JSON.stringify({
+        level: 'info', event: 'resumable_upload_cleanup', expired, chunksDeleted, uploadsDeleted,
+      }));
+    }
+    return { expired, chunksDeleted, uploadsDeleted };
+  },
+});
+
+/** Issue a resumable, chunked upload that covers the complete 25 MiB product limit. */
+export const issueResumableUpload = mutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    tokenHash: v.string(),
+    clientSha256: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (process.env.CHAT_RESUMABLE_UPLOADS_ENABLED === 'false') {
+      throw new Error('Resumable uploads are temporarily unavailable.');
+    }
+    const { clerkUserId, session } = await getOwnedSession(ctx, args.uploadSessionId);
+    const tokenHash = args.tokenHash.trim().toLowerCase();
+    const clientSha256 = args.clientSha256.trim().toLowerCase();
+    if (!isValidFallbackTokenHash(tokenHash) || !isValidFallbackTokenHash(clientSha256)) {
+      throw new Error('Resumable upload identity is invalid.');
+    }
+    if (session.storageId) {
+      return { alreadyStored: true as const, uploadSessionId: session._id, storageId: session.storageId };
+    }
+    if (session.status === 'cancelled') throw new Error('Upload session was cancelled.');
+    if (session.clientSha256 !== clientSha256) throw new Error('File integrity identity does not match the upload session.');
+    if ((session.attemptNo ?? 0) >= CHAT_UPLOAD_CONFIG.maxStorageAttempts) {
+      throw new Error('Maximum storage attempts reached. Remove the file, switch networks, and select it again.');
+    }
+    const now = Date.now();
+    if (session.nextStorageRetryAt && session.nextStorageRetryAt > now) {
+      throw new Error('Secure storage is preparing a retry. Please wait a moment.');
+    }
+    const duplicateToken = await ctx.db
+      .query('chatUploadResumableUploads')
+      .withIndex('by_token_hash', (q) => q.eq('tokenHash', tokenHash))
+      .first();
+    if (duplicateToken) throw new Error('Resumable upload token was already used.');
+
+    const siteUrl = getFallbackUploadSiteUrl();
+    const expiresAt = now + CHAT_UPLOAD_CONFIG.resumableUploadTtlMs;
+    const attemptNo = (session.attemptNo ?? 0) + 1;
+    const attemptId = await createUploadAttempt(ctx, {
+      uploadSessionId: session._id,
+      clerkUserId,
+      uploadUrl: `${siteUrl}/chat-upload-resumable-chunk`,
+      issuedAt: now,
+      expiresAt,
+      attemptNo,
+      transport: 'resumable',
+      clientSha256,
+    });
+    const chunkCount = expectedChunkCount(session.byteSize, CHAT_UPLOAD_CONFIG.resumableChunkBytes);
+    const resumableUploadId = await ctx.db.insert('chatUploadResumableUploads', {
+      uploadSessionId: session._id,
+      uploadAttemptId: attemptId,
+      clerkUserId,
+      tokenHash,
+      clientSha256,
+      expectedByteSize: session.byteSize,
+      expectedMimeType: session.mimeType,
+      chunkBytes: CHAT_UPLOAD_CONFIG.resumableChunkBytes,
+      chunkCount,
+      status: 'issued',
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+      await ctx.db.insert('chatUploadResumableChunks', {
+        resumableUploadId,
+        uploadSessionId: session._id,
+        chunkIndex,
+        expectedByteSize: expectedChunkByteSize({
+          fileByteSize: session.byteSize,
+          chunkBytes: CHAT_UPLOAD_CONFIG.resumableChunkBytes,
+          chunkIndex,
+        }),
+        requestCount: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    await ctx.db.patch(session._id, {
+      status: 'awaiting_storage_upload',
+      currentAttemptId: attemptId,
+      attemptNo,
+      uploadUrlIssuedAt: now,
+      uploadUrlExpiresAt: expiresAt,
+      retryable: true,
+      errorCode: undefined,
+      errorMessage: undefined,
+      nextStorageRetryAt: undefined,
+      lastTransport: 'resumable',
+      updatedAt: now,
+    });
+    return {
+      alreadyStored: false as const,
+      uploadSessionId: session._id,
+      uploadAttemptId: attemptId,
+      attemptNo,
+      resumableUploadId,
+      chunkBytes: CHAT_UPLOAD_CONFIG.resumableChunkBytes,
+      chunkCount,
+      chunkUploadUrl: `${siteUrl}/chat-upload-resumable-chunk`,
+      completeUrl: `${siteUrl}/chat-upload-resumable-complete`,
+      expiresAt,
+    };
+  },
+});
+
+export const getResumableUploadStatus = query({
+  args: { resumableUploadId: v.id('chatUploadResumableUploads') },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload) throw new Error('Resumable upload was not found.');
+    const clerkUserId = await getIdentityClerkId(ctx);
+    if (upload.clerkUserId !== clerkUserId) throw new Error('Resumable upload was not found.');
+    const chunks = await ctx.db
+      .query('chatUploadResumableChunks')
+      .withIndex('by_upload', (q) => q.eq('resumableUploadId', upload._id))
+      .collect();
+    return {
+      status: upload.status,
+      storageId: upload.finalStorageId,
+      storedChunkIndexes: chunks.filter((chunk) => chunk.status === 'stored').map((chunk) => chunk.chunkIndex).sort((a, b) => a - b),
+      chunkCount: upload.chunkCount,
+      expiresAt: upload.expiresAt,
+    };
+  },
+});
+
+export const claimResumableChunk = internalMutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    chunkIndex: v.number(),
+    tokenHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload || upload.uploadSessionId !== args.uploadSessionId || upload.tokenHash !== args.tokenHash) {
+      throw new Error('Resumable upload was not found.');
+    }
+    const now = Date.now();
+    if (upload.expiresAt <= now || upload.status === 'failed' || upload.status === 'expired') {
+      if (upload.expiresAt <= now && upload.status !== 'expired') {
+        await ctx.db.patch(upload._id, { status: 'expired', failureCode: 'resumable_expired', updatedAt: now });
+      }
+      throw new Error('Resumable upload expired.');
+    }
+    if (upload.status === 'completed') {
+      return { alreadyCompleted: true as const, storageId: upload.finalStorageId };
+    }
+    const chunk = await ctx.db
+      .query('chatUploadResumableChunks')
+      .withIndex('by_upload_index', (q) => q.eq('resumableUploadId', upload._id).eq('chunkIndex', args.chunkIndex))
+      .unique();
+    if (!chunk) throw new Error('Resumable chunk index is invalid.');
+    if (chunk.status === 'stored' && chunk.storageId) {
+      return {
+        alreadyStored: true as const,
+        chunkId: chunk._id,
+        storageId: chunk.storageId,
+        sha256: chunk.sha256,
+        expectedByteSize: chunk.expectedByteSize,
+      };
+    }
+    if (chunk.requestCount >= CHAT_UPLOAD_CONFIG.maxChunkAttempts) {
+      await ctx.db.patch(chunk._id, { status: 'failed', failureCode: 'chunk_attempts_exhausted', updatedAt: now });
+      throw new Error('Maximum chunk attempts reached.');
+    }
+    await ctx.db.patch(chunk._id, { requestCount: chunk.requestCount + 1, status: 'pending', updatedAt: now });
+    await ctx.db.patch(upload._id, {
+      status: 'uploading',
+      expiresAt: now + CHAT_UPLOAD_CONFIG.resumableUploadTtlMs,
+      updatedAt: now,
+    });
+    const attempt = await ctx.db.get(upload.uploadAttemptId);
+    if (attempt && attempt.status === 'created') {
+      await ctx.db.patch(attempt._id, { status: 'posting', startedAt: now, updatedAt: now });
+    }
+    return {
+      alreadyStored: false as const,
+      chunkId: chunk._id,
+      expectedByteSize: chunk.expectedByteSize,
+      expectedMimeType: upload.expectedMimeType,
+      fileByteSize: upload.expectedByteSize,
+      chunkBytes: upload.chunkBytes,
+    };
+  },
+});
+
+export const completeResumableChunk = internalMutation({
+  args: {
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    chunkId: v.id('chatUploadResumableChunks'),
+    storageId: v.id('_storage'),
+    actualByteSize: v.number(),
+    sha256: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    const chunk = await ctx.db.get(args.chunkId);
+    if (!upload || !chunk || chunk.resumableUploadId !== upload._id) throw new Error('Resumable chunk was not found.');
+    if (chunk.status === 'stored' && chunk.storageId === args.storageId) return { alreadyStored: true };
+    if (chunk.status === 'stored') throw new Error('Resumable chunk already has a different object.');
+    if (args.actualByteSize !== chunk.expectedByteSize || !isValidFallbackTokenHash(args.sha256)) {
+      throw new Error('Resumable chunk integrity validation failed.');
+    }
+    const now = Date.now();
+    await ctx.db.patch(chunk._id, {
+      status: 'stored',
+      storageId: args.storageId,
+      actualByteSize: args.actualByteSize,
+      sha256: args.sha256,
+      failureCode: undefined,
+      updatedAt: now,
+    });
+    return { alreadyStored: false };
+  },
+});
+
+export const claimResumableAssembly = internalMutation({
+  args: {
+    uploadSessionId: v.id('chatUploadSessions'),
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    tokenHash: v.string(),
+    leaseId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload || upload.uploadSessionId !== args.uploadSessionId || upload.tokenHash !== args.tokenHash) {
+      throw new Error('Resumable upload was not found.');
+    }
+    if (upload.status === 'completed' && upload.finalStorageId) {
+      return { alreadyCompleted: true as const, storageId: upload.finalStorageId };
+    }
+    const now = Date.now();
+    if (upload.expiresAt <= now) throw new Error('Resumable upload expired.');
+    if (
+      upload.status === 'assembling' &&
+      upload.assemblyLeaseExpiresAt &&
+      upload.assemblyLeaseExpiresAt > now &&
+      upload.assemblyLeaseId !== args.leaseId
+    ) throw new Error('Resumable upload assembly is already running.');
+    const chunks = await ctx.db
+      .query('chatUploadResumableChunks')
+      .withIndex('by_upload', (q) => q.eq('resumableUploadId', upload._id))
+      .collect();
+    chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+    if (
+      chunks.length !== upload.chunkCount ||
+      chunks.some((chunk, index) => chunk.chunkIndex !== index || chunk.status !== 'stored' || !chunk.storageId)
+    ) throw new Error('Resumable upload is missing one or more chunks.');
+    await ctx.db.patch(upload._id, {
+      status: 'assembling',
+      assemblyLeaseId: args.leaseId,
+      assemblyLeaseExpiresAt: now + CHAT_UPLOAD_CONFIG.resumableAssemblyLeaseMs,
+      expiresAt: now + CHAT_UPLOAD_CONFIG.resumableAssemblyLeaseMs,
+      updatedAt: now,
+    });
+    return {
+      alreadyCompleted: false as const,
+      leaseId: args.leaseId,
+      expectedByteSize: upload.expectedByteSize,
+      expectedMimeType: upload.expectedMimeType,
+      clientSha256: upload.clientSha256,
+      chunks: chunks.map((chunk) => ({
+        chunkIndex: chunk.chunkIndex,
+        storageId: chunk.storageId!,
+        byteSize: chunk.actualByteSize!,
+      })),
+    };
+  },
+});
+
+export const releaseResumableAssembly = internalMutation({
+  args: {
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    leaseId: v.string(),
+    failureCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (
+      !upload ||
+      upload.status !== 'assembling' ||
+      upload.assemblyLeaseId !== args.leaseId
+    ) return false;
+    await ctx.db.patch(upload._id, {
+      status: 'uploading',
+      assemblyLeaseId: undefined,
+      assemblyLeaseExpiresAt: undefined,
+      failureCode: args.failureCode.slice(0, 120),
+      expiresAt: Date.now() + CHAT_UPLOAD_CONFIG.resumableUploadTtlMs,
+      updatedAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+export const completeResumableAssembly = internalMutation({
+  args: {
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    leaseId: v.string(),
+    storageId: v.id('_storage'),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload) throw new Error('Resumable upload was not found.');
+    if (upload.status === 'completed' && upload.finalStorageId === args.storageId) {
+      return { storageId: args.storageId, alreadyAttached: true };
+    }
+    if (upload.status !== 'assembling' || upload.assemblyLeaseId !== args.leaseId) {
+      throw new Error('Resumable assembly lease is invalid.');
+    }
+    const metadata = await ctx.db.system.get('_storage', args.storageId);
+    if (!metadata || metadata.size !== upload.expectedByteSize || metadata.sha256 !== upload.clientSha256) {
+      throw new Error('Assembled upload integrity validation failed.');
+    }
+    const session = await ctx.db.get(upload.uploadSessionId);
+    if (!session) throw new Error('Upload session was not found.');
+    const result = await attachStorageToSession(ctx, {
+      session,
+      clerkUserId: upload.clerkUserId,
+      uploadAttemptId: upload.uploadAttemptId,
+      storageId: args.storageId,
+    });
+    const now = Date.now();
+    await ctx.db.patch(upload._id, {
+      status: 'completed',
+      finalStorageId: args.storageId,
+      completedAt: now,
+      assemblyLeaseId: undefined,
+      assemblyLeaseExpiresAt: undefined,
+      expiresAt: now,
+      updatedAt: now,
+    });
+    return { storageId: args.storageId, alreadyAttached: result.alreadyAttached };
+  },
+});
+
+export const failResumableUpload = internalMutation({
+  args: {
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    failureCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload || upload.status === 'completed') return null;
+    const now = Date.now();
+    const failureCode = args.failureCode.slice(0, 120);
+    await ctx.db.patch(upload._id, { status: 'failed', failureCode, expiresAt: now, updatedAt: now });
+    const attempt = await ctx.db.get(upload.uploadAttemptId);
+    if (attempt && attempt.status !== 'attached') {
+      await ctx.db.patch(attempt._id, {
+        status: 'failed', failureKind: failureCode,
+        failureMessageSafe: 'The resumable upload did not finish.', completedAt: now, updatedAt: now,
+      });
+    }
+    const session = await ctx.db.get(upload.uploadSessionId);
+    if (session && !session.storageId && session.currentAttemptId === upload.uploadAttemptId) {
+      const retryState = storageRetryState(session.attemptNo ?? 1);
+      await ctx.db.patch(session._id, {
+        status: 'failed_storage_upload',
+        lastFailureKind: failureCode,
+        lastFailureMessageSafe: 'The resumable upload did not finish.',
+        retryable: retryState.retryable,
+        nextStorageRetryAt: retryState.nextStorageRetryAt,
+        errorCode: retryState.errorCode,
+        errorMessage: retryState.errorMessage,
+        updatedAt: now,
+      });
+    }
+    return null;
+  },
+});
+
+export const failOwnedResumableUpload = mutation({
+  args: {
+    resumableUploadId: v.id('chatUploadResumableUploads'),
+    failureCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db.get(args.resumableUploadId);
+    if (!upload) throw new Error('Resumable upload was not found.');
+    const clerkUserId = await getIdentityClerkId(ctx);
+    if (upload.clerkUserId !== clerkUserId) throw new Error('Resumable upload was not found.');
+    if (upload.status === 'completed') return { failed: false as const, alreadyCompleted: true as const };
+    const now = Date.now();
+    const failureCode = args.failureCode.slice(0, 120);
+    await ctx.db.patch(upload._id, { status: 'failed', failureCode, expiresAt: now, updatedAt: now });
+    const attempt = await ctx.db.get(upload.uploadAttemptId);
+    if (attempt && attempt.status !== 'attached') {
+      await ctx.db.patch(attempt._id, {
+        status: 'failed', failureKind: failureCode,
+        failureMessageSafe: 'The resumable upload did not finish.', completedAt: now, updatedAt: now,
+      });
+    }
+    const session = await ctx.db.get(upload.uploadSessionId);
+    if (session && !session.storageId && session.currentAttemptId === upload.uploadAttemptId) {
+      const retryState = storageRetryState(session.attemptNo ?? 1);
+      await ctx.db.patch(session._id, {
+        status: 'failed_storage_upload', lastFailureKind: failureCode,
+        lastFailureMessageSafe: 'The resumable upload did not finish.',
+        retryable: retryState.retryable, nextStorageRetryAt: retryState.nextStorageRetryAt,
+        errorCode: retryState.errorCode, errorMessage: retryState.errorMessage, updatedAt: now,
+      });
+    }
+    return { failed: true as const, alreadyCompleted: false as const };
+  },
+});
+
+/** Delete uniquely identifiable direct-upload objects whose completion response was lost and never reconciled. */
+export const cleanupDirectResponseLossOrphans = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const failed = await ctx.db
+      .query('chatUploadAttempts')
+      .withIndex('by_status_updated', (q) => q.eq('status', 'failed'))
+      .take(100);
+    let scanned = 0;
+    let deleted = 0;
+    let ambiguous = 0;
+    for (const attempt of failed) {
+      if (
+        attempt.transport !== 'direct' ||
+        attempt.failureKind !== 'response_lost' ||
+        !attempt.clientSha256 ||
+        attempt.reconciledStorageId ||
+        attempt.orphanCleanupAt ||
+        now - (attempt.completedAt ?? attempt.updatedAt) < CHAT_UPLOAD_CONFIG.directOrphanGraceMs
+      ) continue;
+      const session = await ctx.db.get(attempt.uploadSessionId);
+      if (!session || session.clientSha256 !== attempt.clientSha256) continue;
+      scanned += 1;
+      const candidates = await directStorageCandidates(ctx, { session, attempt });
+      if (candidates.length === 1) {
+        await ctx.storage.delete(candidates[0]._id);
+        await ctx.db.patch(attempt._id, {
+          orphanCleanupAt: now,
+          orphanCleanupStorageId: candidates[0]._id,
+          updatedAt: now,
+        });
+        deleted += 1;
+      } else {
+        if (candidates.length > 1) ambiguous += 1;
+        await ctx.db.patch(attempt._id, { orphanCleanupAt: now, updatedAt: now });
+      }
+    }
+    if (scanned > 0) {
+      console.info(JSON.stringify({
+        level: 'info',
+        event: 'direct_response_loss_orphan_cleanup',
+        scanned,
+        deleted,
+        ambiguous,
+      }));
+    }
+    return { scanned, deleted, ambiguous };
   },
 });
 

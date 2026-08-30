@@ -113,10 +113,12 @@ function getUploadErrorDetails(error: unknown) {
     const details = error as {
         uploadStatus?: ChatComposerFileStatus;
         retryable?: boolean;
+        nextStorageRetryAt?: number;
     };
     return {
         uploadStatus: details?.uploadStatus,
         retryable: details?.retryable,
+        nextStorageRetryAt: details?.nextStorageRetryAt,
     };
 }
 
@@ -127,6 +129,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const [selectedFileState, setSelectedFileState] = useState<ChatComposerFileState | null>(null);
     const [selectedFileIntent, setSelectedFileIntent] = useState<FilePromptIntent>('attachment');
     const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+    const [retryClock, setRetryClock] = useState(() => Date.now());
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -140,9 +143,15 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     const selectedFile = selectedFileState?.file ?? null;
     const isFileBusy = selectedFileState ? isBusyStatus(selectedFileState.status) : false;
     const isFileBlocked = isBlockedFileState(selectedFileState);
-    const hasSendableFile = Boolean(selectedFileState && !isFileBusy && !isFileBlocked);
+    const isRetryCoolingDown = Boolean(
+        selectedFileState?.nextStorageRetryAt && selectedFileState.nextStorageRetryAt > retryClock,
+    );
+    const retrySecondsRemaining = isRetryCoolingDown
+        ? Math.max(1, Math.ceil(((selectedFileState?.nextStorageRetryAt ?? retryClock) - retryClock) / 1_000))
+        : 0;
+    const hasSendableFile = Boolean(selectedFileState && !isFileBusy && !isFileBlocked && !isRetryCoolingDown);
     const canSubmit = Boolean(input.trim() || hasSendableFile) && !disabled && !isFileBusy && !isFileBlocked;
-    const canSendSelectedFile = Boolean(selectedFileState?.file && !isFileBusy && !isFileBlocked && !disabled);
+    const canSendSelectedFile = Boolean(selectedFileState?.file && !isFileBusy && !isFileBlocked && !isRetryCoolingDown && !disabled);
 
     const updateInput = useCallback((value: string) => {
         inputRef.current = value;
@@ -179,6 +188,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             attachmentRef: upload.attachmentRef,
             retryable: false,
             error: undefined,
+            nextStorageRetryAt: undefined,
         }),
     }), [updateSelectedFileState]);
 
@@ -194,6 +204,17 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     useEffect(() => {
         setIsSpeechSupported(getSpeechRecognition() !== null);
     }, [getSpeechRecognition]);
+
+    useEffect(() => {
+        if (!selectedFileState?.nextStorageRetryAt || selectedFileState.nextStorageRetryAt <= Date.now()) return;
+        const target = selectedFileState.nextStorageRetryAt;
+        const interval = window.setInterval(() => {
+            const now = Date.now();
+            setRetryClock(now);
+            if (now >= target) window.clearInterval(interval);
+        }, 250);
+        return () => window.clearInterval(interval);
+    }, [selectedFileState?.nextStorageRetryAt]);
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -267,7 +288,8 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             setMicError(null);
         } catch (error) {
             const message = getSendErrorMessage(error);
-            const { uploadStatus, retryable } = getUploadErrorDetails(error);
+            const { uploadStatus, retryable, nextStorageRetryAt } = getUploadErrorDetails(error);
+            if (nextStorageRetryAt) setRetryClock(Date.now());
             setMicError(message);
             if (selectedFileState) {
                 setSelectedFileState((current) => current ? {
@@ -281,6 +303,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                                 : 'failed_storage_upload'),
                     error: message,
                     retryable: retryable ?? (isNonRetryableFailure(uploadStatus ?? current.status) ? false : current.retryable),
+                    nextStorageRetryAt,
                 } : current);
                 focusComposer();
             }
@@ -301,15 +324,20 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     ]);
 
     const requestSend = useCallback(() => {
+        if (isRetryCoolingDown) {
+            setMicError(`Secure storage is preparing the next attempt. Retry in ${retrySecondsRemaining} second${retrySecondsRemaining === 1 ? '' : 's'}.`);
+            return;
+        }
         if (selectedFileState?.file && !selectedFileState.attachmentRef && !isFileBusy && !isFileBlocked && !disabled) {
             setSelectedFileState((current) => current ? {
                 ...current,
                 status: 'session_created',
                 error: undefined,
+                nextStorageRetryAt: undefined,
             } : current);
         }
         void handleSend();
-    }, [disabled, handleSend, isFileBlocked, isFileBusy, selectedFileState]);
+    }, [disabled, handleSend, isFileBlocked, isFileBusy, isRetryCoolingDown, retrySecondsRemaining, selectedFileState]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -593,10 +621,10 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         <button
                             type="button"
                             onClick={requestSend}
-                            disabled={disabled}
+                            disabled={disabled || isRetryCoolingDown}
                             className="rounded-md border border-amber-200/25 bg-amber-200/10 px-2 py-1 text-[10px] font-bold text-amber-50 transition hover:bg-amber-200/20 disabled:opacity-40"
                         >
-                            Retry
+                            {isRetryCoolingDown ? `Retry in ${retrySecondsRemaining}s` : 'Retry'}
                         </button>
                     )}
                     {!isFailureStatus(selectedFileState.status) && canSendSelectedFile && (

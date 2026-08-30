@@ -36,12 +36,13 @@ type UploadSessionSnapshot = {
   filename?: string;
   mimeType?: string;
   byteSize?: number;
+  clientSha256?: string;
   processingAttempt?: number;
   errorCode?: string;
   errorMessage?: string;
   retryable?: boolean;
   nextStorageRetryAt?: number;
-  lastTransport?: 'direct' | 'fallback';
+  lastTransport?: 'direct' | 'fallback' | 'resumable';
   extractionPreview?: string;
   extractionCharCount?: number;
   chatContextCharCount?: number;
@@ -65,17 +66,20 @@ export class ChatUploadError extends Error {
   uploadStatus?: ChatComposerFileStatus;
   retryable?: boolean;
   errorCode?: string;
+  nextStorageRetryAt?: number;
 
   constructor(message: string, options: {
     uploadStatus?: ChatComposerFileStatus;
     retryable?: boolean;
     errorCode?: string;
+    nextStorageRetryAt?: number;
   } = {}) {
     super(message);
     this.name = 'ChatUploadError';
     this.uploadStatus = options.uploadStatus;
     this.retryable = options.retryable;
     this.errorCode = options.errorCode;
+    this.nextStorageRetryAt = options.nextStorageRetryAt;
   }
 }
 
@@ -96,6 +100,8 @@ export type ChatComposerFileState = {
   processingAttempt?: number;
   error?: string;
   retryable: boolean;
+  clientSha256?: string;
+  nextStorageRetryAt?: number;
   attachmentRef?: ChatAttachmentRef;
 };
 
@@ -141,18 +147,18 @@ export type UploadFileForConversationArgs = {
 
 const PENDING_ATTACH_PREFIX = 'pending-chat-upload:';
 
-type FallbackUploadTicket =
-  | {
-      alreadyStored: true;
-      uploadSessionId: string;
-      storageId: string;
-    }
+type ResumableUploadTicket =
+  | { alreadyStored: true; uploadSessionId: string; storageId: string }
   | {
       alreadyStored: false;
       uploadSessionId: string;
       uploadAttemptId: string;
       attemptNo: number;
-      fallbackUploadUrl: string;
+      resumableUploadId: string;
+      chunkBytes: number;
+      chunkCount: number;
+      chunkUploadUrl: string;
+      completeUrl: string;
       expiresAt: number;
     };
 
@@ -170,6 +176,155 @@ async function sha256Hex(value: string) {
   const encoded = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', encoded);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function sha256Blob(blob: Blob) {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function resumableUrl(base: string, args: Record<string, string | number>) {
+  const url = new URL(base);
+  for (const [key, value] of Object.entries(args)) url.searchParams.set(key, String(value));
+  return url.toString();
+}
+
+export async function postResumableRequest(args: {
+  url: string;
+  bearerToken: string;
+  body?: Blob;
+  chunkSha256?: string;
+  timeoutMs?: number;
+}) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), args.timeoutMs ?? 90_000);
+  try {
+    const response = await fetch(args.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${args.bearerToken}`,
+        'Content-Type': args.body?.type || 'application/octet-stream',
+        ...(args.chunkSha256 ? { 'X-Chunk-SHA256': args.chunkSha256 } : {}),
+      },
+      body: args.body,
+      signal: controller.signal,
+    });
+    const parsed = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok) {
+      throw new Error(typeof parsed?.error === 'string' ? parsed.error : `Resumable upload failed with HTTP ${response.status}.`);
+    }
+    return parsed ?? {};
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+export async function uploadResumableFile(args: {
+  convex: ConvexClientLike;
+  file: File;
+  fileSha256: string;
+  ticket: Extract<ResumableUploadTicket, { alreadyStored: false }>;
+  bearerToken: string;
+  onProgress?: (progress: number) => void;
+}) {
+  const status = await args.convex.query(api.chatUploads.getResumableUploadStatus, {
+    resumableUploadId: args.ticket.resumableUploadId as Id<'chatUploadResumableUploads'>,
+  }) as { storedChunkIndexes?: number[]; storageId?: string; status?: string };
+  if (status.storageId) return status.storageId;
+  const stored = new Set(status.storedChunkIndexes ?? []);
+  let storedBytes = 0;
+  for (const chunkIndex of stored) {
+    const start = chunkIndex * args.ticket.chunkBytes;
+    storedBytes += Math.min(args.ticket.chunkBytes, args.file.size - start);
+  }
+  args.onProgress?.(Math.min(99, Math.round((storedBytes / args.file.size) * 100)));
+
+  let failureCode = 'resumable_chunk_transport_failed';
+  try {
+    for (let chunkIndex = 0; chunkIndex < args.ticket.chunkCount; chunkIndex += 1) {
+      if (stored.has(chunkIndex)) continue;
+      const start = chunkIndex * args.ticket.chunkBytes;
+      const end = Math.min(args.file.size, start + args.ticket.chunkBytes);
+      const chunk = args.file.slice(start, end, 'application/octet-stream');
+      const chunkSha256 = await sha256Blob(chunk);
+      let completed = false;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < CHAT_UPLOAD_CONFIG.maxChunkAttempts; attempt += 1) {
+        if (attempt > 0) {
+          await waitMs(Math.min(
+            CHAT_UPLOAD_CONFIG.storageRetryMaxDelayMs,
+            CHAT_UPLOAD_CONFIG.storageRetryBaseDelayMs * (2 ** (attempt - 1)),
+          ));
+        }
+        try {
+          await postResumableRequest({
+            url: resumableUrl(args.ticket.chunkUploadUrl, {
+              uploadSessionId: args.ticket.uploadSessionId,
+              resumableUploadId: args.ticket.resumableUploadId,
+              chunkIndex,
+            }),
+            bearerToken: args.bearerToken,
+            body: chunk,
+            chunkSha256,
+          });
+          completed = true;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!completed) {
+        failureCode = lastError instanceof DOMException && lastError.name === 'AbortError'
+          ? 'resumable_chunk_timeout'
+          : 'resumable_chunk_transport_failed';
+        throw lastError ?? new Error('A resumable chunk did not finish.');
+      }
+      storedBytes += chunk.size;
+      args.onProgress?.(Math.min(99, Math.round((storedBytes / args.file.size) * 100)));
+    }
+
+    failureCode = 'resumable_completion_unconfirmed';
+    let completionError: unknown;
+    for (let attempt = 0; attempt < CHAT_UPLOAD_CONFIG.maxChunkAttempts; attempt += 1) {
+      if (attempt > 0) {
+        await waitMs(Math.min(
+          CHAT_UPLOAD_CONFIG.storageRetryMaxDelayMs,
+          CHAT_UPLOAD_CONFIG.storageRetryBaseDelayMs * (2 ** (attempt - 1)),
+        ));
+      }
+      try {
+        const completed = await postResumableRequest({
+          url: resumableUrl(args.ticket.completeUrl, {
+            uploadSessionId: args.ticket.uploadSessionId,
+            resumableUploadId: args.ticket.resumableUploadId,
+          }),
+          bearerToken: args.bearerToken,
+          timeoutMs: 120_000,
+        });
+        if (typeof completed.storageId === 'string') return completed.storageId;
+      } catch (error) {
+        completionError = error;
+      }
+      const reconciled = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+        uploadSessionId: args.ticket.uploadSessionId as Id<'chatUploadSessions'>,
+      }));
+      if (reconciled.storageId) return reconciled.storageId;
+    }
+    throw completionError ?? new Error('Resumable upload completion was not confirmed.');
+  } catch (error) {
+    await args.convex.mutation(api.chatUploads.failOwnedResumableUpload, {
+      resumableUploadId: args.ticket.resumableUploadId as Id<'chatUploadResumableUploads'>,
+      failureCode: error instanceof DOMException && error.name === 'AbortError'
+        ? failureCode === 'resumable_completion_unconfirmed'
+          ? 'resumable_completion_timeout'
+          : 'resumable_chunk_timeout'
+        : failureCode,
+    }).catch(() => undefined);
+    throw new ChatUploadError(
+      'The direct and resumable storage routes could not complete. Switch networks or disable a VPN/privacy blocker before retrying.',
+      { uploadStatus: 'failed_storage_upload', retryable: true, errorCode: failureCode },
+    );
+  }
 }
 
 function normalizeStatus(status: string): ChatComposerFileStatus {
@@ -201,6 +356,7 @@ function toUploadError(snapshot: UploadSessionSnapshot) {
     uploadStatus,
     retryable,
     errorCode: snapshot.errorCode,
+    nextStorageRetryAt: snapshot.nextStorageRetryAt,
   };
 
   if (snapshot.errorMessage) return new ChatUploadError(snapshot.errorMessage, errorOptions);
@@ -454,6 +610,7 @@ async function refreshSessionAfterRetryDelay(args: {
   caseId?: Id<'cases'> | string;
   intent: ChatUploadIntent;
   clientUploadKey: string;
+  clientSha256: string;
 }) {
   const retryAt = args.session.nextStorageRetryAt;
   if (!retryAt || retryAt <= Date.now()) return args.session;
@@ -465,6 +622,7 @@ async function refreshSessionAfterRetryDelay(args: {
     filename: args.file.name,
     mimeType: args.file.type || 'application/octet-stream',
     byteSize: args.file.size,
+    clientSha256: args.clientSha256,
     intent: args.intent,
   }));
 }
@@ -514,19 +672,26 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
 
   args.onStatus?.('session_created');
   const existing = args.existingSession;
-  let session = existing?.uploadSessionId
-    ? parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+  let session: UploadSessionSnapshot;
+  let fileSha256 = existing?.clientSha256;
+  if (existing?.uploadSessionId) {
+    session = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
       uploadSessionId: existing.uploadSessionId as Id<'chatUploadSessions'>,
-    }))
-    : parseSessionSnapshot(await args.convex.mutation(api.chatUploads.startUploadSession, {
+    }));
+    fileSha256 = session.clientSha256 ?? fileSha256 ?? await sha256Blob(args.file);
+  } else {
+    fileSha256 = await sha256Blob(args.file);
+    session = parseSessionSnapshot(await args.convex.mutation(api.chatUploads.startUploadSession, {
       conversationId: args.conversationId as Id<'conversations'> | undefined,
       caseId: args.caseId as Id<'cases'> | undefined,
       clientUploadKey: args.clientUploadKey,
       filename: args.file.name,
       mimeType: args.file.type || 'application/octet-stream',
       byteSize: args.file.size,
+      clientSha256: fileSha256,
       intent: args.intent,
     }));
+  }
 
   if (
     existing?.uploadSessionId &&
@@ -541,6 +706,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       filename: args.file.name,
       mimeType: args.file.type || 'application/octet-stream',
       byteSize: args.file.size,
+      clientSha256: fileSha256,
       intent: args.intent,
     }));
   }
@@ -553,6 +719,7 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
     caseId: args.caseId,
     intent: args.intent,
     clientUploadKey: args.clientUploadKey,
+    clientSha256: fileSha256,
   });
 
   const uploadSessionId = session.uploadSessionId;
@@ -598,61 +765,85 @@ export async function uploadFileForConversation(args: UploadFileForConversationA
       const directFailureDiagnostics = directError instanceof StorageUploadError
         ? directError.diagnostics
         : undefined;
-      const fallbackEligible =
-        directError instanceof StorageUploadError &&
-        directError.retryable &&
-        args.file.size <= CHAT_UPLOAD_CONFIG.fallbackUploadMaxBytes;
+      const fallbackEligible = directError instanceof StorageUploadError && directError.retryable;
 
       if (!fallbackEligible) {
         args.onStatus?.('failed_storage_upload');
         throw directError;
       }
 
-      await waitMs(CHAT_UPLOAD_CONFIG.storageRetryDelayMs + 100);
-      const bearerToken = createFallbackBearerToken();
-      const tokenHash = await sha256Hex(bearerToken);
-      const fallback = await args.convex.mutation(api.chatUploads.issueFallbackUploadTicket, {
-        uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
-        tokenHash,
-      }) as FallbackUploadTicket;
-      if (fallback.alreadyStored) {
-        storageId = fallback.storageId;
-      } else {
-        resolvedAttemptId = fallback.uploadAttemptId;
-        args.onStatus?.('uploading_to_storage');
-        const fallbackDiagnostics = createThrottledDiagnosticRecorder(args.convex);
+      if (directError.kind === 'response_lost') {
         try {
-          const upload = await postFileToStorageWithDiagnostics({
-            uploadUrl: fallback.fallbackUploadUrl,
-            file: args.file,
-            sessionId: uploadSessionId,
-            attemptId: fallback.uploadAttemptId,
-            clientUploadKey: args.clientUploadKey,
-            clientTurnId: resolvedClientTurnId,
-            timeoutMs: 120_000,
-            authorizationBearer: bearerToken,
-            onProgress: ({ percent }) => args.onProgress?.(percent),
-            onDiagnosticEvent: fallbackDiagnostics.handle,
-          });
-          await fallbackDiagnostics.flushTerminal();
-          storageId = upload.storageId;
-        } catch (fallbackError) {
-          await fallbackDiagnostics.flushTerminal();
-          const reconciled = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+          const reconciled = await args.convex.mutation(api.chatUploads.reconcileDirectUpload, {
             uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
-          }));
-          if (reconciled.storageId) {
-            storageId = reconciled.storageId;
-            session = reconciled;
-          } else {
-            args.onStatus?.('failed_storage_upload');
-            if (directFailureDiagnostics?.loadedBytes === directFailureDiagnostics?.totalBytes) {
+            uploadAttemptId: uploadAttemptId as Id<'chatUploadAttempts'>,
+            clientSha256: fileSha256,
+          }) as { reconciled: boolean; storageId?: string };
+          if (reconciled.reconciled && reconciled.storageId) storageId = reconciled.storageId;
+        } catch {
+          // Reconciliation is best-effort. The resumable route remains available.
+        }
+      }
+
+      if (!storageId) {
+        const failedSession = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+          uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+        }));
+        if (failedSession.retryable === false) throw toUploadError(failedSession);
+        if (failedSession.nextStorageRetryAt && failedSession.nextStorageRetryAt > Date.now()) {
+          await waitMs(failedSession.nextStorageRetryAt - Date.now());
+        }
+
+        const bearerToken = createFallbackBearerToken();
+        const tokenHash = await sha256Hex(bearerToken);
+        const fallback = await args.convex.mutation(api.chatUploads.issueResumableUpload, {
+          uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+          tokenHash,
+          clientSha256: fileSha256,
+        }) as ResumableUploadTicket;
+        if (fallback.alreadyStored) {
+          storageId = fallback.storageId;
+        } else {
+          resolvedAttemptId = fallback.uploadAttemptId;
+          args.onStatus?.('uploading_to_storage');
+          try {
+            storageId = await uploadResumableFile({
+              convex: args.convex,
+              file: args.file,
+              fileSha256,
+              ticket: fallback,
+              bearerToken,
+              onProgress: args.onProgress,
+            });
+          } catch (fallbackError) {
+            const reconciled = parseSessionSnapshot(await args.convex.query(api.chatUploads.getUploadSession, {
+              uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
+            }));
+            if (reconciled.storageId) {
+              storageId = reconciled.storageId;
+              session = reconciled;
+            } else {
+              args.onStatus?.('failed_storage_upload');
+              if (reconciled.retryable === false) throw toUploadError(reconciled);
+              if (directFailureDiagnostics?.loadedBytes === directFailureDiagnostics?.totalBytes) {
+                throw new ChatUploadError(
+                  'Storage confirmation was lost and the secure fallback could not complete. Switch networks or disable a VPN/privacy blocker, then retry.',
+                  {
+                    uploadStatus: 'failed_storage_upload',
+                    retryable: reconciled.retryable ?? true,
+                    nextStorageRetryAt: reconciled.nextStorageRetryAt,
+                  },
+                );
+              }
               throw new ChatUploadError(
-                'Storage confirmation was lost and the secure fallback could not complete. Switch networks or disable a VPN/privacy blocker, then retry.',
-                { uploadStatus: 'failed_storage_upload', retryable: reconciled.retryable ?? true },
+                fallbackError instanceof Error ? fallbackError.message : 'The resumable upload did not finish.',
+                {
+                  uploadStatus: 'failed_storage_upload',
+                  retryable: reconciled.retryable ?? true,
+                  nextStorageRetryAt: reconciled.nextStorageRetryAt,
+                },
               );
             }
-            throw fallbackError;
           }
         }
       }

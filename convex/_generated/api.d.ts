@@ -16,6 +16,7 @@ import type * as caseScopeMaintenance from "../caseScopeMaintenance.js";
 import type * as cases from "../cases.js";
 import type * as chatRateLimits from "../chatRateLimits.js";
 import type * as chatTurns from "../chatTurns.js";
+import type * as chatUploadCanary from "../chatUploadCanary.js";
 import type * as chatUploadProcessor from "../chatUploadProcessor.js";
 import type * as chatUploads from "../chatUploads.js";
 import type * as chatWorker from "../chatWorker.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   cases: typeof cases;
   chatRateLimits: typeof chatRateLimits;
   chatTurns: typeof chatTurns;
+  chatUploadCanary: typeof chatUploadCanary;
   chatUploadProcessor: typeof chatUploadProcessor;
   chatUploads: typeof chatUploads;
   chatWorker: typeof chatWorker;

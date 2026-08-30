@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { uploadFileForConversation, type ChatComposerFileState } from '../uploadClient';
-import { CHAT_UPLOAD_CONFIG } from '../uploadShared';
 
 function makeFile(name = 'order.pdf', size = 5) {
   return new File(['x'.repeat(size)], name, { type: 'application/pdf' });
@@ -390,35 +389,53 @@ describe('uploadClient direct storage flow', () => {
     }));
   });
 
-  it('classifies storage upload timeout separately from generic network failure', async () => {
+  it('records a direct timeout distinctly before trying the resumable route', async () => {
     installTimeoutXhr();
     const convex = makeConvexClient();
-    const largeFile = makeFile();
-    Object.defineProperty(largeFile, 'size', {
-      configurable: true,
-      value: CHAT_UPLOAD_CONFIG.fallbackUploadMaxBytes + 1,
+    convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+      if ('filename' in args) {
+        return {
+          uploadSessionId: 'session-1', uploadAttemptId: 'attempt-1', attemptNo: 1,
+          uploadUrl: 'https://convex-upload.test/direct', status: 'awaiting_storage_upload',
+          filename: args.filename, mimeType: args.mimeType, byteSize: args.byteSize,
+          retryable: true, processingAttempt: 0,
+        };
+      }
+      if ('eventType' in args) return { recorded: true };
+      if ('tokenHash' in args) {
+        return { alreadyStored: true, uploadSessionId: 'session-1', storageId: 'storage-reconciled' };
+      }
+      return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
+    });
+    convex.query.mockResolvedValueOnce({
+      uploadSessionId: 'session-1', status: 'failed_storage_upload', retryable: true,
+      filename: 'order.pdf', mimeType: 'application/pdf', byteSize: 5,
     });
 
-    await expect(uploadFileForConversation({
+    await uploadFileForConversation({
       convex: convex as never,
-      file: largeFile,
+      file: makeFile(),
       conversationId: 'conversation-1',
       intent: 'court_order',
       clientUploadKey: 'client-upload-1',
-    })).rejects.toThrow('The file did not finish uploading within the storage time limit.');
+    });
 
     expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       eventType: 'storage_post_failed',
-      diagnostics: expect.objectContaining({
-        failureKind: 'timeout',
-      }),
+      diagnostics: expect.objectContaining({ failureKind: 'timeout' }),
     }));
   });
 
-  it('automatically uses the authenticated fallback route after a blocked direct upload', async () => {
-    vi.useFakeTimers();
-    try {
-      const xhrInstances = installSequencedXhr(['blocked', 'success']);
+  it('automatically uses the authenticated resumable route after a blocked direct upload', async () => {
+    const xhrInstances = installSequencedXhr(['blocked']);
+    const fetchMock = vi.fn(async (...requestArgs: [string, RequestInit?]) => {
+      const [url] = requestArgs;
+      return new Response(
+        url.includes('complete') ? JSON.stringify({ storageId: 'storage-fallback' }) : JSON.stringify({ stored: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
       const convex = makeConvexClient();
       convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
         if ('filename' in args) {
@@ -435,92 +452,98 @@ describe('uploadClient direct storage flow', () => {
             processingAttempt: 0,
           };
         }
+        if ('eventType' in args) return { recorded: true };
         if ('tokenHash' in args) {
           return {
             alreadyStored: false,
             uploadSessionId: 'session-1',
             uploadAttemptId: 'attempt-2',
             attemptNo: 2,
-            fallbackUploadUrl: 'https://deployment.convex.site/chat-upload-fallback?uploadSessionId=session-1&uploadAttemptId=attempt-2',
+            resumableUploadId: 'resumable-1',
+            chunkBytes: 4,
+            chunkCount: 2,
+            chunkUploadUrl: 'https://deployment.convex.site/chat-upload-resumable-chunk',
+            completeUrl: 'https://deployment.convex.site/chat-upload-resumable-complete',
             expiresAt: Date.now() + 60_000,
           };
         }
         return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
       });
+    convex.query
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1', status: 'failed_storage_upload', retryable: true,
+        filename: 'order.pdf', mimeType: 'application/pdf', byteSize: 5,
+      })
+      .mockResolvedValueOnce({ storedChunkIndexes: [], status: 'issued' });
 
-      const uploadPromise = uploadFileForConversation({
+    const upload = await uploadFileForConversation({
         convex: convex as never,
         file: makeFile(),
         conversationId: 'conversation-1',
         intent: 'court_order',
         clientUploadKey: 'client-upload-1',
       });
-      await vi.runAllTimersAsync();
-      const upload = await uploadPromise;
 
-      expect(xhrInstances).toHaveLength(2);
-      expect(xhrInstances[0]?.url).toContain('/direct');
-      expect(xhrInstances[1]?.url).toContain('/chat-upload-fallback');
-      expect(xhrInstances[1]?.headers.Authorization).toMatch(/^Bearer [a-f0-9]{64}$/);
-      expect(convex.mutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-        uploadSessionId: 'session-1',
-        uploadAttemptId: 'attempt-2',
-        storageId: 'storage-fallback',
-      }));
-      expect(upload.status).toBe('ready');
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(xhrInstances).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      headers: expect.objectContaining({ Authorization: expect.stringMatching(/^Bearer [a-f0-9]{64}$/) }),
+    });
+    expect(upload).toMatchObject({ storageId: 'storage-fallback', status: 'ready' });
   });
 
-  it('reconciles a completed fallback upload when its HTTP response is lost', async () => {
-    vi.useFakeTimers();
-    try {
-      installSequencedXhr(['blocked', 'response_lost']);
-      const convex = makeConvexClient();
-      convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
-        if ('filename' in args) {
-          return {
-            uploadSessionId: 'session-1',
-            uploadAttemptId: 'attempt-1',
-            attemptNo: 1,
-            uploadUrl: 'https://convex-upload.test/direct',
-            status: 'awaiting_storage_upload',
-            filename: args.filename,
-            mimeType: args.mimeType,
-            byteSize: args.byteSize,
-            retryable: true,
-            processingAttempt: 0,
-          };
-        }
-        if ('tokenHash' in args) {
-          return {
-            alreadyStored: false,
-            uploadSessionId: 'session-1',
-            uploadAttemptId: 'attempt-2',
-            attemptNo: 2,
-            fallbackUploadUrl: 'https://deployment.convex.site/chat-upload-fallback?uploadSessionId=session-1&uploadAttemptId=attempt-2',
-            expiresAt: Date.now() + 60_000,
-          };
-        }
-        return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
+  it('reconciles a completed resumable upload when its completion response is lost', async () => {
+    installSequencedXhr(['blocked']);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('complete')) throw new TypeError('response lost');
+      return new Response(JSON.stringify({ stored: true }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const convex = makeConvexClient();
+    convex.mutation.mockImplementation(async (_ref: unknown, args: Record<string, unknown>) => {
+      if ('filename' in args) {
+        return {
+          uploadSessionId: 'session-1', uploadAttemptId: 'attempt-1', attemptNo: 1,
+          uploadUrl: 'https://convex-upload.test/direct', status: 'awaiting_storage_upload',
+          filename: args.filename, mimeType: args.mimeType, byteSize: args.byteSize,
+          retryable: true, processingAttempt: 0,
+        };
+      }
+      if ('eventType' in args) return { recorded: true };
+      if ('tokenHash' in args) {
+        return {
+          alreadyStored: false, uploadSessionId: 'session-1', uploadAttemptId: 'attempt-2', attemptNo: 2,
+          resumableUploadId: 'resumable-1', chunkBytes: 5, chunkCount: 1,
+          chunkUploadUrl: 'https://deployment.convex.site/chat-upload-resumable-chunk',
+          completeUrl: 'https://deployment.convex.site/chat-upload-resumable-complete',
+          expiresAt: Date.now() + 60_000,
+        };
+      }
+      return { uploadSessionId: args.uploadSessionId, status: 'processing_queued' };
+    });
+    convex.query
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1', status: 'failed_storage_upload', retryable: true,
+        filename: 'order.pdf', mimeType: 'application/pdf', byteSize: 5,
+      })
+      .mockResolvedValueOnce({ storedChunkIndexes: [], status: 'issued' })
+      .mockResolvedValueOnce({
+        uploadSessionId: 'session-1', storageId: 'storage-1', status: 'stored',
+        filename: 'order.pdf', mimeType: 'application/pdf', byteSize: 5, retryable: false,
       });
 
-      const uploadPromise = uploadFileForConversation({
-        convex: convex as never,
-        file: makeFile(),
-        conversationId: 'conversation-1',
-        intent: 'court_order',
-        clientUploadKey: 'client-upload-1',
-      });
-      await vi.runAllTimersAsync();
-      const upload = await uploadPromise;
+    const upload = await uploadFileForConversation({
+      convex: convex as never,
+      file: makeFile(),
+      conversationId: 'conversation-1',
+      intent: 'court_order',
+      clientUploadKey: 'client-upload-1',
+    });
 
-      expect(convex.query).toHaveBeenCalledTimes(2);
-      expect(upload).toMatchObject({ storageId: 'storage-1', status: 'ready' });
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(upload).toMatchObject({ storageId: 'storage-1', status: 'ready' });
   });
 
   it('normalizes resumed Convex sessions that use existing storage field names', async () => {

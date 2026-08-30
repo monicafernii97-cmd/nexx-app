@@ -57,9 +57,33 @@ crons.interval(
 );
 
 crons.interval(
+  'clean up resumable chat uploads',
+  { minutes: 5 },
+  internal.chatUploads.cleanupResumableUploads,
+);
+
+crons.interval(
+  'clean up direct response-loss orphans',
+  { minutes: 5 },
+  internal.chatUploads.cleanupDirectResponseLossOrphans,
+);
+
+crons.interval(
   'audit recent chat upload failures',
   { minutes: 5 },
   internal.chatUploads.auditRecentStorageUploadFailures,
+);
+
+crons.interval(
+  'run production chat upload canary',
+  { minutes: 10 },
+  internal.chatUploadCanary.runProductionUploadCanary,
+);
+
+crons.interval(
+  'audit production chat upload canary',
+  { minutes: 5 },
+  internal.chatUploadCanary.auditProductionUploadCanary,
 );
 
 crons.interval(

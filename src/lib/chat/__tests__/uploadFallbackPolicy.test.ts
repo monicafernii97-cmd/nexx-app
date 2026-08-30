@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   getStorageAttachmentDisposition,
   getStorageAttemptPolicy,
+  expectedChunkByteSize,
+  expectedChunkCount,
   isValidFallbackTokenHash,
   validateFallbackPayload,
+  validateResumableChunk,
 } from '@convex/lib/chatUploadFallbackPolicy';
 import { hasCompleteDocumentRetrieval } from '@convex/lib/chatUploadReadiness';
 import { shouldPersistUploadProgressDiagnostic } from '../uploadShared';
@@ -65,17 +68,56 @@ describe('chat upload fallback policy', () => {
 
   it('stops retrying after the configured storage-attempt limit', () => {
     expect(getStorageAttemptPolicy({
-      attemptNo: 3,
-      maxAttempts: 4,
+      attemptNo: 1,
+      maxAttempts: 3,
       now: 1_000,
-      retryDelayMs: 1_500,
-    })).toEqual({ exhausted: false, retryable: true, nextStorageRetryAt: 2_500 });
+      retryBaseDelayMs: 1_000,
+      retryMaxDelayMs: 8_000,
+    })).toEqual({ exhausted: false, retryable: true, retryDelayMs: 1_000, nextStorageRetryAt: 2_000 });
     expect(getStorageAttemptPolicy({
-      attemptNo: 4,
-      maxAttempts: 4,
+      attemptNo: 2,
+      maxAttempts: 3,
       now: 1_000,
-      retryDelayMs: 1_500,
-    })).toEqual({ exhausted: true, retryable: false, nextStorageRetryAt: undefined });
+      retryBaseDelayMs: 1_000,
+      retryMaxDelayMs: 8_000,
+    })).toEqual({ exhausted: false, retryable: true, retryDelayMs: 2_000, nextStorageRetryAt: 3_000 });
+    expect(getStorageAttemptPolicy({
+      attemptNo: 3,
+      maxAttempts: 3,
+      now: 1_000,
+      retryBaseDelayMs: 1_000,
+      retryMaxDelayMs: 8_000,
+    })).toEqual({ exhausted: true, retryable: false, retryDelayMs: 4_000, nextStorageRetryAt: undefined });
+  });
+
+  it('calculates and validates every chunk including the final remainder', () => {
+    expect(expectedChunkCount(25, 8)).toBe(4);
+    expect(expectedChunkByteSize({ fileByteSize: 25, chunkBytes: 8, chunkIndex: 3 })).toBe(1);
+    expect(validateResumableChunk({
+      fileByteSize: 25,
+      chunkBytes: 8,
+      chunkIndex: 3,
+      actualByteSize: 1,
+      expectedSha256: 'a'.repeat(64),
+      actualSha256: 'a'.repeat(64),
+    })).toEqual({ ok: true, expectedByteSize: 1 });
+    expect(validateResumableChunk({
+      fileByteSize: 25,
+      chunkBytes: 8,
+      chunkIndex: 3,
+      actualByteSize: 2,
+      actualSha256: 'a'.repeat(64),
+    })).toEqual({ ok: false, failureCode: 'chunk_size_mismatch' });
+  });
+
+  it('covers the production boundary sizes through the full 25 MiB limit', () => {
+    const MiB = 1024 * 1024;
+    expect(expectedChunkCount(1, 4 * MiB)).toBe(1);
+    expect(expectedChunkCount(4 * MiB, 4 * MiB)).toBe(1);
+    expect(expectedChunkCount(19 * MiB, 4 * MiB)).toBe(5);
+    expect(expectedChunkByteSize({ fileByteSize: 19 * MiB, chunkBytes: 4 * MiB, chunkIndex: 4 })).toBe(3 * MiB);
+    expect(expectedChunkCount(25 * MiB, 4 * MiB)).toBe(7);
+    expect(expectedChunkByteSize({ fileByteSize: 25 * MiB, chunkBytes: 4 * MiB, chunkIndex: 6 })).toBe(1 * MiB);
   });
 
   it('throttles progress writes unless time or percentage advances enough', () => {

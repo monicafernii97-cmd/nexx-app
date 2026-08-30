@@ -350,6 +350,36 @@ describe('ChatInput file send flow', () => {
     expect(container.textContent).not.toContain('order.pdf');
   });
 
+  it('disables retry until the server-provided storage cooldown expires', async () => {
+    const error = new Error('Secure storage is preparing a retry.') as Error & {
+      uploadStatus: string;
+      retryable: boolean;
+      nextStorageRetryAt: number;
+    };
+    error.uploadStatus = 'failed_storage_upload';
+    error.retryable = true;
+    error.nextStorageRetryAt = Date.now() + 5_000;
+    const onSend = vi.fn().mockRejectedValue(error);
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+
+    await act(async () => {
+      setFiles(fileInput(container), [makeFile()]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      sendButton(container).click();
+    });
+
+    const retry = buttonWithText(container, 'Retry in');
+    expect(retry?.disabled).toBe(true);
+    expect(sendButton(container).disabled).toBe(true);
+    await act(async () => {
+      input(container).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks non-readable file failures and asks the user to replace the file', async () => {
     const onSend = vi.fn(async (_message, _fileState, _mode, callbacks) => {
       callbacks?.onStatus('failed_empty_extraction');

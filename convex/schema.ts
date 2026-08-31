@@ -582,6 +582,47 @@ export default defineSchema({
         .index('by_status_created', ['status', 'createdAt'])
         .index('by_created', ['createdAt']),
 
+    /**
+     * Durable ownership/cleanup ledger for synthetic browser upload tests.
+     * Test data is always scoped to the authenticated Clerk robot and a
+     * collision-resistant run id so production cleanup cannot touch user data.
+     */
+    chatUploadE2ERuns: defineTable({
+        clerkUserId: v.string(),
+        runId: v.string(),
+        lane: v.union(
+            v.literal('pr'),
+            v.literal('release'),
+            v.literal('daily'),
+            v.literal('weekly'),
+            v.literal('resilience')
+        ),
+        environment: v.union(
+            v.literal('local'),
+            v.literal('preview'),
+            v.literal('staging'),
+            v.literal('production')
+        ),
+        deploymentId: v.optional(v.string()),
+        filenamePrefix: v.string(),
+        status: v.union(
+            v.literal('registered'),
+            v.literal('cleanup_requested'),
+            v.literal('cleaning'),
+            v.literal('cleaned'),
+            v.literal('cleanup_failed')
+        ),
+        cleanupErrorSafe: v.optional(v.string()),
+        cleanupDeletedCounts: v.optional(v.any()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        cleanupRequestedAt: v.optional(v.number()),
+        cleanupCompletedAt: v.optional(v.number()),
+    })
+        .index('by_user_run', ['clerkUserId', 'runId'])
+        .index('by_status_updated', ['status', 'updatedAt'])
+        .index('by_created', ['createdAt']),
+
     messageAttachments: defineTable({
         messageId: v.optional(v.id('messages')),
         turnId: v.optional(v.id('chatTurns')),

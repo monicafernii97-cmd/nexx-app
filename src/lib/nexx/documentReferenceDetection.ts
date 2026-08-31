@@ -136,7 +136,8 @@ const CLAUSE_PRIORITY_SEARCH_TERMS = [
   'later order',
 ];
 
-const SECTION_PATTERN = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/gi;
+const SECTION_PATTERN = /\b(?:section|paragraph|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/gi;
+const PAGE_LIST_PATTERN = /\bpages?\s+\d+(?:\s*(?:(?:,\s*(?:and\s+)?)|and\s+|&\s*|through\s+|to\s+|-)\s*(?:pages?\s+)?\d+)*/gi;
 const DATE_PATTERN = /\b(?:\d{1,2}\/\d{1,2}\/\d{2,4}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:,\s*\d{4})?)\b/gi;
 const GENERIC_LEGAL_QUESTION_PATTERN =
   /\b(?:how\s+do\s+i\s+file|what\s+is\s+(?:a|an|the)?|what\s+are|how\s+long\s+does|what\s+does.+mean\s+generally)\b/i;
@@ -236,7 +237,10 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
     };
   }
   const documentHints = collectPatternMatches(text, DOCUMENT_HINT_PATTERNS);
-  const requestedSections = unique(Array.from(text.matchAll(SECTION_PATTERN)).map((match) => match[0]));
+  const requestedSections = unique([
+    ...Array.from(text.matchAll(SECTION_PATTERN)).map((match) => match[0]),
+    ...Array.from(text.matchAll(PAGE_LIST_PATTERN)).map((match) => match[0]),
+  ]);
   const requestedDates = unique(Array.from(text.matchAll(DATE_PATTERN)).map((match) => match[0]));
   const requestedDocumentTypes = detectDocumentTypes(text);
   const deadlineTerms = matchesAnyTerm(lower, DEADLINE_TERMS);
@@ -247,7 +251,7 @@ export function detectDocumentReference(message: string): DocumentReferenceDetec
   const asksForQuote = /\b(?:quote|exact\s+(?:wording|words|language)|what\s+exact\s+words|word\s+for\s+word)\b/i.test(text);
   const asksForSource = /\b(?:where\s+(?:does|did)\s+it\s+say|where\s+exactly|what\s+page|show\s+me\s+where|cite)\b/i.test(text);
   const asksForComparison = /\b(?:compare|difference|different|amended|prior|previous|original)\b/i.test(text) && documentHints.length > 0;
-  const asksForSpecificLocation = /\b(?:section|paragraph|page|clause)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i.test(text);
+  const asksForSpecificLocation = /\b(?:sections?|paragraphs?|pages?|clauses?)\s+([0-9]+|[ivxlcdm]+|[a-z])\b/i.test(text);
   const documentObjectPattern = /\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf))\b/i;
   const asksIfDocumentSays = /\b(?:does|did|is)\s+(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf)).{0,80}\b(?:say|use|mention|include)\b/i.test(text);
   const hasHolidayPossessionSignal =

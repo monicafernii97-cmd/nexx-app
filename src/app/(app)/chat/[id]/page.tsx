@@ -547,6 +547,7 @@ export default function ConversationPage() {
                         role={msg.role}
                         content={msg.content}
                         isStreaming={msg.status === 'draft'}
+                        messageStatus={msg.status}
                         theme={theme}
                         metadata={msg.metadata}
                         artifactsJson={msg.artifactsJson}

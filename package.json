@@ -10,7 +10,15 @@
     "start": "next start",
     "lint": "eslint",
     "check:env": "node scripts/check-convex-env.mjs development",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e:upload:pr": "playwright test --project=upload-pr",
+    "test:e2e:upload:release": "playwright test --project=upload-release",
+    "test:e2e:upload:daily": "playwright test --project=upload-production",
+    "test:e2e:upload:weekly": "playwright test --project=upload-weekly-chromium --project=upload-weekly-firefox --project=upload-weekly-webkit --project=upload-weekly-mobile",
+    "test:e2e:upload:resilience": "playwright test --project=upload-resilience",
+    "test:e2e:upload:cleanup": "playwright test --project=upload-cleanup",
+    "test:e2e:upload:list": "playwright test --list",
+    "e2e:fixtures": "node scripts/generate-upload-e2e-fixtures.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
@@ -48,6 +56,9 @@
     "stripe": "^21.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@clerk/testing": "^2.2.31",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^28.0.0",
@@ -56,6 +67,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "pdf-lib": "^1.17.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.4"

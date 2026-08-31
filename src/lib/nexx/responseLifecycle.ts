@@ -1,4 +1,5 @@
 import type { RouteMode } from '../types';
+import type { DocumentReferenceDetection } from './documentReferenceDetection';
 
 export type ResponseReasoningEffort = 'medium' | 'high';
 export type ResponseVerbosity = 'medium' | 'high';
@@ -88,6 +89,36 @@ const HIGH_VERBOSITY_ROUTES = new Set<RouteMode>([
 /** Return whether a route should preserve the model's natural conversational prose. */
 export function isNaturalRelationalRoute(routeMode: RouteMode) {
   return NATURAL_RELATIONAL_ROUTES.has(routeMode);
+}
+
+/** Decide whether a document request needs a direct answer rather than a broad report shell. */
+export function isTargetedDocumentRequest(
+  detection: DocumentReferenceDetection,
+  userMessage = '',
+) {
+  const explicitTargetedType = detection.referenceType === 'deadline_lookup' ||
+    detection.referenceType === 'section_lookup' ||
+    detection.referenceType === 'terminology_check' ||
+    detection.referenceType === 'quote_request' ||
+    detection.referenceType === 'metadata_lookup' ||
+    detection.referenceType === 'source_location_request' ||
+    detection.referenceType === 'possession_schedule_interpretation' ||
+    detection.referenceType === 'clause_conflict_interpretation' ||
+    detection.requiresExactText ||
+    detection.requiresPageOrSectionCitation;
+  if (explicitTargetedType) return true;
+
+  const referencesKnownDocument =
+    detection.referenceType === 'explicit_current_attachment' ||
+    detection.referenceType === 'explicit_prior_upload' ||
+    detection.referenceType === 'active_document_followup' ||
+    detection.referenceType === 'implicit_followup';
+  if (!referencesKnownDocument || !userMessage.trim()) return false;
+
+  const broadReviewRequest =
+    /\b(?:analy[sz]e|summari[sz]e|audit|review|explain|break\s+down|walk\s+me\s+through)\b.{0,100}\b(?:entire|full|whole|all|document|order|file|pdf)\b/i.test(userMessage) ||
+    /\b(?:entire|full|whole)\b.{0,60}\b(?:document|order|file|pdf)\b/i.test(userMessage);
+  return !broadReviewRequest;
 }
 
 /** Return whether a route explicitly requests deterministic litigation navigation. */

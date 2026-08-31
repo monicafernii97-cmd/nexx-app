@@ -4,16 +4,16 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
 import { validateFallbackPayload, validateResumableChunk } from './lib/chatUploadFallbackPolicy';
+import { isAllowedNexxBrowserOrigin } from './lib/browserOrigins';
 
 const http = httpRouter();
 
 function isAllowedBrowserOrigin(origin: string | null) {
-  if (!origin) return true;
-  const configured = (process.env.NEXX_APP_ORIGINS ?? '')
-    .split(',').map((value) => value.trim()).filter(Boolean);
-  const defaults = new Set(['https://nexproof.io', 'https://www.nexproof.io', 'https://nexx-app.vercel.app']);
-  if (configured.includes(origin) || defaults.has(origin)) return true;
-  return process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  return isAllowedNexxBrowserOrigin({
+    origin,
+    configuredOrigins: process.env.NEXX_APP_ORIGINS,
+    nodeEnv: process.env.NODE_ENV,
+  });
 }
 
 function corsHeaders(request: Request) {
@@ -41,9 +41,13 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function blobSha256Hex(blob: Blob) {
-  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+async function readBlobOnceWithSha256(blob: Blob) {
+  const bytes = await blob.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return {
+    bytes,
+    sha256: Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(''),
+  };
 }
 
 function rejectDisallowedOrigin(request: Request) {
@@ -210,7 +214,7 @@ http.route({
         return jsonResponse(request, { error: 'chunk_size_mismatch' }, 400);
       }
       const blob = await request.blob();
-      const actualSha256 = await blobSha256Hex(blob);
+      const { bytes, sha256: actualSha256 } = await readBlobOnceWithSha256(blob);
       const expectedSha256 = request.headers.get('x-chunk-sha256')?.trim().toLowerCase();
       const validation = validateResumableChunk({
         fileByteSize: claim.fileByteSize,
@@ -223,7 +227,7 @@ http.route({
       if (!validation.ok) {
         return jsonResponse(request, { error: validation.failureCode }, 400);
       }
-      storedId = await ctx.storage.store(blob);
+      storedId = await ctx.storage.store(new Blob([bytes], { type: blob.type }));
       await ctx.runMutation(internal.chatUploads.completeResumableChunk, {
         resumableUploadId: resumableUploadId as Id<'chatUploadResumableUploads'>,
         chunkId: claim.chunkId,
@@ -260,56 +264,16 @@ http.route({
     if (!uploadSessionId || !resumableUploadId || token.length < 32) {
       return jsonResponse(request, { error: 'Invalid resumable completion request.' }, 401);
     }
-    let assembledStorageId: Id<'_storage'> | undefined;
-    let leaseId: string | undefined;
-    let attached = false;
     try {
       const tokenHash = await sha256Hex(token);
-      leaseId = crypto.randomUUID();
-      const claim = await ctx.runMutation(internal.chatUploads.claimResumableAssembly, {
+      const result = await ctx.runAction(internal.chatUploadResumableAssembly.assemble, {
         uploadSessionId: uploadSessionId as Id<'chatUploadSessions'>,
         resumableUploadId: resumableUploadId as Id<'chatUploadResumableUploads'>,
         tokenHash,
-        leaseId,
+        leaseId: crypto.randomUUID(),
       });
-      if (claim.alreadyCompleted) {
-        return jsonResponse(request, { storageId: claim.storageId, transport: 'resumable' }, 200);
-      }
-      const parts: Blob[] = [];
-      let actualByteSize = 0;
-      for (const chunk of claim.chunks) {
-        const blob = await ctx.storage.get(chunk.storageId);
-        if (!blob || blob.size !== chunk.byteSize) throw new Error('Stored resumable chunk is unavailable.');
-        parts.push(blob);
-        actualByteSize += blob.size;
-      }
-      if (actualByteSize !== claim.expectedByteSize) throw new Error('Assembled upload size did not match.');
-      const assembled = new Blob(parts, { type: claim.expectedMimeType });
-      const assembledSha256 = await blobSha256Hex(assembled);
-      if (assembledSha256 !== claim.clientSha256) throw new Error('Assembled upload integrity did not match.');
-      assembledStorageId = await ctx.storage.store(assembled);
-      await ctx.runMutation(internal.chatUploads.completeResumableAssembly, {
-        resumableUploadId: resumableUploadId as Id<'chatUploadResumableUploads'>,
-        leaseId: claim.leaseId,
-        storageId: assembledStorageId,
-      });
-      attached = true;
-      return jsonResponse(request, { storageId: assembledStorageId, transport: 'resumable' }, 200);
+      return jsonResponse(request, { storageId: result.storageId, transport: 'resumable' }, 200);
     } catch (error) {
-      if (assembledStorageId && !attached) {
-        try { await ctx.storage.delete(assembledStorageId); } catch { /* maintenance remains authoritative */ }
-      }
-      if (leaseId && !attached) {
-        try {
-          await ctx.runMutation(internal.chatUploads.releaseResumableAssembly, {
-            resumableUploadId: resumableUploadId as Id<'chatUploadResumableUploads'>,
-            leaseId,
-            failureCode: error instanceof Error ? error.message : 'resumable_assembly_failed',
-          });
-        } catch {
-          // The lease expires automatically; cleanup is still authoritative.
-        }
-      }
       console.warn(JSON.stringify({
         level: 'warn', event: 'resumable_assembly_failed', resumableUploadId,
         errorCode: error instanceof Error ? error.name : 'unknown',

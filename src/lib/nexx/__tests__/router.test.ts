@@ -3,6 +3,15 @@ import { classifyLegalIntent } from '../legalIntent';
 import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../router';
 
 describe('classifyMessage document follow-ups', () => {
+  it('keeps exact-page lookups against a generic document out of court-order interpretation', () => {
+    const result = classifyMessage(
+      'What exact verification token is written on pages 1, 50, and 100 of the document? Quote each token with its page number.'
+    );
+
+    expect(result.mode).toBe('document_analysis');
+    expect(result.documentReference?.requestedSections).toEqual(['pages 1, 50, and 100']);
+  });
+
   it.each([
     'What deadlines are in it?',
     'What does the order say about custody?',

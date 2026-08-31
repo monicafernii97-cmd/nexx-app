@@ -18,6 +18,8 @@ interface MessageBubbleProps {
     role: 'user' | 'assistant';
     content: string;
     isStreaming?: boolean;
+    /** Durable message lifecycle status, exposed for honest browser verification. */
+    messageStatus?: 'draft' | 'committed' | 'degraded' | 'failed' | 'deleted';
     theme?: ChatTheme;
     metadata?: unknown;
     /** Serialized JSON string of NexxArtifacts, attached to assistant messages. */
@@ -261,6 +263,8 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                 return (
                     <div
                         key={attachment.uploadedFileId}
+                        data-testid="chat-message-attachment"
+                        data-attachment-status={attachment.status}
                         className={`rounded-xl border px-3 py-2 text-left ${isLight
                             ? 'border-gray-200 bg-white text-gray-700'
                             : 'border-white/10 bg-white/[0.06] text-white/75'
@@ -784,6 +788,7 @@ export default function MessageBubble({
     role,
     content,
     isStreaming,
+    messageStatus,
     theme = 'dark',
     metadata,
     artifactsJson,
@@ -926,6 +931,7 @@ export default function MessageBubble({
     if (role === 'user') {
         return (
             <motion.div
+                data-testid="chat-message-user"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05 }}
@@ -998,6 +1004,9 @@ export default function MessageBubble({
     // ── ASSISTANT MESSAGE ──
     return (
         <motion.div
+            data-testid="chat-message-assistant"
+            data-message-streaming={isStreaming ? 'true' : 'false'}
+            data-message-status={messageStatus ?? (isStreaming ? 'draft' : 'committed')}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}

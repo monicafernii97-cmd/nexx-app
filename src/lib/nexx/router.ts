@@ -502,6 +502,12 @@ export function classifyMessage(
     documentReference.referencesDocument &&
     legalIntent === 'general_summary' &&
     !bareVaguePronounFollowUp &&
+    (
+      documentReference.requestedDocumentTypes.some((type) =>
+        ['court_order', 'temporary_order', 'amended_order', 'final_order', 'proposed_order', 'parenting_plan'].includes(type)
+      ) ||
+      documentReference.documentHints.some((hint) => /\border\b|parenting\s+plan/i.test(hint))
+    ) &&
     ACTIVE_DOCUMENT_FOLLOW_UP_PATTERN.test(message)
   ) {
     return buildResult('order_interpretation', documentReference, 'direct_order_interpretation');

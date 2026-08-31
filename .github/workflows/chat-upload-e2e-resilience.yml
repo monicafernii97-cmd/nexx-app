@@ -1,0 +1,67 @@
+name: Chat Upload — Staging Resilience Assurance
+
+on:
+  schedule:
+    - cron: "15 3 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: chat-upload-staging-resilience
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  upload-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: Preview
+    env:
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_LANE: resilience
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: ./.github/actions/setup-node
+      - name: Apply schedule jitter
+        if: github.event_name == 'schedule'
+        run: node -e "setTimeout(() => {}, Math.floor(Math.random() * 300000))"
+      - name: Deploy isolated staging build
+        shell: bash
+        run: |
+          deployment_url="$(npx vercel@53.4.0 deploy --yes --token "$VERCEL_TOKEN")"
+          if [[ "$deployment_url" != https://*.vercel.app ]]; then
+            echo "Vercel did not return a safe staging deployment URL." >&2
+            exit 1
+          fi
+          echo "E2E_BASE_URL=$deployment_url" >> "$GITHUB_ENV"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify staging-only fault lane
+        run: node scripts/verify-upload-e2e-env.mjs
+      - name: Run interruption and resumable recovery suite
+        run: npm run test:e2e:upload:resilience
+      - name: Upload sanitized browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chat-upload-resilience-${{ github.run_id }}
+          path: playwright-report/upload-e2e-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Notify on failure
+        if: failure()
+        env:
+          E2E_ALERT_WEBHOOK: ${{ secrets.E2E_ALERT_WEBHOOK }}
+        run: node scripts/notify-upload-e2e-failure.mjs
+      - name: Open or update GitHub failure alert
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/upsert-upload-e2e-github-alert.mjs

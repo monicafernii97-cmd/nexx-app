@@ -1,0 +1,7 @@
+e2e/.generated/
+playwright-report/
+test-results/
+playwright/.auth/
+coverage/
+.env*
+.clerk/

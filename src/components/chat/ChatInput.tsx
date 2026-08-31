@@ -109,6 +109,12 @@ function fileStatusLabel(state: ChatComposerFileState) {
     return 'Selected';
 }
 
+function formatFileSize(byteSize: number) {
+    if (byteSize < 1024) return `${byteSize} B`;
+    if (byteSize < 1024 * 1024) return `${Math.ceil(byteSize / 1024)} KB`;
+    return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function getUploadErrorDetails(error: unknown) {
     const details = error as {
         uploadStatus?: ChatComposerFileStatus;
@@ -150,7 +156,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
         ? Math.max(1, Math.ceil(((selectedFileState?.nextStorageRetryAt ?? retryClock) - retryClock) / 1_000))
         : 0;
     const hasSendableFile = Boolean(selectedFileState && !isFileBusy && !isFileBlocked && !isRetryCoolingDown);
-    const canSubmit = Boolean(input.trim() || hasSendableFile) && !disabled && !isFileBusy && !isFileBlocked;
+    const canSubmit = Boolean(input.trim() || hasSendableFile) && !disabled && !isFileBusy && !isFileBlocked && !isRetryCoolingDown;
     const canSendSelectedFile = Boolean(selectedFileState?.file && !isFileBusy && !isFileBlocked && !isRetryCoolingDown && !disabled);
 
     const updateInput = useCallback((value: string) => {
@@ -173,7 +179,10 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
     }), []);
 
     const makeUploadCallbacks = useCallback((): ChatInputUploadCallbacks => ({
-        onProgress: (progress) => updateSelectedFileState({ progress }),
+        onProgress: (progress) => setSelectedFileState((current) => current ? {
+            ...current,
+            progress: Math.max(current.progress ?? 0, Math.max(0, Math.min(100, progress))),
+        } : current),
         onStatus: (status) => updateSelectedFileState({ status }),
         onStorageReady: ({ uploadSessionId, storageId }) => updateSelectedFileState({
             uploadSessionId,
@@ -599,52 +608,98 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             </div>
 
             {selectedFileState?.file && (
-                <div className={`flex items-center gap-2 px-4 py-2 mb-2 rounded-xl border animate-in fade-in slide-in-from-bottom-2 ${
+                <div
+                    data-testid="chat-upload-selected"
+                    data-upload-status={selectedFileState.status}
+                    aria-busy={isFileBusy}
+                    className={`px-4 py-2 mb-2 rounded-xl border animate-in fade-in slide-in-from-bottom-2 ${
                     isFileBlocked
                         ? 'border-red-400/25 bg-red-500/10'
                         : isFailureStatus(selectedFileState.status)
                             ? 'border-amber-300/25 bg-amber-400/10'
                             : 'border-white/10 bg-white/[0.075]'
-                }`}>
-                    <Paperclip size={14} className={`flex-shrink-0 ${
-                        isFileBlocked ? 'text-red-200' : isFailureStatus(selectedFileState.status) ? 'text-amber-200' : 'text-[var(--accent-icy)]'
-                    }`} />
-                    <span className="text-xs font-semibold text-white truncate max-w-[220px]">
-                        {selectedFileState.file.name}
-                    </span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wide ${
-                        isFileBlocked ? 'text-red-100/85' : isFailureStatus(selectedFileState.status) ? 'text-amber-100/85' : 'text-white/55'
-                    }`}>
-                        {fileStatusLabel(selectedFileState)}
-                    </span>
-                    {isFailureStatus(selectedFileState.status) && selectedFileState.retryable !== false && !isFileBusy && (
+                }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Paperclip size={14} className={`flex-shrink-0 ${
+                            isFileBlocked ? 'text-red-200' : isFailureStatus(selectedFileState.status) ? 'text-amber-200' : 'text-[var(--accent-icy)]'
+                        }`} />
+                        <span data-testid="chat-upload-file-name" className="text-xs font-semibold text-white truncate max-w-[220px]">
+                            {selectedFileState.file.name}
+                        </span>
+                        <span className="text-[10px] font-medium text-white/40" aria-label={`File size ${formatFileSize(selectedFileState.file.size)}`}>
+                            {formatFileSize(selectedFileState.file.size)}
+                        </span>
+                        <span
+                            data-testid="chat-upload-status"
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            className={`text-[10px] font-bold uppercase tracking-wide ${
+                                isFileBlocked ? 'text-red-100/85' : isFailureStatus(selectedFileState.status) ? 'text-amber-100/85' : 'text-white/55'
+                            }`}
+                        >
+                            {fileStatusLabel(selectedFileState)}
+                        </span>
+                        {isFailureStatus(selectedFileState.status) && selectedFileState.retryable !== false && !isFileBusy && (
                         <button
                             type="button"
                             onClick={requestSend}
                             disabled={disabled || isRetryCoolingDown}
+                            data-testid="chat-upload-retry"
                             className="rounded-md border border-amber-200/25 bg-amber-200/10 px-2 py-1 text-[10px] font-bold text-amber-50 transition hover:bg-amber-200/20 disabled:opacity-40"
                         >
                             {isRetryCoolingDown ? `Retry in ${retrySecondsRemaining}s` : 'Retry'}
                         </button>
-                    )}
-                    {!isFailureStatus(selectedFileState.status) && canSendSelectedFile && (
+                        )}
+                        {isFileBlocked && !isFileBusy && (
+                            <button
+                                type="button"
+                                onClick={() => openFilePicker(selectedFileIntent)}
+                                disabled={disabled}
+                                data-testid="chat-upload-replace"
+                                className="rounded-md border border-red-200/25 bg-red-200/10 px-2 py-1 text-[10px] font-bold text-red-50 transition hover:bg-red-200/20 disabled:opacity-40"
+                            >
+                                Replace file
+                            </button>
+                        )}
+                        {!isFailureStatus(selectedFileState.status) && canSendSelectedFile && (
                         <button
                             type="button"
                             onClick={requestSend}
+                            data-testid="chat-upload-send-file"
                             className="rounded-md border border-sky-200/25 bg-sky-200/10 px-2 py-1 text-[10px] font-bold text-sky-50 transition hover:bg-sky-200/20"
                         >
                             Send file
                         </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={removeFile}
+                            disabled={isFileBusy || disabled}
+                            data-testid="chat-upload-remove"
+                            className="ml-auto w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors disabled:opacity-40"
+                            aria-label="Remove attached file"
+                        >
+                            <X size={10} weight="bold" className="text-white/80" />
+                        </button>
+                    </div>
+                    {isFileBusy && (
+                        <div
+                            data-testid="chat-upload-progress"
+                            role="progressbar"
+                            aria-label="File upload progress"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.max(0, Math.min(100, selectedFileState.progress ?? 0))}
+                            className="mt-2 h-1 overflow-hidden rounded-full bg-white/10"
+                        >
+                            <div
+                                className="h-full rounded-full bg-[var(--accent-icy)] transition-[width] duration-200"
+                                style={{ width: `${Math.max(2, Math.min(100, selectedFileState.progress ?? 0))}%` }}
+                            />
+                        </div>
                     )}
-                    <button
-                        type="button"
-                        onClick={removeFile}
-                        disabled={isFileBusy || disabled}
-                        className="ml-auto w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors disabled:opacity-40"
-                        aria-label="Remove attached file"
-                    >
-                        <X size={10} weight="bold" className="text-white/80" />
-                    </button>
                 </div>
             )}
 
@@ -654,6 +709,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                 className="sr-only"
                 accept={getChatUploadAccept()}
                 aria-label="Choose a file to upload"
+                data-testid="chat-upload-input"
                 onChange={handleFileChange}
             />
 
@@ -664,6 +720,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
             >
                 <textarea
                     ref={textareaRef}
+                    data-testid="chat-composer"
                     value={input}
                     onChange={(e) => {
                         if (isListening) stopRecognition();
@@ -691,6 +748,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         } disabled:opacity-40 disabled:cursor-not-allowed`}
                         title="Attach a file"
                         aria-label="Attach a file"
+                        data-testid="chat-upload-trigger"
                     >
                         <Paperclip size={16} weight="regular" />
                     </button>
@@ -723,6 +781,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                         onClick={requestSend}
                         disabled={!canSubmit}
                         aria-label="Send message"
+                        data-testid="chat-send"
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm ${
                             canSubmit
                                 ? 'bg-[var(--accent-icy)] text-white hover:scale-105 hover:shadow-lg cursor-pointer'
@@ -739,6 +798,7 @@ export default function ChatInput({ onSend, disabled, placeholder, onQuickAction
                     id={micErrorId}
                     role="status"
                     aria-live="polite"
+                    data-testid="chat-upload-error"
                     className="text-[11px] font-medium text-red-500 mt-2 text-center px-4 animate-in fade-in"
                 >
                     {micError}

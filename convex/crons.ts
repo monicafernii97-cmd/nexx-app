@@ -92,6 +92,12 @@ crons.interval(
   internal.conversations.cleanupStaleUploadDrafts,
 );
 
+crons.hourly(
+  'clean up abandoned synthetic upload runs',
+  { minuteUTC: 40 },
+  internal.chatUploadE2E.cleanupAbandonedRuns,
+);
+
 /**
  * Purge expired export run and job records daily (30-day retention).
  * Only deletes terminal records (completed, failed, timeout).

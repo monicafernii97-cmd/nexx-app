@@ -1892,6 +1892,7 @@ export const completeResumableAssembly = internalMutation({
     resumableUploadId: v.id('chatUploadResumableUploads'),
     leaseId: v.string(),
     storageId: v.id('_storage'),
+    verifiedSha256: v.string(),
   },
   handler: async (ctx, args) => {
     const upload = await ctx.db.get(args.resumableUploadId);
@@ -1903,7 +1904,11 @@ export const completeResumableAssembly = internalMutation({
       throw new Error('Resumable assembly lease is invalid.');
     }
     const metadata = await ctx.db.system.get('_storage', args.storageId);
-    if (!metadata || metadata.size !== upload.expectedByteSize || metadata.sha256 !== upload.clientSha256) {
+    if (
+      !metadata ||
+      metadata.size !== upload.expectedByteSize ||
+      args.verifiedSha256 !== upload.clientSha256
+    ) {
       throw new Error('Assembled upload integrity validation failed.');
     }
     const session = await ctx.db.get(upload.uploadSessionId);

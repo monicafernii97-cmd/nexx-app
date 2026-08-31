@@ -3,6 +3,7 @@ import type { RouteMode } from '../../types';
 import {
   explicitlyRequestsStoredDocumentForTurn,
   isNaturalRelationalRoute,
+  isTargetedDocumentRequest,
   responseLifecyclePolicy,
   responseReasoningEffort,
   responseVerbosity,
@@ -11,9 +12,18 @@ import {
   shouldApplyRenderedLegalVerifier,
   shouldForceStoredDocumentGrounding,
 } from '../responseLifecycle';
+import { detectDocumentReference } from '../documentReferenceDetection';
 import { preservePlainProviderProse } from '../responseTransport';
 
 describe('response lifecycle policy', () => {
+  it('keeps specific known-document requests direct while reserving report shells for broad reviews', () => {
+    const targetedMessage = 'What exact verification token is written on pages 1, 50, and 100 of the document?';
+    const broadMessage = 'Analyze the entire document and summarize all provisions.';
+
+    expect(isTargetedDocumentRequest(detectDocumentReference(targetedMessage), targetedMessage)).toBe(true);
+    expect(isTargetedDocumentRequest(detectDocumentReference(broadMessage), broadMessage)).toBe(false);
+  });
+
   it.each<RouteMode>([
     'co_parent_response',
     'supportive_strategy',

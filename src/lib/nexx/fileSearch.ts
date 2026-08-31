@@ -45,6 +45,17 @@ export async function deleteVectorStore(vectorStoreId: string): Promise<void> {
   }
 }
 
+/** Delete an uploaded OpenAI file during durable synthetic-test cleanup. */
+export async function deleteOpenAIFile(fileId: string): Promise<void> {
+  try {
+    const client = getOpenAIClient();
+    await client.files.delete(fileId);
+  } catch (err) {
+    // Cleanup is retried by the durable E2E ledger; do not expose provider details.
+    console.warn('[FileSearch] Failed to delete uploaded file:', fileId, err);
+  }
+}
+
 /**
  * Upload a file to OpenAI and attach it to a vector store.
  *

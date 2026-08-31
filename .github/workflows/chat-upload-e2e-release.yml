@@ -1,0 +1,59 @@
+name: Chat Upload — Production Release Assurance
+
+on:
+  deployment_status:
+
+concurrency:
+  group: chat-upload-production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: read
+  issues: write
+
+jobs:
+  upload-release:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Production
+    env:
+      E2E_BASE_URL: https://nexproof.io
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_LANE: release
+      E2E_ALLOW_PRODUCTION: "true"
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      VERCEL_DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          ref: ${{ github.event.deployment.ref }}
+      - uses: ./.github/actions/setup-node
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify safe production identity and lane
+        run: node scripts/verify-upload-e2e-env.mjs
+      - name: Run release upload journey
+        run: npm run test:e2e:upload:release
+      - name: Upload sanitized browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chat-upload-release-${{ github.run_id }}
+          path: playwright-report/upload-e2e-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Notify on failure
+        if: failure()
+        env:
+          E2E_ALERT_WEBHOOK: ${{ secrets.E2E_ALERT_WEBHOOK }}
+        run: node scripts/notify-upload-e2e-failure.mjs
+      - name: Open or update GitHub failure alert
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/upsert-upload-e2e-github-alert.mjs

@@ -87,6 +87,7 @@ import {
 } from '../src/lib/nexx/responseTransport';
 import {
     explicitlyRequestsStoredDocumentForTurn,
+    isTargetedDocumentRequest,
     responseLifecyclePolicy,
     shouldApplyDeterministicLegalEnrichment,
     shouldApplyDeterministicLitigationRenderer,
@@ -94,6 +95,7 @@ import {
     shouldForceStoredDocumentGrounding,
 } from '../src/lib/nexx/responseLifecycle';
 import { verifyPlainTextDocumentGrounding } from '../src/lib/nexx/plainTextGrounding';
+import { renderExactRequestedPages } from '../src/lib/nexx/requestedPageAnswer';
 import { canonicalConversationMemoryPage } from '../src/lib/nexx/conversationMemoryPolicy';
 import { createDocumentQueryEmbedding } from '../src/lib/nexx/documentEmbeddings';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
@@ -177,6 +179,19 @@ function degradedResponse(message = DEGRADED_MESSAGE): NexxAssistantResponse {
 /** Normalize provider exceptions into retryable worker error metadata. */
 function normalizeProviderError(error: unknown) {
     return normalizeProviderFailure(error);
+}
+
+/** Return a content-free failure stage for operational logs. */
+function safeFailureStage(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const knownStages = [
+        'plain_text_document_grounding_failed',
+        'legal_interpretation_verification_failed',
+        'structured_output_recovery_failed',
+        'Provider stream ended before completion',
+        'Provider returned an empty conversational response',
+    ];
+    return knownStages.find((stage) => message.startsWith(stage)) ?? 'provider_or_unknown';
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -625,6 +640,13 @@ type AttachmentContext = {
     fullDocumentReviewStructuredJson?: string;
     fullDocumentReviewRecordId?: Id<'documentUnderstandingRecords'>;
     fullDocumentReviewSourceChunkIds?: Id<'documentChunks'>[];
+    requestedPageContexts?: Array<{
+        pageNumber: number;
+        text: string;
+        extractionMethod?: string;
+        ocrConfidence?: number;
+        warnings?: string[];
+    }>;
     documentChunks?: DocumentChunkContext[];
     isActiveDocument?: boolean;
 };
@@ -845,19 +867,6 @@ function shouldIncludeStoredDocumentsWithCurrentUpload(detection: DocumentRefere
         );
 }
 
-function shouldRenderTargetedDocumentAnswer(detection: DocumentReferenceDetection) {
-    return detection.referenceType === 'deadline_lookup' ||
-        detection.referenceType === 'section_lookup' ||
-        detection.referenceType === 'terminology_check' ||
-        detection.referenceType === 'quote_request' ||
-        detection.referenceType === 'metadata_lookup' ||
-        detection.referenceType === 'source_location_request' ||
-        detection.referenceType === 'possession_schedule_interpretation' ||
-        detection.referenceType === 'clause_conflict_interpretation' ||
-        detection.requiresExactText ||
-        detection.requiresPageOrSectionCitation;
-}
-
 function attachmentIdentityKey(attachment: AttachmentContext) {
     if (attachment.storageSha256) return `sha256:${attachment.storageSha256}`;
     if (attachment.storageId) return `storage:${attachment.storageId.toString()}`;
@@ -1060,6 +1069,30 @@ function buildRetrievedChunkPrompt(chunks: DocumentChunkContext[], sourcePackets
     ].join('\n');
 }
 
+function buildRequestedPagePrompt(
+    attachment: AttachmentContext,
+    sourcePackets: LegalDocumentSourcePacket[],
+) {
+    if (!attachment.requestedPageContexts?.length) return '';
+    return [
+        '<REQUESTED_PAGES>',
+        ...attachment.requestedPageContexts.map((page) => {
+            const source = sourcePackets.find((packet) =>
+                packet.fileId === attachment.uploadedFileId.toString() &&
+                page.pageNumber >= (packet.pageStart ?? page.pageNumber + 1) &&
+                page.pageNumber <= (packet.pageEnd ?? packet.pageStart ?? page.pageNumber - 1)
+            );
+            return [
+                `<PAGE number="${page.pageNumber}" sourceId="${escapeXmlAttribute(source?.sourceId)}" extractionMethod="${escapeXmlAttribute(page.extractionMethod ?? 'unknown')}" confidence="${page.ocrConfidence ?? ''}">`,
+                `SOURCE_ID: ${source?.sourceId ?? ''}`,
+                sanitizeDocumentContextText(page.text),
+                '</PAGE>',
+            ].join('\n');
+        }),
+        '</REQUESTED_PAGES>',
+    ].join('\n');
+}
+
 /** Select a bounded, deduped set of uploaded documents to include in the model prompt. */
 function selectAttachmentContextsForPrompt(
     context: GenerationContext,
@@ -1159,6 +1192,7 @@ function buildAttachmentContextPrompt(
                         : 'current chat turn attachment';
 
         const retrievedChunkPrompt = buildRetrievedChunkPrompt(attachment.documentChunks ?? [], sourcePackets);
+        const requestedPagePrompt = buildRequestedPagePrompt(attachment, sourcePackets);
         const shouldIncludeFullContext = !preferRetrievedChunks || !retrievedChunkPrompt;
 
         if (!attachment.chatContextText?.trim() && !retrievedChunkPrompt) {
@@ -1176,6 +1210,7 @@ function buildAttachmentContextPrompt(
             attachment.extractionError ? `Extraction note: ${escapeXmlText(attachment.extractionError)}` : undefined,
             attachment.extractionWarnings?.length ? `Extraction warnings: ${escapeXmlText(attachment.extractionWarnings.join(', '))}` : 'None',
             '</WARNINGS>',
+            requestedPagePrompt || undefined,
             retrievedChunkPrompt || undefined,
             shouldIncludeFullContext && attachment.chatContextText?.trim()
                 ? [
@@ -1592,14 +1627,15 @@ function hasClauseConflictSignal(detection: DocumentReferenceDetection) {
 function renderCitationLockedDocumentMessage(
     response: NexxAssistantResponse,
     sourcePackets: LegalDocumentSourcePacket[],
-    documentReference: DocumentReferenceDetection
+    documentReference: DocumentReferenceDetection,
+    userMessage: string
 ) {
     const answer = response.documentAnswer;
     if (!answer) return response;
 
     return {
         ...response,
-        message: shouldRenderTargetedDocumentAnswer(documentReference)
+        message: isTargetedDocumentRequest(documentReference, userMessage)
             ? renderTargetedLegalDocumentAnswerMarkdown(answer, sourcePackets, response.message)
             : renderCourtOrderAnalysisMarkdown(answer, sourcePackets, response.message),
     };
@@ -1624,7 +1660,7 @@ function renderDocumentMessage(
         };
     }
 
-    return renderCitationLockedDocumentMessage(response, sourcePackets, documentReference);
+    return renderCitationLockedDocumentMessage(response, sourcePackets, documentReference, userMessage);
 }
 
 function renderLitigationNavigationMessage(args: {
@@ -2219,7 +2255,7 @@ function citationLockedFallbackResponse(
             ? 'Here is what the visible order language supports.'
             : undefined,
         {
-            isTargetedQuestion: shouldRenderTargetedDocumentAnswer(documentReference),
+            isTargetedQuestion: isTargetedDocumentRequest(documentReference, userMessage),
             userMessage,
         }
     );
@@ -2322,6 +2358,12 @@ async function generateWithFallbacks({
         storedRouteMode
     );
     const routeMode = (storedRouteMode ?? routerResult.mode) as RouteMode;
+    console.info('[ChatWorker] Generation routing resolved', {
+        jobId,
+        routeMode,
+        storedRouteMode,
+        analysisMode: context.turn.analysisMode,
+    });
     const shouldRunSemanticDocumentRetrieval =
         (context.attachmentContexts?.length ?? 0) > 0 ||
         Boolean(routerResult.documentReference?.referencesDocument) ||
@@ -2329,6 +2371,11 @@ async function generateWithFallbacks({
     if (shouldRunSemanticDocumentRetrieval) {
         context = await enrichContextWithSemanticDocumentChunks(ctx, context, client);
     }
+    console.info('[ChatWorker] Document retrieval context prepared', {
+        jobId,
+        attachmentCount: context.attachmentContexts?.length ?? 0,
+        availableDocumentCount: context.availableDocumentContexts?.length ?? 0,
+    });
     const model = context.turn.model ?? 'gpt-5.4';
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
@@ -2350,6 +2397,7 @@ async function generateWithFallbacks({
     const officialResearchTargetsInjected = Boolean(contextPacket.officialResearchTargets?.length);
 
     const contextPrompt = buildContextPrompt(contextPacket);
+    console.info('[ChatWorker] User context prompt prepared', { jobId, contextPromptLength: contextPrompt.length });
     const highComplexityTurn =
         context.turn.message.length > 2_000 ||
         Boolean(followUpSummary && followUpSummary.length > 4_000);
@@ -2375,6 +2423,17 @@ async function generateWithFallbacks({
         usePlainText,
         reassessmentTarget,
     );
+    console.info('[ChatWorker] Provider input prepared', {
+        jobId,
+        routeMode,
+        inputItemCount: promptBundle.input.length,
+        sourcePacketCount: promptBundle.documentSourcePackets.length,
+        sourcePageRanges: promptBundle.documentSourcePackets.map((packet) => ({
+            pageStart: packet.pageStart,
+            pageEnd: packet.pageEnd,
+        })),
+        attachmentContextLength: promptBundle.attachmentContextPrompt.length,
+    });
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(promptBundle.routerResult, context.conversation?.vectorStoreId);
     const runtimeCapabilitySnapshot = {
@@ -2580,6 +2639,14 @@ async function generateWithFallbacks({
                     lastError = new Error(
                         'structured_output_recovery_failed: Provider response could not be parsed into the required schema.'
                     );
+                    console.warn('[ChatWorker] Structured response recovery exhausted', {
+                        jobId,
+                        routeMode,
+                        model: step.model,
+                        attempt: attemptIndex + 1,
+                        rawResponseLength: rawText.length,
+                        failureStage: 'structured_output_recovery_failed',
+                    });
                     continue;
                 }
                 parsedResponse = suppressWeakArtifacts(recoveryResult.data);
@@ -2779,6 +2846,14 @@ async function generateWithFallbacks({
                     lastError = new Error(
                         `legal_interpretation_verification_failed: ${legalInterpretationVerification.errors.join(' | ')}`
                     );
+                    console.warn('[ChatWorker] Legal interpretation verification exhausted', {
+                        jobId,
+                        routeMode,
+                        model: step.model,
+                        attempt: attemptIndex + 1,
+                        failureStage: 'legal_interpretation_verification_failed',
+                        verifierErrorCount: legalInterpretationVerification.errors.length,
+                    });
                     continue;
                 }
             }
@@ -2829,6 +2904,17 @@ async function generateWithFallbacks({
                     groundingUserMessage
                 );
             }
+            const exactRequestedPages = renderExactRequestedPages({
+                detection: promptBundle.documentReference,
+                pages: promptBundle.attachmentContexts.flatMap((attachment) =>
+                    (attachment.requestedPageContexts ?? []).map((page) => ({
+                        filename: attachment.filename,
+                        pageNumber: page.pageNumber,
+                        text: page.text,
+                    }))
+                ),
+            });
+            if (exactRequestedPages) parsedResponse.message = exactRequestedPages;
             parsedResponse.agenticOutcome = finalizeAgenticOutcome(parsedResponse.agenticOutcome, reassessmentTarget);
 
             console.info('[ChatWorker] Provider attempt completed', {
@@ -2861,6 +2947,8 @@ async function generateWithFallbacks({
                 model: step.model,
                 errorCode: normalized.code,
                 errorMessage: normalized.message,
+                errorName: error instanceof Error ? error.name : typeof error,
+                failureStage: safeFailureStage(error),
             });
             lastError = error;
             if (!normalized.retryable) break;
@@ -3061,6 +3149,7 @@ export const processChatGenerationJob = internalAction({
     handler: async (ctx, args) => {
         const workerStartedAt = Date.now();
         const leaseOwner = crypto.randomUUID();
+        let workerStage = 'leasing_job';
         const lease = await ctx.runMutation(internal.chatTurns.leaseGenerationJob, {
             jobId: args.jobId,
             leaseOwner,
@@ -3074,6 +3163,7 @@ export const processChatGenerationJob = internalAction({
         console.info('[ChatWorker] Job leased', { jobId: args.jobId, turnId: lease.turnId });
 
         try {
+            workerStage = 'loading_generation_context';
             const context = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
                 turnId: lease.turnId,
             });
@@ -3095,7 +3185,21 @@ export const processChatGenerationJob = internalAction({
             }
 
             const fullReviewAttachments: AttachmentContext[] = context.attachmentContexts ?? [];
+            console.info('[ChatWorker] Generation context loaded', {
+                jobId: args.jobId,
+                analysisMode: context.turn.analysisMode,
+                attachmentCount: fullReviewAttachments.length,
+                attachmentReviewStates: fullReviewAttachments.map((attachment) => ({
+                    status: attachment.status,
+                    coverageStatus: attachment.coverageStatus,
+                    fullDocumentReviewStatus: attachment.fullDocumentReviewStatus,
+                    reviewMarkdownLength: attachment.fullDocumentReviewMarkdown?.length ?? 0,
+                    pagesProcessed: attachment.pagesProcessed,
+                    pagesTotal: attachment.pagesTotal,
+                })),
+            });
             if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
+                workerStage = 'completing_coverage_gate';
                 await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
                     leaseOwner,
@@ -3129,6 +3233,7 @@ export const processChatGenerationJob = internalAction({
             if (context.turn.analysisMode === 'full_document_review' && fullReviewAttachments.length > 0) {
                 const missingRecord = fullReviewAttachments.find((attachment) => !attachment.fullDocumentReviewMarkdown?.trim());
                 if (missingRecord) {
+                    workerStage = 'completing_review_gate';
                     await ctx.runMutation(internal.chatTurns.completeAssistant, {
                         jobId: args.jobId,
                         leaseOwner,
@@ -3151,6 +3256,7 @@ export const processChatGenerationJob = internalAction({
                 const content = fullReviewAttachments
                     .map((attachment) => attachment.fullDocumentReviewMarkdown!.trim())
                     .join('\n\n');
+                workerStage = 'committing_verified_full_review';
                 const completion = await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
                     leaseOwner,
@@ -3168,6 +3274,7 @@ export const processChatGenerationJob = internalAction({
                         })),
                     }),
                 });
+                workerStage = 'resolving_full_review_evidence';
                 const reviewCitations = await ctx.runQuery(internal.chatTurns.resolveFullReviewEvidence, {
                     turnId: lease.turnId,
                     candidates: fullReviewEvidenceCandidates(fullReviewAttachments),
@@ -3205,6 +3312,7 @@ export const processChatGenerationJob = internalAction({
                 context.documentAmbiguity?.requiresClarification &&
                 isDocumentContextRoute(persistedRouteMode)
             ) {
+                workerStage = 'completing_document_ambiguity';
                 const documentReference = detectDocumentReference(context.turn.message);
                 await ctx.runMutation(internal.chatTurns.completeAssistant, {
                     jobId: args.jobId,
@@ -3240,6 +3348,7 @@ export const processChatGenerationJob = internalAction({
                 return null;
             }
 
+            workerStage = 'generating_provider_response';
             const result = await generateWithFallbacks({
                 ctx,
                 context,
@@ -3247,6 +3356,7 @@ export const processChatGenerationJob = internalAction({
                 leaseOwner,
             });
 
+            workerStage = 'committing_provider_response';
             const completion = await ctx.runMutation(internal.chatTurns.completeAssistant, {
                 jobId: args.jobId,
                 leaseOwner,
@@ -3466,6 +3576,9 @@ export const processChatGenerationJob = internalAction({
                 turnId: lease.turnId,
                 errorCode: loggedError.code,
                 errorMessage: loggedError.message,
+                errorName: error instanceof Error ? error.name : typeof error,
+                failureStage: safeFailureStage(error),
+                workerStage,
             });
             const normalized = normalizeProviderError(error);
             const userMessage = buildSavedWorkFailureMessage({

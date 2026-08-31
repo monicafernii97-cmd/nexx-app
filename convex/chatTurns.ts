@@ -22,6 +22,7 @@ import {
 } from '../src/lib/nexx/documentSelection';
 import {
     buildDocumentChunkSearchQuery,
+    extractRequestedPages,
     retrieveRelevantDocumentChunks,
 } from '../src/lib/nexx/documentChunkRetrieval';
 import { fuzzyTextContains } from '../src/lib/nexx/legalDocumentAnswer';
@@ -52,8 +53,10 @@ import {
 } from '../src/lib/chat/regeneration';
 import {
     CHAT_RATE_LIMIT_WINDOW_MS,
+    UPLOAD_E2E_DAILY_LIMIT,
     chatRateLimitKeyForModel,
     fixedWindowStartMs,
+    isUploadE2ERobotEmail,
     userSubscriptionTier,
 } from './lib/chatRateLimitPolicy';
 import { normalizeReviewFlagMessage, requiresZdrForClassification, sanitizeAuditMetadata } from './lib/documentTelemetry';
@@ -532,16 +535,43 @@ async function getRelevantDocumentChunkContexts(
             .first();
         if (chunk && chunkMatchesActiveDocumentMemory(chunk, uploadedFile)) understandingChunks.push(chunk);
     }
+    const requestedPages = extractRequestedPages(args.detection.requestedSections);
+    const requestedPageChunks = requestedPages.length > 0
+        ? (generationId
+            ? await ctx.db
+                .query('documentChunks')
+                .withIndex('by_file_generation', (q) =>
+                    q.eq('uploadedFileId', uploadedFile._id).eq('memoryGenerationId', generationId)
+                )
+                .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE)
+            : await ctx.db
+                .query('documentChunks')
+                .withIndex('by_uploaded_file_chunk', (q) => q.eq('uploadedFileId', uploadedFile._id))
+                .take(MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE)
+        ).filter((chunk) => {
+            if (!chunkMatchesActiveDocumentMemory(chunk, uploadedFile) || chunk.pageStart === undefined) {
+                return false;
+            }
+            const pageEnd = chunk.pageEnd ?? chunk.pageStart;
+            return requestedPages.some((page) => page >= chunk.pageStart! && page <= pageEnd);
+        })
+        : [];
     const continuityChunks = await getContinuityChunksForSearchHits(ctx, {
         uploadedFile,
         searchChunks: mergeDocumentChunkDocs([
+            ...requestedPageChunks,
             ...searchChunks.slice(0, MAX_RETRIEVED_CHUNKS_PER_FILE),
             ...understandingChunks,
         ]),
         generationId,
     });
 
-    const chunks = mergeDocumentChunkDocs([...understandingChunks, ...searchChunks, ...continuityChunks])
+    const chunks = mergeDocumentChunkDocs([
+        ...requestedPageChunks,
+        ...understandingChunks,
+        ...searchChunks,
+        ...continuityChunks,
+    ])
         .filter((chunk) => chunkMatchesActiveDocumentMemory(chunk, uploadedFile));
     const chunksById = new Map(chunks.map((chunk) => [chunk._id.toString(), chunk]));
 
@@ -577,6 +607,46 @@ async function getRelevantDocumentChunkContexts(
             chunkId: chunk.chunkId as Id<'documentChunks'>,
             uploadedFileId: chunk.uploadedFileId as Id<'uploadedFiles'>,
         }));
+}
+
+/** Load only the exact pages named by the user so page lookups are not lost inside aggregated chunks. */
+async function getRequestedDocumentPageContexts(
+    ctx: QueryCtx,
+    args: {
+        uploadedFile: Doc<'uploadedFiles'>;
+        detection: DocumentReferenceDetection;
+    }
+) {
+    const requestedPages = extractRequestedPages(args.detection.requestedSections).slice(0, 50);
+    if (requestedPages.length === 0) return [];
+
+    const pages = [];
+    for (const pageNumber of requestedPages) {
+        const page = args.uploadedFile.activeMemoryGenerationId
+            ? await ctx.db
+                .query('documentPages')
+                .withIndex('by_generation_page', (q) =>
+                    q.eq('memoryGenerationId', args.uploadedFile.activeMemoryGenerationId!).eq('pageNumber', pageNumber)
+                )
+                .first()
+            : await ctx.db
+                .query('documentPages')
+                .withIndex('by_uploaded_file_page', (q) =>
+                    q.eq('uploadedFileId', args.uploadedFile._id).eq('pageNumber', pageNumber)
+                )
+                .first();
+        if (!page || page.uploadedFileId !== args.uploadedFile._id) continue;
+        const text = page.canonicalText ?? page.text;
+        if (!text.trim()) continue;
+        pages.push({
+            pageNumber,
+            text,
+            extractionMethod: page.extractionMethod,
+            ocrConfidence: page.ocrConfidence,
+            warnings: page.warnings,
+        });
+    }
+    return pages;
 }
 
 /** Hydrate semantic vector hits plus adjacent clauses after re-checking document access. */
@@ -856,6 +926,13 @@ async function consumeTurnRateLimit(
 
 function rateLimitPolicyForTurn(user: Doc<'users'>, model?: string) {
     const resolvedModel = model || PRIMARY_MODEL;
+    if (isUploadE2ERobotEmail(user.email)) {
+        return {
+            key: `upload_e2e:${chatRateLimitKeyForModel(resolvedModel)}`,
+            limit: UPLOAD_E2E_DAILY_LIMIT,
+            windowMs: CHAT_RATE_LIMIT_WINDOW_MS,
+        };
+    }
     return {
         key: chatRateLimitKeyForModel(resolvedModel),
         limit: getDailyLimit(userSubscriptionTier(user), resolvedModel),
@@ -1559,6 +1636,10 @@ export const getGenerationContext = internalQuery({
                             : undefined,
                     fullDocumentReviewRecordId: understandingRecord?._id,
                     fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
+                    requestedPageContexts: await getRequestedDocumentPageContexts(ctx, {
+                        uploadedFile,
+                        detection: documentReference,
+                    }),
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
                         message: contextualFollowUpMessage,
@@ -1755,6 +1836,10 @@ export const getGenerationContext = internalQuery({
                             : undefined,
                     fullDocumentReviewRecordId: understandingRecord?._id,
                     fullDocumentReviewSourceChunkIds: understandingRecord?.sourceChunkIds,
+                    requestedPageContexts: await getRequestedDocumentPageContexts(ctx, {
+                        uploadedFile,
+                        detection: documentReference,
+                    }),
                     documentChunks: await getRelevantDocumentChunkContexts(ctx, {
                         uploadedFileId: uploadedFile._id,
                         message: contextualFollowUpMessage,

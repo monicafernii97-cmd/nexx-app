@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { detectDocumentReference } from '../documentReferenceDetection';
 import {
   buildDocumentChunkSearchQuery,
+  extractRequestedPages,
   retrieveRelevantDocumentChunks,
   type DocumentChunkRetrievalCandidate,
 } from '../documentChunkRetrieval';
@@ -43,6 +44,11 @@ const chunks: DocumentChunkRetrievalCandidate[] = [
 ];
 
 describe('retrieveRelevantDocumentChunks', () => {
+  it('extracts page lists and bounded page ranges without dropping later pages', () => {
+    expect(extractRequestedPages(['pages 1, 50, and 100'])).toEqual([1, 50, 100]);
+    expect(extractRequestedPages(['pages 8 through 10'])).toEqual([8, 9, 10]);
+  });
+
   it('builds a compact full-text query from exact terms and sections', () => {
     const detection = detectDocumentReference('Does section 7 say shall or may about Father day possession?');
     const query = buildDocumentChunkSearchQuery(

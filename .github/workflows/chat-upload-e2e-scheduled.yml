@@ -1,0 +1,110 @@
+name: Chat Upload — Scheduled UX and Security Assurance
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Browser assurance scope
+        required: true
+        default: daily
+        type: choice
+        options: [daily, weekly]
+
+concurrency:
+  group: chat-upload-scheduled-${{ inputs.lane || github.event.schedule }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  upload-daily:
+    if: github.event_name == 'workflow_dispatch' && inputs.lane == 'daily' || github.event.schedule == '30 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Production
+    env:
+      E2E_BASE_URL: https://nexproof.io
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_LANE: daily
+      E2E_ALLOW_PRODUCTION: "true"
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: ./.github/actions/setup-node
+      - name: Apply schedule jitter
+        if: github.event_name == 'schedule'
+        run: node -e "setTimeout(() => {}, Math.floor(Math.random() * 300000))"
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify safe production identity and lane
+        run: node scripts/verify-upload-e2e-env.mjs
+      - name: Run daily production upload journey
+        run: npm run test:e2e:upload:daily
+      - name: Upload sanitized browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chat-upload-daily-${{ github.run_id }}
+          path: playwright-report/upload-e2e-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Notify on failure
+        if: failure()
+        env:
+          E2E_ALERT_WEBHOOK: ${{ secrets.E2E_ALERT_WEBHOOK }}
+        run: node scripts/notify-upload-e2e-failure.mjs
+      - name: Open or update GitHub failure alert
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/upsert-upload-e2e-github-alert.mjs
+
+  upload-weekly:
+    if: github.event_name == 'workflow_dispatch' && inputs.lane == 'weekly' || github.event.schedule == '0 4 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: Production
+    env:
+      E2E_BASE_URL: https://nexproof.io
+      E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+      E2E_OUTSIDER_EMAIL: ${{ secrets.E2E_OUTSIDER_EMAIL }}
+      E2E_LANE: weekly
+      E2E_ALLOW_PRODUCTION: "true"
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: ./.github/actions/setup-node
+      - name: Apply schedule jitter
+        if: github.event_name == 'schedule'
+        run: node -e "setTimeout(() => {}, Math.floor(Math.random() * 300000))"
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Verify safe production identity and lane
+        run: node scripts/verify-upload-e2e-env.mjs
+      - name: Run weekly UX, security, retrieval, and performance suite
+        run: npm run test:e2e:upload:weekly
+      - name: Upload sanitized browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chat-upload-weekly-${{ github.run_id }}
+          path: playwright-report/upload-e2e-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Notify on failure
+        if: failure()
+        env:
+          E2E_ALERT_WEBHOOK: ${{ secrets.E2E_ALERT_WEBHOOK }}
+        run: node scripts/notify-upload-e2e-failure.mjs
+      - name: Open or update GitHub failure alert
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/upsert-upload-e2e-github-alert.mjs

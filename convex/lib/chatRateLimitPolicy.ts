@@ -8,6 +8,13 @@ import {
 } from '../../src/lib/tiers';
 
 export const CHAT_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const UPLOAD_E2E_DAILY_LIMIT = 250;
+
+const UPLOAD_E2E_ROBOT_EMAIL = /^upload-robot-(owner|outsider)\+(preview|production)@nexproof\.io$/i;
+
+export function isUploadE2ERobotEmail(email?: string) {
+  return typeof email === 'string' && UPLOAD_E2E_ROBOT_EMAIL.test(email.trim());
+}
 
 export function fixedWindowStartMs(now: number, windowMs: number) {
   return Math.floor(now / windowMs) * windowMs;

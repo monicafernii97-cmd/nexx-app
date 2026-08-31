@@ -101,7 +101,40 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(container.textContent).toContain('order.pdf');
+    expect(container.querySelector('[data-testid="chat-upload-selected"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="chat-upload-file-name"]')?.textContent).toBe('order.pdf');
+    expect(container.querySelector('[data-testid="chat-upload-status"]')?.getAttribute('role')).toBe('status');
     expect(document.activeElement).toBe(input(container));
+  });
+
+  it('exposes monotonic upload progress through an accessible progressbar', async () => {
+    const pending = deferred();
+    const onSend = vi.fn((_message, _fileState, _mode, callbacks) => {
+      callbacks?.onStatus('uploading_to_storage');
+      callbacks?.onProgress(42);
+      callbacks?.onProgress(20);
+      return pending.promise;
+    });
+    const { container, root } = await renderChatInput(onSend);
+    roots.push(root);
+
+    await act(async () => {
+      setFiles(fileInput(container), [makeFile()]);
+      fileInput(container).dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      buttonWithText(container, 'Send file')?.click();
+    });
+
+    const progress = container.querySelector('[data-testid="chat-upload-progress"]');
+    expect(progress?.getAttribute('role')).toBe('progressbar');
+    expect(progress?.getAttribute('aria-valuenow')).toBe('42');
+    expect(container.querySelector('[data-testid="chat-upload-selected"]')?.getAttribute('aria-busy')).toBe('true');
+
+    await act(async () => {
+      pending.resolve();
+      await pending.promise;
+    });
   });
 
   it('pressing Enter after file selection sends the selected file and clears on success', async () => {
@@ -404,6 +437,7 @@ describe('ChatInput file send flow', () => {
     });
 
     expect(container.textContent).toContain('Replace file');
+    expect(container.querySelector('[data-testid="chat-upload-replace"]')).toBeTruthy();
     expect(sendButton(container).disabled).toBe(true);
 
     await act(async () => {

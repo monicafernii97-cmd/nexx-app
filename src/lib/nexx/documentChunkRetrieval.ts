@@ -220,14 +220,23 @@ function buildFilingBucketTerms(plan: FilingRetrievalBucketPlan[]) {
   return new Map(plan.map(({ bucket, queries }) => [bucket, normalizeBucketTerms(queries)]));
 }
 
-function extractRequestedPages(sections: string[]) {
-  return unique(
-    sections
-      .map((section) => section.match(/\bpage\s+(\d+)\b/i)?.[1])
-      .filter((page): page is string => Boolean(page))
-      .map((page) => Number.parseInt(page, 10))
-      .filter(Number.isFinite)
-  );
+export function extractRequestedPages(sections: string[]) {
+  const pages: number[] = [];
+  for (const section of sections) {
+    if (!/\bpages?\b/i.test(section)) continue;
+    const values = Array.from(section.matchAll(/\d+/g))
+      .map((match) => Number.parseInt(match[0], 10))
+      .filter((page) => Number.isFinite(page) && page > 0);
+    if (/\b(?:through|to)\b|\d\s*-\s*\d/i.test(section) && values.length === 2) {
+      const [start, end] = values;
+      if (end >= start && end - start <= 50) {
+        for (let page = start; page <= end; page += 1) pages.push(page);
+        continue;
+      }
+    }
+    pages.push(...values);
+  }
+  return unique(pages);
 }
 
 function extractSectionTerms(sections: string[]) {

@@ -68,6 +68,15 @@ describe('detectDocumentReference', () => {
     });
   });
 
+  it('preserves every page in a comma-separated page request', () => {
+    expect(detectDocumentReference('Quote the entries on pages 1, 50, and 100 of the document.')).toMatchObject({
+      referencesDocument: true,
+      referenceType: 'quote_request',
+      requestedSections: ['pages 1, 50, and 100'],
+      requiresExactText: true,
+    });
+  });
+
   it('detects comparison requests', () => {
     expect(detectDocumentReference('Compare this amended order to the prior order.')).toMatchObject({
       referencesDocument: true,

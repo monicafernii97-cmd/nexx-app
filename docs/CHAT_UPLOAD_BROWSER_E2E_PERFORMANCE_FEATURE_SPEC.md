@@ -1,11 +1,11 @@
 # NEXX Chat Upload Browser E2E, Security, and Performance Assurance
 
-**Document status:** Implementation-ready feature specification  
+**Document status:** Core browser assurance implemented in PR #242; Codex reporting and approval-control extension specified below
 **Owner:** NEXX Engineering  
 **Primary surface:** Chat file upload and document-ingestion workflow  
 **Target environments:** Pull-request preview, staging, and production  
 **Recommended framework:** Playwright  
-**Last updated:** August 30, 2026
+**Last updated:** September 1, 2026
 
 ## 1. Executive summary
 
@@ -13,13 +13,14 @@ NEXX needs a real browser-based testing layer that exercises the chat upload fea
 
 This feature adds that missing layer while preserving high platform performance and strong security boundaries. It uses synthetic accounts and synthetic documents only. It separates safe production checks from controlled failure testing so routine verification cannot disrupt customer traffic or create unsafe production data.
 
-The final assurance model has five complementary layers:
+The final assurance model has six complementary layers:
 
 1. **Per-PR preview smoke:** catches broken UI, selectors, validation, and integration before merge.
 2. **Post-production-deploy smoke:** confirms each live release can complete a real signed-in upload.
 3. **Daily production journey:** checks the full browser-to-storage-to-processing path on the live domain.
 4. **Weekly expanded UX and security suite:** covers supported formats, large files, retry behavior, isolation, cleanup, accessibility, and performance budgets.
 5. **Monthly staging resilience suite:** safely injects network interruption, response loss, slow connections, and partial chunk failures.
+6. **Codex operations layer:** delivers every scheduled report to one persistent Codex task, notifies the owner directly, creates a dedicated incident task for confirmed problems, and waits for explicit repair approval before changing code.
 
 The existing 10-minute backend upload canary remains in place. It validates storage and route health without a browser; the new browser robot validates the actual customer experience.
 
@@ -604,9 +605,9 @@ Real model calls are limited to the release, daily, or weekly lane as configured
 
 ## 18. CI/CD workflow design
 
-### 18.1 Proposed scripts
+### 18.1 Implemented script baseline
 
-Add package scripts:
+The merged baseline provides these package scripts:
 
 ```json
 {
@@ -618,12 +619,12 @@ Add package scripts:
 }
 ```
 
-### 18.2 Proposed workflow files
+### 18.2 Implemented workflow baseline
 
 - `.github/workflows/chat-upload-e2e-preview.yml`
 - `.github/workflows/chat-upload-e2e-release.yml`
 - `.github/workflows/chat-upload-e2e-scheduled.yml`
-- `.github/workflows/chat-upload-resilience-staging.yml`
+- `.github/workflows/chat-upload-e2e-resilience.yml`
 
 ### 18.3 Workflow controls
 
@@ -647,15 +648,17 @@ Add package scripts:
 
 ## 19. Secrets and configuration
 
-Recommended environment-scoped secrets:
+Implemented environment-scoped secrets and credentials:
 
-- `E2E_BASE_URL`
-- `E2E_OWNER_AUTH_SECRET` or provider-supported test token secret
-- `E2E_OUTSIDER_AUTH_SECRET`
-- `E2E_SYNTHETIC_CASE_ID`
-- `E2E_CLEANUP_SECRET`
-- `E2E_ALERT_WEBHOOK_URL`
-- `E2E_STAGING_FAULT_SECRET` — staging only
+- `E2E_OWNER_EMAIL` — exact-match synthetic owner identity.
+- `E2E_OUTSIDER_EMAIL` — exact-match synthetic outsider identity for isolation checks.
+- `CLERK_SECRET_KEY` — server-side test authentication setup.
+- `CLERK_PUBLISHABLE_KEY` — matching Clerk application identity.
+- `E2E_ALERT_WEBHOOK` — optional immediate failure notification destination.
+- `VERCEL_TOKEN` — isolated resilience deployment only.
+- `GITHUB_TOKEN` — GitHub-provided workflow token, restricted through workflow permissions.
+
+`E2E_BASE_URL`, `E2E_LANE`, and `E2E_ALLOW_PRODUCTION` are explicit workflow configuration values rather than stored secrets.
 
 Rules:
 
@@ -763,7 +766,7 @@ scripts/
   chat-upload-e2e-preview.yml
   chat-upload-e2e-release.yml
   chat-upload-e2e-scheduled.yml
-  chat-upload-resilience-staging.yml
+  chat-upload-e2e-resilience.yml
 ```
 
 Likely product changes:
@@ -942,3 +945,829 @@ The chat upload feature should be considered fully monitored only when both of t
 2. **Customer-path health:** the signed-in browser robot proves a real user can select, upload, process, attach, and safely use a document.
 
 Neither signal replaces the other. Together they provide fast outage detection, realistic user-experience verification, security regression coverage, and measurable performance protection without exposing customer data or creating meaningful production load.
+
+## 32. Post-merge implementation status
+
+### 32.1 PR #242 is the implementation baseline
+
+GitHub pull request `#242`, **Add production browser assurance for chat uploads**, was merged into `main` on August 31, 2026 as merge commit `3617d22`. It implemented the core browser-assurance system described by this specification, including:
+
+- Preview, release, daily, weekly, and resilience GitHub Actions workflows.
+- Signed-in Playwright upload journeys and deterministic synthetic documents.
+- Production-safe identity checks and staging-only fault injection.
+- Sanitized structured result artifacts.
+- Failure webhook delivery.
+- Deduplicated GitHub failure issues.
+- Resumable upload, security, retrieval, cleanup, and performance coverage.
+
+The browser robot therefore exists in `main`. A local checkout that predates merge commit `3617d22` will not display those files until it is updated from `main`; absence from an older branch is not evidence that the merged robot is missing.
+
+### 32.2 What PR #242 does not provide
+
+PR #242 does not, by itself, provide the complete owner-facing operating experience required here. The following extension remains to be implemented and configured:
+
+- One persistent Codex task where every daily report appears.
+- A direct Codex desktop notification for each daily report and every action-required incident.
+- Detection of a missing, late, cancelled, or infrastructure-failed GitHub run.
+- A plain-language summary that translates GitHub and Playwright evidence for the owner.
+- Creation of a dedicated Codex incident task for a confirmed or credible product problem.
+- A hard approval gate that prevents Codex from editing code before the owner approves repair.
+- A post-approval repair workflow with a branch, verification, reviewable pull request, and progress updates.
+- Cross-links among the Codex daily report, Codex incident task, GitHub Actions run, GitHub issue, deployment, and repair pull request.
+
+### 32.3 Operational readiness is separate from code merge
+
+The feature is operational only when all required GitHub environments, secrets, robot users, alert destinations, and Codex automation are configured. A merged workflow with missing secrets can be present in `main` while scheduled checks skip or fail during setup.
+
+The owner-facing daily report must explicitly state one of these readiness conditions:
+
+- `OPERATING`: the scheduled run completed and all required reporting paths work.
+- `DEGRADED`: the product check completed, but an alert, artifact, cleanup, or reporting path failed.
+- `NOT_CONFIGURED`: one or more required secrets, identities, permissions, or automations are absent.
+- `NO_RECENT_RUN`: the expected scheduled run did not start or cannot be found.
+
+### 32.4 Existing schedule correction requirement
+
+The merged scheduled workflow currently uses GitHub cron expressions `30 5 * * *` and `0 4 * * 0`. GitHub evaluates scheduled workflow cron expressions in UTC. Those expressions therefore do not represent 5:30 AM and 4:00 AM in `America/Chicago` throughout the year.
+
+Implementation must preserve the local-time requirements in Section 7 by using GitHub Actions' timezone-aware schedule syntax. The required design is:
+
+1. Keep the daily cron expression `30 5 * * *` and add `timezone: "America/Chicago"` to that schedule entry.
+2. Keep the weekly cron expression `0 4 * * 0` and add `timezone: "America/Chicago"` to that schedule entry.
+3. Apply zero to five minutes of jitter after GitHub selects the correct local-time occurrence.
+4. Add a workflow syntax check confirming that both entries declare the IANA time zone.
+5. Add an operational check around both Central Standard Time and Central Daylight Time dates.
+
+The Codex reporting automation must use the same IANA time zone and must not rely on a fixed UTC offset.
+
+## 33. Human-in-the-loop operating model
+
+### 33.1 Required outcome
+
+The system must behave like a careful monitoring teammate:
+
+1. The browser robot runs independently in GitHub Actions.
+2. A Codex automation checks the result after the expected completion window.
+3. Codex posts a report to the persistent daily task and notifies the owner.
+4. If the run is healthy, Codex records the result and takes no code action.
+5. If the run is inconclusive, Codex performs bounded, non-repair diagnostics and reports what is missing.
+6. If the run indicates a credible bug, Codex creates or updates a dedicated incident task.
+7. Codex explains the evidence, likely customer impact, confidence, and proposed repair.
+8. Codex enters `AWAITING_OWNER_APPROVAL` and stops before editing code.
+9. Only after explicit approval may Codex create or edit repair code.
+10. Merge, deployment, rollback, destructive data actions, and secret rotation remain separately controlled actions unless the owner explicitly authorizes them.
+
+### 33.2 Separation of responsibilities
+
+| Component | Responsibility | May edit product code? |
+|---|---|---:|
+| GitHub browser robot | Execute repeatable tests and produce sanitized evidence | No |
+| GitHub alerting | Send webhook and create/update a deduplicated issue | No |
+| Codex daily task | Collect, interpret, report, notify, correlate, and answer owner questions | No |
+| Codex incident task before approval | Diagnose read-only, propose a repair, and wait | No |
+| Codex incident task after approval | Implement the approved scope in an isolated branch/worktree and verify it | Yes |
+| Owner | Approve repair, reject it, narrow scope, request more investigation, and approve merge/deploy | N/A |
+
+### 33.3 Safety invariant
+
+Finding a bug is not authorization to fix it. The system must preserve this invariant across retries, task restarts, context compaction, app restarts, and schedule reruns:
+
+> No tracked source file may be changed for an incident until an approval record for that incident exists.
+
+The approval record must identify the incident, approver, timestamp, approved scope, and any restrictions. General statements such as “keep monitoring,” “look into it,” or “tell me what happened” are not repair approval.
+
+## 34. Codex task topology and conversation locations
+
+### 34.1 Persistent daily task
+
+Create one Codex project task with the exact title:
+
+`Nexproof Daily System Check`
+
+This is the owner’s permanent monitoring inbox and the primary place to talk with the system. Every scheduled run posts one complete report in this same task. Healthy, degraded, failed, missed, and configuration-error reports all appear here; healthy reports must not silently disappear.
+
+The task must be associated with the saved Nexproof project and the canonical GitHub repository `monicafernii97-cmd/nexx-app`. It must not be tied to an obsolete feature branch. Read-only reporting should compare the latest completed workflow commit with the current `origin/main` head.
+
+The owner can reply naturally in this task, including:
+
+- “Explain what failed in plain language.”
+- “Show me the evidence.”
+- “Was any customer data affected?”
+- “Run one confirmation check.”
+- “Do not repair this yet.”
+- “Create a repair plan only.”
+- “Approve repair for incident NEXX-UPLOAD-2026-09-01-01.”
+- “Close this as a transient infrastructure failure.”
+
+### 34.2 Dedicated incident task
+
+For each new confirmed or credible actionable failure, create one Codex task with this title format:
+
+`Nexproof Repair Approval — <incident-id> — <short component>`
+
+Example:
+
+`Nexproof Repair Approval — NEXX-UPLOAD-2026-09-01-01 — upload readiness`
+
+The incident task is the focused place for diagnosis, approval, implementation progress, verification evidence, and the repair pull request. The persistent daily task must link to it and retain a short status line until resolution.
+
+Do not create duplicate incident tasks for the same unresolved signature. Update the existing task when the environment, first failed phase, deployment identifier, and primary failure code match.
+
+### 34.3 Task ownership and lifecycle
+
+- The daily task remains active indefinitely unless the owner pauses or retires monitoring.
+- Incident tasks begin in `AWAITING_OWNER_APPROVAL`.
+- A rejected incident becomes `REPAIR_DECLINED` while monitoring continues.
+- An incident requiring more evidence becomes `INVESTIGATING_READ_ONLY`.
+- An approved incident becomes `APPROVED_FOR_REPAIR` before any edit occurs.
+- A completed repair becomes `PR_READY`, not `DEPLOYED`, unless deployment was separately authorized and verified.
+- Resolved incident tasks may be archived only after the final daily task update links the resolution evidence.
+
+### 34.4 Where the owner receives updates
+
+The system must provide updates in these locations:
+
+1. **Codex daily task:** authoritative owner-readable report history.
+2. **Codex incident task:** focused discussion and approval for each actionable problem.
+3. **Codex desktop notification:** direct notification that a report or approval request is ready.
+4. **GitHub Actions run:** primary execution logs and sanitized artifact.
+5. **GitHub issue:** deduplicated engineering backstop for failed scheduled workflows.
+6. **Configured alert webhook:** secondary real-time channel when present.
+
+Codex is the owner-facing source of truth. GitHub remains the engineering evidence source of truth.
+
+## 35. Scheduling and delivery timing
+
+### 35.1 Daily sequence
+
+The target operating sequence in `America/Chicago` is:
+
+| Time | Event |
+|---|---|
+| 5:30 AM plus up to five minutes jitter | GitHub daily browser journey starts |
+| By 5:50 AM | Normal completion target, including retry and artifact upload |
+| 6:00 AM | Codex daily heartbeat checks the expected run |
+| 6:00–6:05 AM | Codex reads the run, sanitized result, GitHub issue state, and current `main` head |
+| By 6:05 AM | Codex posts the complete daily report and sends a notification |
+| Immediately after classification | If actionable, Codex creates or updates the incident task and requests approval |
+
+### 35.2 Late or still-running jobs
+
+If the expected GitHub run is still in progress at 6:00 AM, Codex may wait or recheck for up to 15 minutes. It must post a `LATE` report if the run remains incomplete after that window. A late run is a monitoring event even when the product has not yet been proven unhealthy.
+
+Codex must not wait silently beyond the bounded window. The owner must receive an update stating what is late, when it started, and when the system will check again.
+
+### 35.3 Missed-run watchdog
+
+If no matching scheduled run exists for the expected local date:
+
+- Classify the report as `NO_RECENT_RUN` and severity `HIGH`.
+- Check whether GitHub Actions is disabled, the workflow file is missing from `main`, the schedule was skipped, or credentials prevented access.
+- Create an incident task for the monitoring failure.
+- Notify the owner.
+- Do not claim that the product is healthy or unhealthy.
+- Do not change workflow code until approval.
+
+### 35.4 Weekly and monthly reporting
+
+Weekly and monthly suites also post into the persistent daily task. They use report prefixes `WEEKLY ASSURANCE` and `MONTHLY RESILIENCE` and may create their own incident tasks. A daily report must not overwrite or hide a recent unresolved weekly or monthly incident.
+
+## 36. Codex automation definition
+
+### 36.1 Automation type
+
+Use a Codex **heartbeat automation attached to the persistent daily task**. A heartbeat is required so all reports and follow-up conversation remain in one continuous task rather than producing disconnected scheduled jobs.
+
+The automation must be active, use the local Nexproof project environment, use the owner’s configured Codex model unless explicitly changed, and keep normal notifications enabled. The local host, Codex app, repository access, GitHub authentication, and network connectivity are operational dependencies and must be checked during setup.
+
+### 36.2 Required heartbeat prompt
+
+The implementation prompt must preserve the following behavior, even if wording is adjusted for product constraints:
+
+```text
+Run the Nexproof daily system-check reporting workflow. Treat America/Chicago as the reporting time zone. Inspect the latest expected GitHub Actions run for “Chat Upload — Scheduled UX and Security Assurance” in monicafernii97-cmd/nexx-app, confirm that it ran against the expected origin/main commit, and read only sanitized artifacts and logs. Also inspect any matching open GitHub alert issue and the last successful run.
+
+Post one complete plain-language report in this task on every run, including healthy runs. State whether the system is OPERATING, DEGRADED, NOT_CONFIGURED, or NO_RECENT_RUN; include lane, start and finish time in America/Chicago, commit, deployment or target URL, result counts, last successful phase, cleanup status, customer impact assessment, confidence, links, and recommended next action.
+
+If there is a credible product bug, security failure, cleanup failure, missing scheduled run, or repeated infrastructure failure, create or update one dedicated Codex incident task named “Nexproof Repair Approval — <incident-id> — <short component>”. Notify the owner and link the incident task from this daily task.
+
+Before approval, perform only bounded read-only diagnosis and safe confirmation checks. Do not edit tracked files, create a repair commit, push a branch, open a repair pull request, merge, deploy, roll back, rotate secrets, or modify production. In the incident task, explain the evidence, likely cause, affected users, proposed files or systems, verification plan, risks, and rollback plan, then set the state to AWAITING_OWNER_APPROVAL.
+
+Begin code repair only after the owner explicitly approves the identified incident and scope. After approval, work in an isolated codex/ branch or worktree, provide progress updates, run proportionate tests, open a ready-for-review pull request to the repository default branch, and return the PR and verification evidence. Never merge or deploy unless separately authorized.
+```
+
+### 36.3 Report cursor and idempotency
+
+The automation must persist a cursor containing:
+
+- Last processed GitHub run ID.
+- Last processed attempt number.
+- Last reported commit SHA.
+- Last successful run ID and timestamp.
+- Open incident signatures and Codex task IDs.
+- Last notification status.
+
+If the same run is observed again without new evidence, update neither the report nor the notification. If a rerun produces a new attempt number or changed status, post a concise update linked to the original report.
+
+## 37. Daily report contract
+
+### 37.1 Required report header
+
+Every report begins with one of these owner-readable outcomes:
+
+- `✅ NEXXPROOF DAILY CHECK — HEALTHY`
+- `⚠️ NEXXPROOF DAILY CHECK — DEGRADED`
+- `🚨 NEXXPROOF DAILY CHECK — APPROVAL NEEDED`
+- `❓ NEXXPROOF DAILY CHECK — NO RUN FOUND`
+- `🔧 NEXXPROOF DAILY CHECK — NOT CONFIGURED`
+
+Color or emoji must never be the only status indicator.
+
+### 37.2 Required fields
+
+Every report contains:
+
+- Local reporting date and time in `America/Chicago`.
+- Workflow lane: daily, weekly, monthly, release, or manual confirmation.
+- GitHub run ID and attempt.
+- Git commit tested and whether it matches the expected `origin/main` head.
+- Target environment and public hostname.
+- Overall workflow conclusion.
+- Test totals: passed, failed, skipped, and retried.
+- Browser and viewport where applicable.
+- Upload transport used.
+- Last successful phase.
+- Sanitized failure code and failing assertion when applicable.
+- Cleanup outcome.
+- Whether synthetic artifacts remain.
+- Whether any evidence suggests customer data exposure.
+- Customer-impact assessment: none observed, possible, likely, or confirmed.
+- Confidence: low, medium, or high, with a one-sentence reason.
+- Comparison with the last successful run.
+- Links to the Actions run, sanitized artifact, GitHub alert, incident task, relevant deployment, and runbook.
+- One recommended next action.
+- Approval state when an incident exists.
+
+### 37.3 Healthy report behavior
+
+A healthy report must be concise but complete. It confirms the customer path, cleanup, commit, and next scheduled check. It must not create an incident task.
+
+### 37.4 Failed report behavior
+
+A failed report must distinguish among:
+
+- Confirmed product regression.
+- Suspected product regression.
+- Test flake.
+- GitHub runner or dependency failure.
+- Authentication or secret configuration failure.
+- Monitoring system failure.
+- Cleanup failure.
+- Security isolation failure.
+
+It must never label an infrastructure-only failure as a confirmed customer outage without corroborating evidence.
+
+## 38. Direct notification contract
+
+### 38.1 Primary notification
+
+The owner must receive a Codex desktop/app notification after every completed daily report. Action-required notifications must identify:
+
+- Nexproof.
+- Severity.
+- Short failure area.
+- Whether repair approval is requested.
+- The incident task title.
+
+Example notification text:
+
+`Nexproof needs your approval: the production upload reached processing but never became ready. Open NEXX-UPLOAD-2026-09-01-01 in Codex.`
+
+### 38.2 Notification prerequisites
+
+Setup must verify:
+
+- Codex notifications are not muted for the automation.
+- Windows permits notifications from Codex.
+- The persistent daily task is visible and not archived.
+- The local host is available for the scheduled heartbeat.
+- GitHub authentication can read Actions runs, artifacts, issues, commits, and deployments.
+
+If any prerequisite fails, report `NOT_CONFIGURED`; do not silently assume notifications are working.
+
+### 38.3 Secondary alert paths
+
+The existing `E2E_ALERT_WEBHOOK` remains the immediate GitHub-side failure path. GitHub issues remain the durable engineering backstop. The webhook may target a service such as email, Slack, Teams, or another owner-approved destination, but its destination must be documented during deployment.
+
+The absence of a configured webhook must be visible in the Codex daily report. A skipped webhook is `DEGRADED` for alerting even if the browser test itself passes.
+
+### 38.4 Notification deduplication
+
+- One normal notification per completed scheduled report.
+- One action-required notification when an incident first enters `AWAITING_OWNER_APPROVAL`.
+- One reminder after 24 hours if a critical or high incident is still awaiting approval.
+- No more than one reminder per 24 hours per incident.
+- Immediate notification for new evidence that materially increases severity or confirms customer impact.
+- A final notification when a repair PR is ready or an incident is resolved.
+
+## 39. Incident classification and approval state machine
+
+### 39.1 States
+
+```text
+DETECTED
+  -> TRIAGING_READ_ONLY
+  -> DISMISSED_TRANSIENT
+  -> AWAITING_OWNER_APPROVAL
+      -> REPAIR_DECLINED
+      -> INVESTIGATE_MORE
+      -> APPROVED_FOR_REPAIR
+          -> REPAIR_IN_PROGRESS
+          -> VERIFICATION_FAILED
+          -> PR_READY
+          -> RESOLVED
+```
+
+### 39.2 When to create an incident task
+
+Create or update an incident task when any of the following is true:
+
+- A daily customer journey fails after its configured test retry.
+- A release smoke test fails.
+- A security or cross-user isolation assertion fails once.
+- Cleanup fails or synthetic artifacts remain beyond policy.
+- The expected scheduled run is missing.
+- Required secrets, robot identities, or permissions are missing.
+- The same infrastructure failure occurs on two consecutive scheduled runs.
+- A performance budget is exceeded for the configured consecutive-run threshold.
+- The webhook or Codex reporting path repeatedly fails.
+
+### 39.3 Valid approval
+
+Approval must be explicit and incident-scoped. Valid examples include:
+
+- `Approve repair for NEXX-UPLOAD-2026-09-01-01 as proposed.`
+- `Approved, but only change the upload readiness logic and tests.`
+- `Proceed with the repair; do not touch authentication.`
+
+Invalid or insufficient examples include:
+
+- `Okay.`
+- `Look into it.`
+- `What do you think?`
+- `Can this be fixed?`
+- `Keep me updated.`
+
+When approval language is ambiguous, Codex must ask for explicit scope confirmation and remain in `AWAITING_OWNER_APPROVAL`.
+
+### 39.4 Approval record
+
+The incident task must record:
+
+- Incident ID.
+- Approving user.
+- Approval timestamp in `America/Chicago` and UTC.
+- Exact approved scope.
+- Explicit exclusions.
+- Planned branch name.
+- Planned verification commands or suites.
+- Whether PR creation is included.
+- Whether merge or deployment is authorized; default is no.
+
+## 40. Allowed actions before repair approval
+
+Before approval, Codex may:
+
+- Read GitHub Actions status, sanitized logs, and artifacts.
+- Read source code, configuration, commit history, and diffs.
+- Inspect open GitHub issues and recent deployment state.
+- Compare failed and last-successful runs.
+- Reproduce in a non-mutating local or isolated diagnostic environment.
+- Run existing tests that do not modify tracked files or production.
+- Dispatch at most one safe confirmation run when needed to classify a transient result.
+- Verify that synthetic cleanup completed.
+- Prepare a proposed repair plan, affected-file list, tests, risks, and rollback plan.
+- Create or update the Codex incident task and GitHub alert.
+
+Before approval, Codex must not:
+
+- Edit tracked source, test, workflow, or configuration files.
+- Create a repair commit or push a repair branch.
+- Open a repair pull request.
+- Change secrets, robot credentials, environment variables, domains, or permissions.
+- Modify production or customer data.
+- Merge, deploy, promote, or roll back a release.
+- Close the GitHub alert as fixed.
+- Suppress, weaken, skip, or delete the failing test merely to obtain a pass.
+
+## 41. Repair workflow after approval
+
+### 41.1 Preparation
+
+After approval:
+
+1. Re-read the approval scope and current incident evidence.
+2. Fetch the latest repository default branch.
+3. Confirm the failure still applies to the current head commit.
+4. Create an isolated worktree and a branch prefixed `codex/`.
+5. Post the branch and planned verification in the incident task.
+
+### 41.2 Implementation
+
+- Make the smallest safe change that resolves the approved root cause.
+- Preserve unrelated owner changes.
+- Add or update regression coverage that fails before the fix and passes afterward when practical.
+- Do not broaden into unrelated refactors without new approval.
+- Provide concise progress updates in the incident task during long work.
+
+### 41.3 Verification
+
+Verification is proportional to risk and includes, as applicable:
+
+- Focused regression tests.
+- TypeScript check.
+- ESLint.
+- Production build.
+- Relevant Playwright project.
+- Safe preview browser journey.
+- Cleanup verification.
+- Security isolation checks.
+- Review of sanitized artifacts for secrets or customer information.
+
+### 41.4 Pull request
+
+When verification passes:
+
+- Commit only the approved repair and its tests.
+- Push the `codex/` branch.
+- Open a ready-for-review pull request against the repository default branch.
+- Link the incident, failed run, GitHub issue, verification evidence, and rollback notes.
+- Allow CodeRabbit’s normal automatic review process to run; do not manually trigger it unless requested.
+- Report the PR in both the incident task and persistent daily task.
+
+Creating a PR does not authorize merge or deployment. Those remain owner-controlled unless separately approved.
+
+### 41.5 Verification failure
+
+If the repair does not verify:
+
+- Stop before pushing a misleading or known-broken change.
+- Report which check failed and whether the failure is related.
+- Preserve evidence in the incident task.
+- Return to `INVESTIGATE_MORE` or request revised scope.
+- Do not weaken tests, bypass gates, or deploy an unverified repair.
+
+## 42. Correlation, deduplication, and audit trail
+
+### 42.1 Incident signature
+
+The stable incident signature is:
+
+`environment + lane + first-failed-phase + sanitized-failure-code + deployment-or-commit`
+
+The signature is used to deduplicate GitHub issues, Codex incident tasks, and notifications.
+
+### 42.2 Required cross-links
+
+Each actionable incident must maintain links to:
+
+- Persistent Codex daily report.
+- Codex incident task.
+- GitHub Actions run and attempt.
+- Sanitized structured summary.
+- GitHub alert issue.
+- Tested commit and deployment.
+- Last successful run.
+- Repair branch and PR when created.
+- Post-repair verification run.
+
+### 42.3 Owner decision history
+
+Do not erase prior decisions when an incident changes state. Record approvals, rejections, narrowed scope, reopened incidents, and superseding evidence as timestamped task updates.
+
+## 43. Failure handling for the reporting layer
+
+### 43.1 GitHub succeeds but Codex cannot report
+
+The GitHub workflow remains authoritative. The GitHub issue and webhook provide fallback visibility for failures. On its next successful heartbeat, Codex posts a catch-up report clearly labeled `LATE DELIVERY` with the original run time.
+
+### 43.2 Codex runs but GitHub cannot be reached
+
+Codex posts `DEGRADED — GITHUB UNAVAILABLE`, includes the last known successful run, and does not infer current product health. It retries at the next configured interval without creating repeated incident tasks.
+
+### 43.3 Artifact is missing
+
+Codex uses workflow conclusion and sanitized job metadata but marks confidence low. If the workflow failed before reporter initialization, the absence of the artifact is expected evidence of a setup-stage failure. If the workflow passed without the required artifact, classify reporting as degraded and create an incident after two consecutive occurrences.
+
+### 43.4 Task creation fails
+
+Post the full approval request in the persistent daily task, notify the owner, and mark `INCIDENT_TASK_CREATION_FAILED`. Never begin repair merely because the dedicated task could not be created.
+
+### 43.5 Notification delivery cannot be verified
+
+The daily report must display `NOTIFICATION DELIVERY UNVERIFIED`. The report itself remains available in the persistent task, while GitHub issue and webhook routes remain active.
+
+## 44. Security and privacy controls for Codex operations
+
+- Codex reads only sanitized browser evidence by default.
+- Authentication tokens, cookies, upload tickets, signed URLs, webhook URLs, and secret values must never be copied into a task message.
+- Task messages must not include robot email addresses when a stable synthetic identity label is sufficient.
+- Unexpected customer data causes immediate stop, artifact suppression, critical notification, and security incident creation.
+- Codex must not download raw uploaded documents from production.
+- GitHub authentication must use the least privilege needed to read Actions, artifacts, issues, commits, and deployments; write access is needed only for explicitly approved repair branches and PRs.
+- Approval tasks must not include secrets in prompts, titles, summaries, or links.
+- The reporting cursor stores identifiers and status only, not secret-bearing logs.
+- Local diagnostic output containing unexpected sensitive information must not be pasted into Codex reports.
+
+## 45. Implementation components for the Codex extension
+
+### 45.1 Required setup actions
+
+1. Confirm PR #242 files are present on `main`.
+2. Verify GitHub scheduled workflows are enabled.
+3. Configure and validate required Production and preview secrets.
+4. Configure `E2E_ALERT_WEBHOOK` or explicitly document its deferred destination.
+5. Correct the GitHub schedule to be `America/Chicago` and DST aware.
+6. Create the persistent Codex project task `Nexproof Daily System Check`.
+7. Attach the daily heartbeat automation to that task.
+8. Keep normal Codex notifications enabled and verify Windows notification permissions.
+9. Authenticate Codex’s local environment to read the Nexproof GitHub repository and Actions artifacts.
+10. Run a manual healthy workflow and confirm a healthy report arrives.
+11. Run a controlled, non-production failed workflow and confirm incident-task creation and notification.
+12. Verify that no file changes occur before approval.
+13. Approve a test incident in a safe branch and validate the full repair-to-PR path.
+
+### 45.2 Optional repository helper
+
+A small read-only reporting helper may be added under `scripts/` to normalize GitHub run metadata and the sanitized Playwright summary for Codex. If added, it must:
+
+- Accept a run ID or discover the latest expected scheduled run.
+- Output a versioned JSON schema.
+- Never print secrets.
+- Fail closed on unexpected artifact content.
+- Include local-time conversion using `America/Chicago`.
+- Distinguish no run, running, completed, cancelled, skipped, and inaccessible states.
+- Remain read-only and usable without repository write permission.
+
+### 45.3 Recommended machine-readable Codex report schema
+
+```json
+{
+  "schemaVersion": 1,
+  "reportType": "daily",
+  "operatingState": "OPERATING",
+  "severity": "none",
+  "localDate": "2026-09-01",
+  "timeZone": "America/Chicago",
+  "workflowRunId": "123456789",
+  "attempt": 1,
+  "lane": "daily",
+  "commit": "abcdef1",
+  "matchesMain": true,
+  "conclusion": "success",
+  "cleanupStatus": "passed",
+  "customerImpact": "none_observed",
+  "confidence": "high",
+  "incidentId": null,
+  "approvalState": "not_required"
+}
+```
+
+## 46. Rollout plan for the Codex extension
+
+### Phase A: Reconcile and configure
+
+- Update the working checkout from merged `main` without overwriting unrelated local work.
+- Verify PR #242 files and GitHub environments.
+- Correct the local-time schedule.
+- Configure alerting and robot credentials.
+
+Exit criteria:
+
+- Manual daily and weekly dispatches start successfully.
+- Sanitized summary artifacts are produced.
+- GitHub failure issue and webhook paths are verified.
+
+### Phase B: Daily task and healthy reporting
+
+- Create the persistent Codex daily task.
+- Attach the heartbeat automation.
+- Implement run discovery, cursoring, and healthy reports.
+- Enable direct Codex notifications.
+
+Exit criteria:
+
+- Seven consecutive daily runs produce exactly one report each.
+- No report duplicates occur.
+- A missed-run simulation produces `NO_RECENT_RUN`.
+
+### Phase C: Incident and approval gate
+
+- Implement incident signature and dedicated task creation.
+- Implement approval state persistence.
+- Enforce no-edit-before-approval behavior.
+- Test rejection, narrowed approval, and ambiguous approval.
+
+Exit criteria:
+
+- Controlled failure creates exactly one incident task.
+- Codex notifies the owner.
+- Repository tracked files remain unchanged until explicit approval.
+- Repeated evidence updates the same incident.
+
+### Phase D: Approved repair workflow
+
+- Implement isolated worktree/branch creation after approval.
+- Implement verification and ready-for-review PR handoff.
+- Link all evidence and owner decisions.
+
+Exit criteria:
+
+- A safe seeded defect completes the approved repair flow.
+- The generated PR targets the default branch and is not a draft.
+- Nothing is merged or deployed without separate authorization.
+
+### Phase E: Reliability calibration
+
+- Observe 30 days of daily reports.
+- Measure notification delivery, late runs, false incidents, duplicate incidents, and approval-gate compliance.
+- Tune thresholds without reducing functional or security coverage.
+
+Exit criteria:
+
+- 100% of scheduled dates have a report or explicit missed-run report.
+- 100% of actionable incidents have an approval record before first tracked-file modification.
+- 100% of repair PRs link to their incident and verification evidence.
+
+## 47. Acceptance tests for owner-facing operations
+
+### 47.1 Healthy day
+
+- GitHub daily run passes.
+- Codex posts one healthy report by the delivery target.
+- Owner receives a Codex notification.
+- No incident task is created.
+- Report links resolve and cleanup is confirmed.
+
+### 47.2 Confirmed product failure
+
+- GitHub run fails after retry with a product assertion.
+- GitHub issue is created or updated.
+- Codex posts an approval-needed report.
+- Owner receives a direct notification.
+- Exactly one incident task is created.
+- Codex performs read-only diagnosis and proposes a repair.
+- No tracked file changes before approval.
+
+### 47.3 Owner approves repair
+
+- Approval is recorded with scope.
+- Codex creates an isolated `codex/` branch or worktree.
+- Repair and regression coverage are implemented.
+- Verification evidence is posted.
+- A ready-for-review PR targets the default branch.
+- The system does not merge or deploy automatically.
+
+### 47.4 Owner declines repair
+
+- Incident becomes `REPAIR_DECLINED`.
+- No repair branch or PR is created.
+- Monitoring continues.
+- A later materially different failure can create a new incident.
+
+### 47.5 Ambiguous approval
+
+- Owner replies with an ambiguous phrase such as “okay.”
+- Codex asks for explicit incident-scoped approval.
+- No tracked file is changed.
+
+### 47.6 Missing GitHub run
+
+- No expected scheduled run exists.
+- Codex reports `NO_RECENT_RUN` instead of healthy or failed product status.
+- Incident task and owner notification are created.
+- Diagnosis distinguishes disabled schedule, access failure, and missing workflow.
+
+### 47.7 Notification path failure
+
+- Webhook is absent or fails.
+- Codex report shows alerting degradation.
+- GitHub issue and Codex notification continue when available.
+- Product test result remains separately stated.
+
+### 47.8 Duplicate failure
+
+- The same incident signature recurs.
+- Existing GitHub issue and Codex incident task are updated.
+- No duplicate task is created.
+- Notification frequency follows the deduplication policy.
+
+### 47.9 Security failure
+
+- Cross-user isolation test fails in a controlled non-production validation.
+- Codex creates a critical incident and notifies immediately.
+- Evidence is sanitized.
+- No automatic repair, merge, deployment, or production mutation occurs.
+
+### 47.10 Daylight-saving transition
+
+- Tests simulate dates in CST and CDT.
+- GitHub daily run starts once at 5:30 AM local on both dates.
+- Codex report starts once at 6:00 AM local on both dates.
+- No duplicate run or false missed-run report is produced during a DST transition.
+
+## 48. Owner playbook
+
+### 48.1 Normal daily use
+
+Open `Nexproof Daily System Check` in Codex to see the latest result. No response is required for a healthy report.
+
+### 48.2 When approval is requested
+
+Open the linked incident task and choose one of four responses:
+
+1. Approve the proposed repair.
+2. Approve with a narrower scope or exclusions.
+3. Ask for more read-only investigation.
+4. Decline repair and continue monitoring.
+
+### 48.3 If the owner replies in the daily task
+
+Codex may accept an explicit incident-scoped approval in the daily task, but it must copy the approval record into the corresponding incident task before editing code. Ambiguous comments remain non-approval.
+
+### 48.4 If the owner does not respond
+
+The system continues monitoring and may send bounded reminders. It does not repair, merge, deploy, or close the incident on the owner’s behalf.
+
+## 49. Owner-facing examples
+
+### 49.1 Healthy report example
+
+```text
+✅ NEXXPROOF DAILY CHECK — HEALTHY
+
+The production customer upload path passed today at 5:42 AM Central. The robot signed in, uploaded the synthetic PDF, waited for processing, attached it to chat, and removed all synthetic data.
+
+Tested: main at abcdef1
+Result: 5 passed, 0 failed, 0 skipped
+Cleanup: passed
+Customer impact: none observed
+Confidence: high
+
+Next check: tomorrow at 5:30 AM Central.
+```
+
+### 49.2 Approval-needed report example
+
+```text
+🚨 NEXXPROOF DAILY CHECK — APPROVAL NEEDED
+
+The upload completed, but the document never became ready for chat in two attempts. The backend storage check remained healthy, so the evidence currently points to processing or browser readiness rather than a full storage outage.
+
+Customer impact: possible — users may see completed uploads that remain unavailable
+Confidence: medium
+Cleanup: passed
+Incident: NEXX-UPLOAD-2026-09-01-01
+Repair status: waiting for your approval; no code has been changed
+
+Open the linked incident task to review the evidence and proposed repair.
+```
+
+### 49.3 Incident approval request example
+
+```text
+I traced the failure to the readiness transition after document processing. I have not changed any code.
+
+Proposed repair scope:
+- readiness-state handling in the upload composer
+- one regression test for the failed transition
+- the focused production browser journey
+
+Risks: a broad readiness change could enable send too early, so the repair will preserve the existing complete-document gate.
+
+Reply “Approve repair for NEXX-UPLOAD-2026-09-01-01” to authorize this scope, or tell me what to narrow. Merge and deployment will still require separate authorization.
+```
+
+## 50. Expanded definition of done
+
+The complete browser-assurance and owner-operations feature is done only when:
+
+- PR #242 functionality is present on the repository default branch.
+- Scheduled GitHub runs occur at the specified `America/Chicago` local times across DST changes.
+- Required GitHub secrets, robot identities, environments, Actions permissions, and alert routes are configured.
+- The persistent Codex task `Nexproof Daily System Check` exists.
+- A heartbeat automation posts every expected report into that task.
+- The owner receives direct Codex notifications.
+- Missing or late runs are reported, not silently ignored.
+- Healthy reports include cleanup and commit confirmation.
+- Actionable failures create exactly one deduplicated incident task.
+- Incident tasks contain evidence, impact, confidence, proposed repair, tests, risk, and rollback information.
+- No tracked file is changed before explicit incident-scoped approval.
+- Approved repairs use isolated `codex/` branches or worktrees.
+- Repair PRs are ready for review, target the default branch, and include verification evidence.
+- No repair PR is merged or deployed without separate authorization.
+- GitHub, Codex, and webhook failures each have a visible fallback path.
+- The owner can converse naturally in the daily task and incident tasks without needing to inspect raw CI logs.
+- Audit history preserves every report, incident, approval decision, repair, and resolution link.
+
+Until these owner-facing requirements are satisfied, the browser robot may be technically running, but the complete daily monitoring teammate described by this specification is not operationally complete.

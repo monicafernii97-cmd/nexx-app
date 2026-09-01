@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 const token = process.env.GITHUB_TOKEN?.trim();
 const repository = process.env.GITHUB_REPOSITORY?.trim();
 if (!token || !repository)
@@ -7,13 +9,26 @@ const [owner, repo] = repository.split("/");
 const lane = process.env.E2E_LANE ?? "unknown";
 const title = `[Upload E2E] ${lane} browser assurance failure`;
 const runUrl = `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${repository}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+let operations = null;
+try {
+  operations = JSON.parse(
+    fs.readFileSync("playwright-report/upload-e2e-operations.json", "utf8"),
+  );
+} catch {
+  // A legacy run may fail before an operations envelope can be created.
+}
 const body = [
   `The ${lane} chat-upload browser assurance workflow failed.`,
   "",
   `Run: ${runUrl}`,
   `Commit: ${process.env.GITHUB_SHA ?? "unknown"}`,
+  `Failure code: ${operations?.failureCode ?? "unknown"}`,
+  `Last successful phase: ${operations?.lastSuccessfulPhase ?? "unknown"}`,
+  `Cleanup: ${operations?.cleanupStatus ?? "unknown"}`,
+  `Customer impact: ${operations?.customerImpact ?? "not yet classified"}`,
   "",
-  "Use the upload E2E runbook. Confirm cleanup before closing this alert.",
+  "Runbook: https://github.com/monicafernii97-cmd/nexx-app/blob/main/docs/CHAT_UPLOAD_E2E_CODEX_OPERATIONS_RUNBOOK.md",
+  "Confirm cleanup before closing this alert.",
 ].join("\n");
 const headers = {
   Authorization: `Bearer ${token}`,

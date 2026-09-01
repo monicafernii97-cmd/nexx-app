@@ -3,6 +3,7 @@ name: Chat Upload — Staging Resilience Assurance
 on:
   schedule:
     - cron: "15 3 1 * *"
+      timezone: "America/Chicago"
   workflow_dispatch:
 
 concurrency:
@@ -35,7 +36,7 @@ jobs:
       - name: Deploy isolated staging build
         shell: bash
         run: |
-          deployment_url="$(npx vercel@53.4.0 deploy --yes --token "$VERCEL_TOKEN")"
+          deployment_url="$(npx vercel@59.11.0 deploy --yes --token "$VERCEL_TOKEN")"
           if [[ "$deployment_url" != https://*.vercel.app ]]; then
             echo "Vercel did not return a safe staging deployment URL." >&2
             exit 1
@@ -47,12 +48,20 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run interruption and resumable recovery suite
         run: npm run test:e2e:upload:resilience
+      - name: Build owner-facing operations envelope
+        if: always()
+        env:
+          E2E_JOB_STATUS: ${{ job.status }}
+          E2E_ALERT_WEBHOOK_CONFIGURED: ${{ secrets.E2E_ALERT_WEBHOOK != '' }}
+        run: node scripts/build-upload-e2e-operations-envelope.mjs
       - name: Upload sanitized browser evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: chat-upload-resilience-${{ github.run_id }}
-          path: playwright-report/upload-e2e-summary.json
+          path: |
+            playwright-report/upload-e2e-summary.json
+            playwright-report/upload-e2e-operations.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Notify on failure

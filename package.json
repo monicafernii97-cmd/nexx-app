@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint",
     "check:env": "node scripts/check-convex-env.mjs development",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:ops-monitor",
+    "test:ops-monitor": "node --test scripts/__tests__/*.test.mjs",
     "test:e2e:upload:pr": "playwright test --project=upload-pr",
     "test:e2e:upload:release": "playwright test --project=upload-release",
     "test:e2e:upload:daily": "playwright test --project=upload-production",
@@ -18,7 +19,8 @@
     "test:e2e:upload:resilience": "playwright test --project=upload-resilience",
     "test:e2e:upload:cleanup": "playwright test --project=upload-cleanup",
     "test:e2e:upload:list": "playwright test --list",
-    "e2e:fixtures": "node scripts/generate-upload-e2e-fixtures.mjs"
+    "e2e:fixtures": "node scripts/generate-upload-e2e-fixtures.mjs",
+    "e2e:report:daily": "node scripts/report-upload-e2e-status.mjs --lane daily --format markdown"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",

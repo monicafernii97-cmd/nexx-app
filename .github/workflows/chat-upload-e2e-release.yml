@@ -16,7 +16,9 @@ jobs:
   upload-release:
     if: >-
       github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Production'
+      github.event.deployment.environment == 'Production' &&
+      github.event.deployment.creator.login == 'vercel[bot]' &&
+      github.event.deployment.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: Production
@@ -39,12 +41,20 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run release upload journey
         run: npm run test:e2e:upload:release
+      - name: Build owner-facing operations envelope
+        if: always()
+        env:
+          E2E_JOB_STATUS: ${{ job.status }}
+          E2E_ALERT_WEBHOOK_CONFIGURED: ${{ secrets.E2E_ALERT_WEBHOOK != '' }}
+        run: node scripts/build-upload-e2e-operations-envelope.mjs
       - name: Upload sanitized browser evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: chat-upload-release-${{ github.run_id }}
-          path: playwright-report/upload-e2e-summary.json
+          path: |
+            playwright-report/upload-e2e-summary.json
+            playwright-report/upload-e2e-operations.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Notify on failure

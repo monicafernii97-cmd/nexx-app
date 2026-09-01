@@ -63,7 +63,7 @@ test("release assurance cannot loop on GitHub environment deployments", () => {
     source,
     /github\.event\.deployment\.creator\.login == 'vercel\[bot\]'/,
   );
-  assert.match(
+  assert.doesNotMatch(
     source,
     /github\.event\.deployment\.ref == github\.event\.repository\.default_branch/,
   );

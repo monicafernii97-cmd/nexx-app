@@ -46,7 +46,7 @@ Do not infer health from an old run, an unmerged branch, or the presence of work
 
 GitHub schedule entries declare `timezone: "America/Chicago"`. Jitter of up to five minutes occurs after the scheduled trigger.
 
-Release assurance accepts only a successful `Production` deployment created by `vercel[bot]` for the repository default branch. GitHub Actions jobs that merely use the `Production` environment must not trigger release assurance; without this guard, the release job's own environment deployment can create a loop.
+Release assurance accepts only a successful `Production` deployment created by `vercel[bot]`. Vercel's production event can identify the deployed revision with a commit SHA in `deployment.ref`, so that field must not be compared with the default branch name. GitHub Actions jobs that merely use the `Production` environment have a different creator and must not trigger release assurance; without the creator guard, the release job's own environment deployment can create a loop.
 
 ## 4. Required GitHub configuration
 

@@ -17,8 +17,7 @@ jobs:
     if: >-
       github.event.deployment_status.state == 'success' &&
       github.event.deployment.environment == 'Production' &&
-      github.event.deployment.creator.login == 'vercel[bot]' &&
-      github.event.deployment.ref == github.event.repository.default_branch
+      github.event.deployment.creator.login == 'vercel[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: Production

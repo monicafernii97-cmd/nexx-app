@@ -53,3 +53,18 @@ test("resilience deployment pins the validated Vercel CLI", () => {
   assert.match(source, /npx vercel@59\.11\.0 deploy/);
   assert.doesNotMatch(source, /vercel@(?:latest|53\.4\.0)/);
 });
+
+test("release assurance cannot loop on GitHub environment deployments", () => {
+  const source = fs.readFileSync(
+    path.join(workflowDir, "chat-upload-e2e-release.yml"),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /github\.event\.deployment\.creator\.login == 'vercel\[bot\]'/,
+  );
+  assert.match(
+    source,
+    /github\.event\.deployment\.ref == github\.event\.repository\.default_branch/,
+  );
+});

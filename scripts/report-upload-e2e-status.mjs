@@ -320,7 +320,12 @@ async function main() {
   }
   const candidates = [];
   for (const run of runs) {
-    if (run.event !== "schedule" && run.event !== "workflow_dispatch") continue;
+    if (
+      !requestedRunId &&
+      run.event !== "schedule" &&
+      run.event !== "workflow_dispatch"
+    )
+      continue;
     const jobs = run.jobs ?? getRunJobs(repository, run.databaseId);
     const job = jobForLane(jobs, lane, { includeSkipped: Boolean(requestedRunId) });
     if (!job) continue;

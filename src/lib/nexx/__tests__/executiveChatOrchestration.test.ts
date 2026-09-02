@@ -135,6 +135,18 @@ describe('executive chat turn understanding', () => {
     expect(transition.kind).toBe('clarify');
   });
 
+  it('plans a clarification whenever ambiguity is material even if focus is safely retained', () => {
+    const state = control();
+    const understanding = understandTurn({ message: 'which', controlState: state });
+    const plan = buildExecutionPlan({
+      message: 'which', understanding,
+      transition: { kind: 'retain', reasonCodes: ['uncertain_preserves_focus'] },
+      taskId, focusRevision: 3, routeMode: 'document_analysis', activeDocumentIds: [orderId],
+    });
+    expect(understanding.ambiguityMaterial).toBe(true);
+    expect(plan.responseAct).toBe('clarify');
+  });
+
   it('allows an explicit topic switch to replace focus while retaining previous task identity', () => {
     const state = control();
     const message = 'Switch topics: help me prepare for mediation';
@@ -262,6 +274,15 @@ describe('hard response publication contract', () => {
     expect(content).toContain('full-document review');
     expect(pending.pendingAct).toBe('select');
     expect(pending.options).toHaveLength(2);
+  });
+
+  it('prioritizes a safe clarification over stale grounded text during ambiguity repair', () => {
+    const content = buildPublicationRepairContent({
+      errors: ['RESP_UNRESOLVED_REFERENT'], questionKind: 'confirmation',
+      supported: 'Stale provider answer that assumes a choice.', stage: 'clarification',
+    });
+    expect(content).toMatch(/^Which part/);
+    expect(content).not.toContain('Stale provider answer');
   });
 
   it('maps provider-safe source aliases back to authorized canonical chunk IDs', () => {

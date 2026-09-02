@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyExecutiveChatRelease } from '../lib/executive-chat-release.mjs';
+import fs from 'node:fs';
 
 const base = {
   environment: 'production', gitSha: 'abcdef1234567', schemaVersion: '1.0.0',
@@ -19,3 +20,8 @@ test('deployment drift blocks promotion', () => {
   assert.ok(result.reasonCodes.includes('git_sha_mismatch'));
 });
 
+test('preview deployment can omit the production-only release secret', () => {
+  const script = fs.readFileSync(new URL('../publish-executive-chat-release.mjs', import.meta.url), 'utf8');
+  assert.match(script, /VERCEL_ENV !== 'production'/);
+  assert.match(script, /Preview manifest skipped/);
+});

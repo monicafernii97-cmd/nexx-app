@@ -12,6 +12,8 @@ Required protected environment values:
 
 Manifest endpoints and mutations never return credentials or document content. Rotate `VERIFICATION_SECRET` if it appears in logs or is otherwise exposed.
 
+The production build's Convex-manifest publication is deliberately bootstrap-safe. If the shared secret or newly introduced manifest mutation is not available yet, the build records a warning and continues so the additive backend and web code can deploy. This does not approve the release: the post-deployment production assurance workflow publishes both manifests again and fails closed unless the protected endpoint, shared secret, release pair, and every compatibility field agree.
+
 ## Rollout order
 
 1. Deploy additive schema and code with semantic arbitration disabled.
@@ -35,4 +37,3 @@ After rollback, confirm:
 2. No active manifest claims incompatible web/backend versions.
 3. Existing conversations and uploaded documents remain available.
 4. Redacted decision timelines contain no raw document text or credentials.
-

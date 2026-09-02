@@ -17,6 +17,10 @@ if (runtime === 'convex' && process.env.VERCEL_ENV !== 'production') {
   process.stdout.write('[executive-chat-release] Preview manifest skipped; production manifests are published only from the production deployment pair.\n');
   process.exit(0);
 }
+if (!secret && runtime === 'convex') {
+  process.stderr.write('[executive-chat-release] Convex manifest publication deferred; the production assurance job will enforce registration and compatibility after deployment.\n');
+  process.exit(0);
+}
 if (!secret) throw new Error('release_manifest_secret_missing');
 const contract = JSON.parse(fs.readFileSync(new URL('../config/executive-chat-release-contract.json', import.meta.url), 'utf8'));
 
@@ -57,10 +61,16 @@ const normalized = {
   deployedAt: Date.now(),
 };
 delete normalized.convexUrl;
-await client.mutation(anyApi.releaseManifest.upsertFromRelease, { secret, ...normalized });
-const compatibility = await client.query(anyApi.releaseManifest.getCompatibilityForRelease, {
-  secret,
-  environment: normalized.environment,
-});
-process.stdout.write(`${JSON.stringify({ runtime, environment: normalized.environment, compatible: compatibility.compatible, reasonCodes: compatibility.reasonCodes })}\n`);
-if (runtime === 'web' && !compatibility.compatible) process.exitCode = 1;
+try {
+  await client.mutation(anyApi.releaseManifest.upsertFromRelease, { secret, ...normalized });
+  const compatibility = await client.query(anyApi.releaseManifest.getCompatibilityForRelease, {
+    secret,
+    environment: normalized.environment,
+  });
+  process.stdout.write(`${JSON.stringify({ runtime, environment: normalized.environment, compatible: compatibility.compatible, reasonCodes: compatibility.reasonCodes })}\n`);
+  if (runtime === 'web' && !compatibility.compatible) process.exitCode = 1;
+} catch (error) {
+  if (runtime !== 'convex') throw error;
+  const reason = error instanceof Error ? error.message.split('\n', 1)[0] : 'unknown_error';
+  process.stderr.write(`[executive-chat-release] Convex manifest publication deferred (${reason}); the production assurance job remains fail-closed.\n`);
+}

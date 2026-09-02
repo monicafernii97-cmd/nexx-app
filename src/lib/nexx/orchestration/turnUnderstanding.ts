@@ -79,7 +79,12 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
   const optionAmbiguous = resolved.optionCandidates.length > 1 &&
     resolved.optionCandidates[0].score - resolved.optionCandidates[1].score < 0.18;
   const taskAmbiguous = Boolean(topTask && secondTask && topTask.score - secondTask.score < 0.18 && topTask.score >= 0.5);
-  const ambiguityMaterial = resolved.unresolvedFragment || optionAmbiguous || taskAmbiguous || (speechAct === 'unknown' && hasContext);
+  const confirmationResolved = speechAct === 'confirm' && Boolean(
+    input.controlState?.lastAssistantOffer || input.controlState?.pendingOptions.length === 1
+  );
+  const ambiguityMaterial = !confirmationResolved && (
+    resolved.unresolvedFragment || optionAmbiguous || taskAmbiguous || (speechAct === 'unknown' && hasContext)
+  );
 
   const reasonCodes = [
     `speech_act_${speechAct}`,
@@ -88,6 +93,7 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     ...(resolved.unresolvedFragment ? ['unresolved_referential_fragment'] : []),
     ...(optionAmbiguous ? ['ambiguous_pending_options'] : []),
     ...(taskAmbiguous ? ['ambiguous_tasks'] : []),
+    ...(confirmationResolved ? ['confirmation_resolved_by_pending_offer'] : []),
   ];
 
   return {

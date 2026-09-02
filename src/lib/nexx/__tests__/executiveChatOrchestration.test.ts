@@ -7,7 +7,7 @@ import type { ConversationControlSnapshot, PendingOption } from '../orchestratio
 import { understandTurn } from '../orchestration/turnUnderstanding';
 import { verifyResponseClaims } from '../response/claimVerifier';
 import { mintPublicationEnvelope, serializePublicationEnvelope, validatePersistedEnvelope } from '../response/publicationContract';
-import { decideRepair } from '../response/repairPolicy';
+import { buildPublicationRepairContent, decideRepair } from '../response/repairPolicy';
 import { buildCanonicalAnswerPlanV2, verifyCanonicalAnswerPlanV2 } from '../legal-engine/canonicalAnswerPlan';
 
 const orderId = 'order-1';
@@ -90,6 +90,26 @@ describe('executive chat turn understanding', () => {
     const transition = decideFocusTransition({ message, understanding, controlState: state });
     expect(understanding.speechAct).toBe('confirm');
     expect(transition).toMatchObject({ kind: 'refine', taskId });
+  });
+
+  it('lets a single pending offer resolve confirmation even when older tasks score similarly', () => {
+    const state = control({
+      pendingAct: 'confirm',
+      lastAssistantOffer: {
+        act: 'confirm', object: 'perform the focused review', targetTaskId: taskId, documentIds: [orderId],
+      },
+    });
+    const understanding = understandTurn({
+      message: 'please do so',
+      controlState: state,
+      activeTasks: [
+        { taskId, kind: 'document_review', status: 'active', goal: 'review order', normalizedGoal: 'review order', documentIds: [orderId], evidenceGenerationIds: [] },
+        { taskId: 'older-task', kind: 'document_review', status: 'waiting_user', goal: 'review order', normalizedGoal: 'review order', documentIds: [orderId], evidenceGenerationIds: [] },
+      ],
+    });
+    expect(understanding.speechAct).toBe('confirm');
+    expect(understanding.ambiguityMaterial).toBe(false);
+    expect(understanding.reasonCodes).toContain('confirmation_resolved_by_pending_offer');
   });
 
   it('selects a pending option by alias without losing its document', () => {
@@ -229,6 +249,20 @@ describe('hard response publication contract', () => {
     }],
   });
   const decision = canPerformOperation('answer_focused_question', snapshot);
+
+  it('turns a generic open-analysis answer into explicit persistent choices', () => {
+    const content = buildPublicationRepairContent({
+      errors: ['RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE'],
+      questionKind: 'open_analysis',
+      supported: 'This order contains the following relevant provisions.',
+      stage: 'deterministic_repair',
+    });
+    const pending = derivePendingInteraction({ content, taskId, documentIds: [orderId], focusRevision: 3 });
+    expect(content).toContain('focused review');
+    expect(content).toContain('full-document review');
+    expect(pending.pendingAct).toBe('select');
+    expect(pending.options).toHaveLength(2);
+  });
 
   it('maps provider-safe source aliases back to authorized canonical chunk IDs', () => {
     const canonical = buildCanonicalAnswerPlanV2({

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyExecutiveChatRelease } from '../lib/executive-chat-release.mjs';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const base = {
   environment: 'production', gitSha: 'abcdef1234567', schemaVersion: '1.0.0',
@@ -24,4 +25,27 @@ test('preview deployment can omit the production-only release secret', () => {
   const script = fs.readFileSync(new URL('../publish-executive-chat-release.mjs', import.meta.url), 'utf8');
   assert.match(script, /runtime === 'convex' && process\.env\.VERCEL_ENV !== 'production'/);
   assert.match(script, /production manifests are published only/);
+});
+
+test('production Convex bootstrap defers publication when the shared secret is absent', () => {
+  const result = spawnSync(process.execPath, ['scripts/publish-executive-chat-release.mjs', 'convex'], {
+    cwd: new URL('../..', import.meta.url),
+    env: { ...process.env, VERCEL_ENV: 'production', VERIFICATION_SECRET: '' },
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stderr, /manifest publication deferred/);
+  assert.match(result.stderr, /production assurance job/);
+});
+
+test('web assurance remains fail-closed when the shared secret is absent', () => {
+  const result = spawnSync(process.execPath, ['scripts/publish-executive-chat-release.mjs', 'web'], {
+    cwd: new URL('../..', import.meta.url),
+    env: { ...process.env, VERIFICATION_SECRET: '' },
+    encoding: 'utf8',
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /release_manifest_secret_missing/);
 });

@@ -35,6 +35,9 @@ jobs:
       - name: Run Tests
         run: npx vitest run --reporter=verbose
 
+      - name: Verify release compatibility contract tests
+        run: node --test scripts/__tests__/executive-chat-release.test.mjs
+
   lint:
     name: ESLint
     runs-on: ubuntu-latest

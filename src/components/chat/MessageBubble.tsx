@@ -848,13 +848,25 @@ export default function MessageBubble({
         ? (metadata as Record<string, unknown>).agenticOutcome as Record<string, unknown>
         : undefined;
     const agenticStatus = typeof agenticOutcome?.status === 'string' ? agenticOutcome.status : undefined;
+    const publication = metadata && typeof metadata === 'object' && !Array.isArray(metadata) &&
+        (metadata as Record<string, unknown>).publication &&
+        typeof (metadata as Record<string, unknown>).publication === 'object'
+        ? (metadata as Record<string, unknown>).publication as Record<string, unknown>
+        : undefined;
+    const publicationDecision = typeof publication?.decision === 'string' ? publication.decision : undefined;
     const outcomeLabel = agenticStatus === 'corrected'
         ? 'Correction'
         : agenticStatus === 'partial'
             ? 'Partial result'
             : agenticStatus === 'needs_input'
                 ? 'Needs one detail'
-                : undefined;
+                : publicationDecision === 'publish_scoped'
+                    ? 'Verified scoped answer'
+                    : publicationDecision === 'publish_limitation'
+                        ? 'Verified limitation'
+                        : publication?.verified === true
+                            ? 'Verified response'
+                            : undefined;
     const userAttachments = useMemo(() => getUserAttachments(metadata), [metadata]);
 
     useEffect(() => {

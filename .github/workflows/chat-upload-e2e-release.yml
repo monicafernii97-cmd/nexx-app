@@ -29,6 +29,7 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       VERCEL_DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+      VERIFICATION_SECRET: ${{ secrets.VERIFICATION_SECRET }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
@@ -40,6 +41,10 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run release upload journey
         run: npm run test:e2e:upload:release
+      - name: Run executive chat continuity journey
+        run: npm run test:e2e:executive-chat:release
+      - name: Register web release and block backend drift
+        run: node scripts/publish-executive-chat-release.mjs web
       - name: Build owner-facing operations envelope
         if: always()
         env:

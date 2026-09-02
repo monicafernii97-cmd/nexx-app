@@ -87,6 +87,25 @@ crons.interval(
 );
 
 crons.interval(
+  'run executive chat quality canary',
+  { minutes: 10 },
+  internal.chatQualityCanary.runExecutiveChatCanary,
+);
+
+crons.interval(
+  'audit executive chat quality canary',
+  { minutes: 5 },
+  internal.chatQualityCanary.auditExecutiveChatCanary,
+  {},
+);
+
+crons.daily(
+  'clean up executive chat quality canary runs',
+  { hourUTC: 6, minuteUTC: 40 },
+  internal.chatQualityCanary.cleanupOldRuns,
+);
+
+crons.interval(
   'clean up stale chat upload drafts',
   { minutes: 5 },
   internal.conversations.cleanupStaleUploadDrafts,

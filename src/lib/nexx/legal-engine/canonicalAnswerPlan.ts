@@ -1,6 +1,9 @@
 import type { LegalInterpretationAnswer } from './legalInterpretationSchema';
 import { buildLegalQuestionContract, type LegalQuestionContract } from './questionContract';
 import { responsePlanFromLegalInterpretation } from './responsePlan';
+import type { NexxAssistantResponse } from '../../types';
+import type { CapabilityDecision } from '../capabilities/types';
+import type { PendingOption, QuestionKind, TurnExecutionPlan } from '../orchestration/types';
 
 export type CanonicalLegalAnswerPlan = {
   version: 1;
@@ -62,4 +65,128 @@ export function canonicalAnswerPlanFromLegalInterpretation(
     } : null,
     materialLimitation: legacy.materialLimitation ?? null,
   };
+}
+
+export type CanonicalAnswerProposition = {
+  propositionId: string;
+  text: string;
+  kind: 'document_fact' | 'legal_inference' | 'general_guidance' | 'limitation';
+  evidenceIds: string[];
+  confidence: 'high' | 'medium' | 'low';
+};
+
+export type CanonicalAnswerPlanV2 = {
+  schemaVersion: 2;
+  planId: string;
+  taskId: string;
+  questionKind: QuestionKind;
+  directAnswer: string;
+  answerStatus: 'supported' | 'supported_scoped' | 'needs_clarification' | 'limited';
+  propositions: CanonicalAnswerProposition[];
+  controllingClauses: Array<{ label: string; sourceIds: string[] }>;
+  interactingClauses: Array<{ label: string; sourceIds: string[] }>;
+  scopeDisclosure?: string;
+  requiredTerms: string[];
+  prohibitedClaims: string[];
+  allowedNextActions: string[];
+  pendingOptions?: PendingOption[];
+};
+
+function compactProposition(value: string) {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 4_000);
+}
+
+function responseDirectAnswer(response: NexxAssistantResponse) {
+  return compactProposition(
+    response.legalInterpretation?.directAnswer ??
+    response.documentAnswer?.answer ??
+    response.message
+  );
+}
+
+export function buildCanonicalAnswerPlanV2(args: {
+  executionPlan: TurnExecutionPlan;
+  response: NexxAssistantResponse;
+  evidenceIds: string[];
+  capabilityDecision: CapabilityDecision;
+  pendingOptions?: PendingOption[];
+}): CanonicalAnswerPlanV2 {
+  const directAnswer = responseDirectAnswer(args.response);
+  const legal = args.response.legalInterpretation;
+  const evidenceIds = Array.from(new Set(args.evidenceIds));
+  const propositions: CanonicalAnswerProposition[] = [];
+  if (directAnswer) {
+    propositions.push({
+      propositionId: 'direct_answer',
+      text: directAnswer,
+      kind: evidenceIds.length > 0 ? 'document_fact' : 'general_guidance',
+      evidenceIds,
+      confidence: args.capabilityDecision.supportLevel === 'complete' ? 'high' : args.capabilityDecision.supportLevel === 'scoped' ? 'medium' : 'low',
+    });
+  }
+  for (const [index, clause] of (legal?.controllingClauses ?? []).entries()) {
+    const text = compactProposition(clause.quote || clause.label);
+    if (!text) continue;
+    propositions.push({
+      propositionId: `controlling_${index + 1}`,
+      text,
+      kind: 'document_fact',
+      evidenceIds: clause.sourceIds.length > 0 ? clause.sourceIds : evidenceIds,
+      confidence: 'high',
+    });
+  }
+  for (const [index, limitation] of args.capabilityDecision.userSafeLimitations.entries()) {
+    propositions.push({
+      propositionId: `limitation_${index + 1}`,
+      text: limitation.text,
+      kind: 'limitation',
+      evidenceIds: [],
+      confidence: 'high',
+    });
+  }
+  const answerStatus: CanonicalAnswerPlanV2['answerStatus'] = args.executionPlan.responseAct === 'clarify'
+    ? 'needs_clarification'
+    : !args.capabilityDecision.allowed
+      ? 'limited'
+      : args.capabilityDecision.supportLevel === 'complete'
+        ? 'supported'
+        : 'supported_scoped';
+  return {
+    schemaVersion: 2,
+    planId: args.executionPlan.planId,
+    taskId: args.executionPlan.taskId,
+    questionKind: args.executionPlan.questionKind,
+    directAnswer,
+    answerStatus,
+    propositions,
+    controllingClauses: (legal?.controllingClauses ?? []).map((clause) => ({ label: clause.label, sourceIds: clause.sourceIds })),
+    interactingClauses: (legal?.interactingClauses ?? []).map((clause) => ({ label: clause.label, sourceIds: clause.sourceIds })),
+    scopeDisclosure: args.capabilityDecision.supportLevel === 'scoped'
+      ? args.capabilityDecision.userSafeLimitations.find((item) => item.code === 'full_review_not_ready' || item.code === 'document_coverage_incomplete')?.text
+      : undefined,
+    requiredTerms: [],
+    prohibitedClaims: args.capabilityDecision.prohibitedClaims,
+    allowedNextActions: args.capabilityDecision.alternateOperations,
+    pendingOptions: args.pendingOptions,
+  };
+}
+
+export function verifyCanonicalAnswerPlanV2(args: {
+  plan: CanonicalAnswerPlanV2;
+  authorizedEvidenceIds: string[];
+}) {
+  const errors: string[] = [];
+  const allowed = new Set(args.authorizedEvidenceIds);
+  if (!args.plan.planId || !args.plan.taskId) errors.push('canonical_plan_linkage_missing');
+  if (!args.plan.directAnswer && !['needs_clarification', 'limited'].includes(args.plan.answerStatus)) errors.push('canonical_direct_answer_missing');
+  for (const proposition of args.plan.propositions) {
+    if (!proposition.text.trim()) errors.push(`canonical_proposition_empty:${proposition.propositionId}`);
+    if (proposition.kind === 'document_fact' && proposition.evidenceIds.length === 0) {
+      errors.push(`canonical_document_evidence_missing:${proposition.propositionId}`);
+    }
+    for (const evidenceId of proposition.evidenceIds) {
+      if (!allowed.has(evidenceId)) errors.push(`canonical_evidence_unauthorized:${proposition.propositionId}:${evidenceId}`);
+    }
+  }
+  return { passed: errors.length === 0, errors };
 }

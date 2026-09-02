@@ -58,6 +58,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "executive-chat-release",
+      testMatch: /executive-chat-continuity\.spec\.ts/,
+      dependencies: ["clerk-setup"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       name: "upload-production",
       testMatch: /upload-production\.spec\.ts/,
       dependencies: ["clerk-setup"],

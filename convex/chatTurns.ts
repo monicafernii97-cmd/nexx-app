@@ -61,6 +61,14 @@ import {
 } from './lib/chatRateLimitPolicy';
 import { normalizeReviewFlagMessage, requiresZdrForClassification, sanitizeAuditMetadata } from './lib/documentTelemetry';
 import { routeModeValidator } from './lib/routeModeValidator';
+import { loadConversationControlContext, persistTurnOrchestration } from './conversationControl';
+import { understandTurn } from '../src/lib/nexx/orchestration/turnUnderstanding';
+import {
+    PUBLICATION_VALIDATOR_VERSION,
+    validatePersistedEnvelope,
+    type PersistedPublicationEnvelope,
+} from '../src/lib/nexx/response/publicationContract';
+import { stableCapabilityHash } from '../src/lib/nexx/capabilities/documentCapabilityLedger';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -1204,7 +1212,7 @@ export const acceptChatTurn = mutation({
             }
         }
 
-        const [existingDocumentState, conversationSummary] = await Promise.all([
+        const [existingDocumentState, conversationSummary, recentConversationMessages, existingControlContext] = await Promise.all([
             ctx.db
                 .query('conversationDocumentState')
                 .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
@@ -1213,19 +1221,60 @@ export const acceptChatTurn = mutation({
                 .query('conversationSummaries')
                 .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
                 .first(),
+            ctx.db
+                .query('messages')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', args.conversationId))
+                .order('desc')
+                .take(12),
+            loadConversationControlContext(ctx, {
+                conversationId: args.conversationId,
+                userId: user._id,
+            }),
         ]);
         const hasActiveDocumentContext =
             validatedAttachments.length > 0 ||
-            Boolean(existingDocumentState?.activeUploadedFileId);
+            Boolean(existingDocumentState?.activeUploadedFileId) ||
+            Boolean(existingControlContext.controlState?.activeDocumentIds.length);
+        const preliminaryControl = existingControlContext.controlState
+            ? {
+                ...existingControlContext.controlState,
+                activeDocumentIds: Array.from(new Set([
+                    ...validatedAttachments.map((attachment) => attachment.uploadedFileId.toString()),
+                    ...existingControlContext.controlState.activeDocumentIds,
+                ])),
+            }
+            : undefined;
+        const preliminaryUnderstanding = understandTurn({
+            message: effectiveMessage,
+            controlState: preliminaryControl,
+            activeTasks: existingControlContext.tasks,
+            recentUserTurns: recentConversationMessages
+                .filter((message) => message.role === 'user')
+                .map((message) => ({ id: message._id.toString(), content: message.content })),
+            recentAssistantTurns: recentConversationMessages
+                .filter((message) => message.role === 'assistant')
+                .map((message) => ({ id: message._id.toString(), content: message.content })),
+            conversationSummary: conversationSummary?.summary,
+        });
+        const activeTaskIsDocument = preliminaryControl?.activeTaskKind === 'document_review' ||
+            preliminaryControl?.activeTaskKind === 'document_question';
+        const activeMode = activeTaskIsDocument
+            ? ('document_analysis' as const)
+            : conversation.routeMode as RouteMode | undefined;
         const contextualRoute = resolveTurnRoute({
             message: effectiveMessage,
             conversationSummary: conversationSummary?.summary,
-            activeMode: conversation.routeMode as RouteMode | undefined,
+            activeMode,
             hasActiveDocumentContext,
         });
+        const preservesDocumentTask = activeTaskIsDocument &&
+            preliminaryUnderstanding.continuity !== 'new_task' &&
+            preliminaryUnderstanding.speechAct !== 'switch_topic';
         const routeMode = args.routeMode === 'safety_escalation'
             ? args.routeMode
-            : contextualRoute.mode;
+            : preservesDocumentTask && contextualRoute.mode === 'adaptive_chat'
+                ? activeMode!
+                : contextualRoute.mode;
         const requestedTemperature = args.routeMode === routeMode ? args.temperature : undefined;
         const temperature = requestedTemperature !== undefined && Number.isFinite(requestedTemperature)
             ? Math.min(2, Math.max(0, requestedTemperature))
@@ -1261,6 +1310,34 @@ export const acceptChatTurn = mutation({
             userContextJson: args.userContextJson,
             attachmentRefsJson: validatedAttachments.length > 0 ? JSON.stringify(validatedAttachments) : undefined,
             createdAt: now,
+            updatedAt: now,
+        });
+
+        const activeDocumentIds = Array.from(new Set([
+            ...validatedAttachments.map((attachment) => attachment.uploadedFileId),
+            ...(existingDocumentState?.activeUploadedFileId ? [existingDocumentState.activeUploadedFileId] : []),
+        ]));
+        const orchestration = await persistTurnOrchestration(ctx, {
+            conversation,
+            userId: user._id,
+            turnId,
+            message: effectiveMessage,
+            routeMode,
+            attachmentDocumentIds: validatedAttachments.map((attachment) => attachment.uploadedFileId),
+            activeDocumentIds,
+            recentMessages: recentConversationMessages
+                .filter((message) => message.status !== 'deleted' && !message.supersededByMessageId && !message.supersededByTurnId)
+                .reverse()
+                .map((message) => ({ role: message.role, content: message.content })),
+            conversationSummary: conversationSummary?.summary,
+            now,
+        });
+        await ctx.db.patch(turnId, {
+            taskId: orchestration.taskId,
+            focusRevision: orchestration.focusRevision,
+            understandingId: orchestration.understandingId,
+            executionPlanId: orchestration.executionPlanId,
+            status: 'understanding_saved',
             updatedAt: now,
         });
 
@@ -1353,7 +1430,7 @@ export const acceptChatTurn = mutation({
         });
 
         await ctx.db.patch(turnId, {
-            status: shouldPersistUserMessage ? 'user_saved' : 'queued',
+            status: 'plan_saved',
             userMessageId,
             updatedAt: now,
         });
@@ -1362,7 +1439,6 @@ export const acceptChatTurn = mutation({
             nextTurnNumber: turnNumber + 1,
             lastMessageAt: now,
             messageCount: (conversation.messageCount ?? 0) + (shouldPersistUserMessage ? 1 : 0),
-            routeMode,
         });
 
         await insertChatAuditEvent(ctx, {
@@ -1379,6 +1455,11 @@ export const acceptChatTurn = mutation({
                 analysisMode,
                 attachmentCount: validatedAttachments.length,
                 persistedUserMessage: shouldPersistUserMessage,
+                taskId: orchestration.taskId,
+                focusRevision: orchestration.focusRevision,
+                speechAct: orchestration.understanding.speechAct,
+                continuity: orchestration.understanding.continuity,
+                transition: orchestration.transition.kind,
             },
         });
 
@@ -1389,7 +1470,7 @@ export const acceptChatTurn = mutation({
             duplicate: false,
             turnId,
             jobId,
-            status: shouldPersistUserMessage ? 'user_saved' : 'queued',
+            status: 'plan_saved',
             userMessageId: userMessageId ?? null,
             assistantMessageId: null,
         };
@@ -1520,7 +1601,17 @@ export const getGenerationContext = internalQuery({
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return null;
 
-        const [conversation, user, summaryDoc, caseGraphDoc, courtSettings, activeLegalIssueState] = await Promise.all([
+        const [
+            conversation,
+            user,
+            summaryDoc,
+            caseGraphDoc,
+            courtSettings,
+            activeLegalIssueState,
+            conversationControlState,
+            turnUnderstanding,
+            turnExecutionPlan,
+        ] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
             ctx.db
@@ -1539,6 +1630,18 @@ export const getGenerationContext = internalQuery({
                 .query('conversationLegalIssueState')
                 .withIndex('by_conversation_status', (q) => q.eq('conversationId', turn.conversationId).eq('status', 'focused'))
                 .order('desc')
+                .first(),
+            ctx.db
+                .query('conversationControlStates')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+                .first(),
+            ctx.db
+                .query('turnUnderstandings')
+                .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+                .first(),
+            ctx.db
+                .query('turnExecutionPlans')
+                .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
                 .first(),
         ]);
 
@@ -1867,6 +1970,9 @@ export const getGenerationContext = internalQuery({
             caseGraphDoc,
             conversationDocumentState: documentState,
             activeLegalIssueState,
+            conversationControlState,
+            turnUnderstanding,
+            turnExecutionPlan,
             documentAmbiguity,
             attachmentContexts,
             availableDocumentContexts,
@@ -2700,21 +2806,20 @@ export const redactLeakedAssistantMessages = internalMutation({
     },
 });
 
-/** Finalize a turn with a committed or degraded assistant message. */
-export const completeAssistant = internalMutation({
-    args: {
-        jobId: v.id('chatGenerationJobs'),
-        leaseOwner: v.string(),
-        content: v.string(),
-        artifactsJson: v.optional(v.string()),
-        providerResponseId: v.optional(v.string()),
-        degraded: v.optional(v.boolean()),
-        errorCode: v.optional(v.string()),
-        errorMessage: v.optional(v.string()),
-        errorRetryable: v.optional(v.boolean()),
-        metadataJson: v.optional(v.string()),
-    },
-    handler: async (ctx, args) => {
+type AssistantCompletionCoreArgs = {
+    jobId: Id<'chatGenerationJobs'>;
+    leaseOwner: string;
+    content: string;
+    artifactsJson?: string;
+    providerResponseId?: string;
+    degraded?: boolean;
+    errorCode?: string;
+    errorMessage?: string;
+    errorRetryable?: boolean;
+    metadataJson?: string;
+};
+
+async function completeAssistantCore(ctx: MutationCtx, args: AssistantCompletionCoreArgs) {
         const now = Date.now();
         const job = await ctx.db.get(args.jobId);
         if (!job || job.leaseOwner !== args.leaseOwner) return null;
@@ -2823,6 +2928,19 @@ export const completeAssistant = internalMutation({
             }
         }
 
+        if (turn.taskId) {
+            const task = await ctx.db.query('conversationTasks')
+                .withIndex('by_conversation_task', (q) => q.eq('conversationId', turn.conversationId).eq('taskId', turn.taskId!))
+                .first();
+            if (task && task.userId === turn.userId) {
+                await ctx.db.patch(task._id, {
+                    resultMessageId: assistantMessageId,
+                    latestTurnId: turn._id,
+                    updatedAt: now,
+                });
+            }
+        }
+
         const outcome = agenticOutcomeFromMetadata(metadata);
         const correction = outcome && outcome.correction && typeof outcome.correction === 'object' && !Array.isArray(outcome.correction)
             ? outcome.correction as Record<string, unknown>
@@ -2864,6 +2982,36 @@ export const completeAssistant = internalMutation({
                         supersededByMessageId: assistantMessageId,
                         updatedAt: now,
                     });
+                    const targetTurn = target.turnId ? await ctx.db.get(target.turnId) : null;
+                    if (targetTurn?.taskId) {
+                        const dependentTasks = (await Promise.all([
+                            ctx.db.query('conversationTasks')
+                                .withIndex('by_conversation_status', (q) => q.eq('conversationId', turn.conversationId).eq('status', 'active'))
+                                .collect(),
+                            ctx.db.query('conversationTasks')
+                                .withIndex('by_conversation_status', (q) => q.eq('conversationId', turn.conversationId).eq('status', 'waiting_user'))
+                                .collect(),
+                            ctx.db.query('conversationTasks')
+                                .withIndex('by_conversation_status', (q) => q.eq('conversationId', turn.conversationId).eq('status', 'waiting_system'))
+                                .collect(),
+                        ])).flat().filter((task) => task.parentTaskId === targetTurn.taskId);
+                        for (const dependentTask of dependentTasks) {
+                            await ctx.db.patch(dependentTask._id, { status: 'superseded', updatedAt: now });
+                            if (dependentTask.resultMessageId) {
+                                const dependentMessage = await ctx.db.get(dependentTask.resultMessageId);
+                                if (dependentMessage && dependentMessage.conversationId === turn.conversationId) {
+                                    await ctx.db.patch(dependentMessage._id, {
+                                        metadata: {
+                                            ...asMetadataObject(dependentMessage.metadata),
+                                            invalidatedByCorrectionTurnId: turn._id,
+                                            invalidatedReason: finding,
+                                        },
+                                        updatedAt: now,
+                                    });
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2899,7 +3047,200 @@ export const completeAssistant = internalMutation({
         }
 
         return { assistantMessageId };
+}
+
+export const commitValidatedAssistant = internalMutation({
+    args: {
+        jobId: v.id('chatGenerationJobs'),
+        leaseOwner: v.string(),
+        envelopeJson: v.string(),
+        capabilitySnapshotHash: v.string(),
+        evidenceSetHash: v.string(),
+        artifactsJson: v.optional(v.string()),
+        providerResponseId: v.optional(v.string()),
+        metadataJson: v.optional(v.string()),
+        repairHistoryJson: v.optional(v.string()),
     },
+    handler: async (ctx, args) => {
+        const now = Date.now();
+        const job = await ctx.db.get(args.jobId);
+        if (!job || job.leaseOwner !== args.leaseOwner) return null;
+        const turn = await ctx.db.get(job.turnId);
+        if (!turn || !turn.executionPlanId || !turn.taskId || turn.focusRevision === undefined) {
+            throw new Error('publication_orchestration_context_missing');
+        }
+        const [plan, control] = await Promise.all([
+            ctx.db.get(turn.executionPlanId),
+            ctx.db.query('conversationControlStates')
+                .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+                .first(),
+        ]);
+        if (!plan || plan.turnId !== turn._id || plan.userId !== turn.userId) throw new Error('publication_plan_scope_mismatch');
+        if (!control || control.userId !== turn.userId) throw new Error('publication_control_scope_mismatch');
+        if (turn.publicationEnvelopeId) throw new Error('publication_envelope_already_used');
+
+        let envelope: PersistedPublicationEnvelope;
+        try {
+            envelope = JSON.parse(args.envelopeJson) as PersistedPublicationEnvelope;
+        } catch {
+            throw new Error('publication_envelope_invalid_json');
+        }
+        const validation = validatePersistedEnvelope({
+            envelope,
+            turnId: turn._id.toString(),
+            planId: plan.planId,
+            taskId: turn.taskId,
+            focusRevision: control.focusRevision,
+            capabilitySnapshotHash: args.capabilitySnapshotHash,
+            evidenceSetHash: args.evidenceSetHash,
+        });
+        if (!validation.passed || envelope.validatorVersion !== PUBLICATION_VALIDATOR_VERSION) {
+            await ctx.db.insert('responsePublicationAudits', {
+                envelopeId: typeof envelope.envelopeId === 'string' ? envelope.envelopeId : `rejected_${turn._id}`,
+                turnId: turn._id,
+                conversationId: turn.conversationId,
+                userId: turn.userId,
+                planId: plan.planId,
+                taskId: turn.taskId,
+                focusRevision: control.focusRevision,
+                decision: 'rejected',
+                checksJson: JSON.stringify(envelope.checks ?? {}),
+                rejectionCodes: validation.errors,
+                capabilitySnapshotHash: args.capabilitySnapshotHash,
+                evidenceSetHash: args.evidenceSetHash,
+                canonicalPlanHash: envelope.canonicalPlanHash ?? 'missing',
+                contentHash: stableCapabilityHash(envelope.content ?? ''),
+                validatorVersion: envelope.validatorVersion ?? 'missing',
+                repairHistoryJson: args.repairHistoryJson,
+                createdAt: now,
+            });
+            await ctx.db.patch(turn._id, { status: 'repair_pending', errorCode: 'publication_validation_failed', updatedAt: now });
+            await ctx.db.patch(job._id, { status: 'repair_pending', errorCode: 'publication_validation_failed', updatedAt: now });
+            throw new Error(`publication_validation_failed:${validation.errors.join(',')}`);
+        }
+
+        const unsafeContent = looksLikeInternalStructuredPayload(envelope.content);
+        if (unsafeContent) throw new Error('publication_internal_payload_rejected');
+        const auditId = await ctx.db.insert('responsePublicationAudits', {
+            envelopeId: envelope.envelopeId,
+            turnId: turn._id,
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            planId: plan.planId,
+            taskId: turn.taskId,
+            focusRevision: control.focusRevision,
+            decision: envelope.decision,
+            checksJson: JSON.stringify(envelope.checks),
+            rejectionCodes: [],
+            capabilitySnapshotHash: args.capabilitySnapshotHash,
+            evidenceSetHash: args.evidenceSetHash,
+            canonicalPlanHash: envelope.canonicalPlanHash,
+            contentHash: stableCapabilityHash(envelope.content),
+            validatorVersion: envelope.validatorVersion,
+            repairHistoryJson: args.repairHistoryJson,
+            createdAt: now,
+        });
+        await ctx.db.patch(turn._id, {
+            status: 'validated',
+            capabilitySnapshotHash: args.capabilitySnapshotHash,
+            evidenceSetHash: args.evidenceSetHash,
+            publicationEnvelopeId: envelope.envelopeId,
+            updatedAt: now,
+        });
+        await ctx.db.patch(plan._id, { status: 'completed', updatedAt: now });
+
+        const publicationMetadata = {
+            ...metadataFromJson(args.metadataJson),
+            publication: {
+                envelopeId: envelope.envelopeId,
+                decision: envelope.decision,
+                responseAct: envelope.responseAct,
+                validatorVersion: envelope.validatorVersion,
+                verified: true,
+            },
+        };
+        const result = await completeAssistantCore(ctx, {
+            jobId: args.jobId,
+            leaseOwner: args.leaseOwner,
+            content: envelope.content,
+            artifactsJson: args.artifactsJson,
+            providerResponseId: args.providerResponseId,
+            degraded: false,
+            metadataJson: JSON.stringify(publicationMetadata),
+        });
+
+        if (envelope.pendingOptionsJson || envelope.assistantOfferJson || envelope.responseAct === 'clarify') {
+            let optionCount = 0;
+            if (envelope.pendingOptionsJson) {
+                try {
+                    const parsed = JSON.parse(envelope.pendingOptionsJson) as unknown;
+                    if (!Array.isArray(parsed)) throw new Error('pending_options_not_array');
+                    optionCount = parsed.length;
+                    for (const option of parsed as Array<Record<string, unknown>>) {
+                        if (
+                            option.targetTaskId !== turn.taskId ||
+                            option.expiresAfterFocusRevision !== control.focusRevision ||
+                            !Array.isArray(option.documentIds) ||
+                            option.documentIds.some((id) => !control.activeDocumentIds.some((activeId) => activeId.toString() === id))
+                        ) {
+                            throw new Error('pending_option_scope_mismatch');
+                        }
+                    }
+                } catch (error) {
+                    throw new Error(`publication_pending_options_invalid:${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+            const pendingAct = optionCount > 1
+                ? 'select' as const
+                : optionCount === 1 || envelope.assistantOfferJson
+                    ? 'confirm' as const
+                    : envelope.responseAct === 'clarify'
+                        ? 'clarify' as const
+                        : undefined;
+            await ctx.db.patch(control._id, {
+                pendingAct,
+                pendingOptionsJson: envelope.pendingOptionsJson,
+                pendingSourceTurnId: pendingAct ? turn._id : undefined,
+                lastAssistantOfferJson: envelope.assistantOfferJson,
+                updatedAt: now,
+            });
+        }
+        return { ...result, publicationAuditId: auditId };
+    },
+});
+
+const RECOVERY_COPY = {
+    context_unavailable: 'I could not safely load the saved conversation context for this turn. Your conversation is still saved; please retry this response.',
+    provider_unavailable: 'I could not finish this response. Your uploaded files and conversation are still saved, so you can retry without uploading them again.',
+    worker_interrupted: 'The response was interrupted before it could be verified. Your saved work is intact; please retry the response.',
+    validation_exhausted: 'I could not verify this answer safely. Your conversation and documents remain available; please narrow the question or retry.',
+} as const;
+
+export const commitSystemRecoveryNotice = internalMutation({
+    args: {
+        jobId: v.id('chatGenerationJobs'),
+        leaseOwner: v.string(),
+        recoveryCode: v.union(
+            v.literal('context_unavailable'),
+            v.literal('provider_unavailable'),
+            v.literal('worker_interrupted'),
+            v.literal('validation_exhausted')
+        ),
+        errorCode: v.optional(v.string()),
+        errorMessage: v.optional(v.string()),
+        retryable: v.boolean(),
+        metadataJson: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => completeAssistantCore(ctx, {
+        jobId: args.jobId,
+        leaseOwner: args.leaseOwner,
+        content: RECOVERY_COPY[args.recoveryCode],
+        degraded: true,
+        errorCode: args.errorCode ?? args.recoveryCode,
+        errorMessage: args.errorMessage,
+        errorRetryable: args.retryable,
+        metadataJson: args.metadataJson,
+    }),
 });
 
 /** Requeue or degrade expired jobs so conversations never stay stuck active. */

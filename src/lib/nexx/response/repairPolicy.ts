@@ -59,11 +59,12 @@ export function buildPublicationRepairContent(args: {
       '- A full-document review covering the entire current document',
     ].join('\n');
   }
+  if (args.stage === 'clarification') {
+    return 'Which part of the current request do you want me to handle? I will keep the same document and task active.';
+  }
   const grounded = [args.supported, args.limitation]
     .filter((value): value is string => Boolean(value?.trim()))
     .join('\n\n');
   if (grounded) return grounded;
-  return args.stage === 'clarification'
-    ? 'Which part of the current request do you want me to handle? I will keep the same document and task active.'
-    : 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.';
+  return 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.';
 }

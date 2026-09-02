@@ -31,7 +31,7 @@ export function buildExecutionPlan(args: {
   routeMode: RouteMode;
   activeDocumentIds: string[];
 }): TurnExecutionPlan {
-  const responseAct = args.transition.kind === 'clarify'
+  const responseAct = args.transition.kind === 'clarify' || args.understanding.ambiguityMaterial
     ? 'clarify'
     : args.understanding.speechAct === 'correct' || args.understanding.speechAct === 'challenge'
       ? 'correct'

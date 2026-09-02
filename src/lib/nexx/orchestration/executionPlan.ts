@@ -46,6 +46,7 @@ export function buildExecutionPlan(args: {
   ]));
   const requiresDocuments = selectedDocumentIds.length > 0;
   const kind = questionKind(args.message, args.understanding);
+  const requiresDocumentText = requiresDocuments && kind !== 'capability';
   return {
     schemaVersion: 1,
     planId: `plan_${fingerprint(`${args.taskId}:${args.focusRevision}:${args.message}`)}`,
@@ -54,11 +55,14 @@ export function buildExecutionPlan(args: {
     responseAct,
     routeMode: args.routeMode,
     selectedDocumentIds,
-    evidenceRequirements: requiresDocuments ? ['authorized_document', 'relevant_source_unit'] : [],
-    retrievalQueries: requiresDocuments ? [args.message.trim().slice(0, 2_000)] : [],
-    capabilityRequirements: requiresDocuments ? ['document_metadata', 'scoped_text_or_chunks'] : [],
+    evidenceRequirements: requiresDocuments
+      ? ['authorized_document', ...(requiresDocumentText ? ['relevant_source_unit'] : [])]
+      : [],
+    retrievalQueries: requiresDocumentText ? [args.message.trim().slice(0, 2_000)] : [],
+    capabilityRequirements: requiresDocuments
+      ? ['document_metadata', ...(requiresDocumentText ? ['scoped_text_or_chunks'] : [])]
+      : [],
     fallbackOrder: ['deterministic_repair', 'rerender', 'single_regeneration', 'scoped_answer', 'clarification', 'safe_limitation'],
     questionKind: kind,
   };
 }
-

@@ -11,7 +11,7 @@ const CONFIRM = /^(?:yes|yeah|yep|correct|right|exactly|okay|ok|sure|please|plea
 const CONTINUE = /^(?:continue|go\s+on|keep\s+going|more|proceed|carry\s+on|then\s+what)[.! ]*$/i;
 const CLARIFY = /^(?:which|what|why|how|huh|what\s+do\s+you\s+mean|which\s+one|what\s+one)[?!. ]*$/i;
 const SOCIAL = /^(?:hi|hello|hey|thanks|thank\s+you|got\s+it|k|lol|👍|👌|🙏)[!. ]*$/iu;
-const CAPABILITY = /\b(?:can|could|do)\s+you\s+(?:read|access|see|search|review|open)|\bdo\s+you\s+have\s+(?:access|the\s+file)\b/i;
+const CAPABILITY = /\b(?:can|could|do)\s+you\s+(?:read|access|see|search|review|open)|\bdo\s+you\s+have\s+(?:access|the\s+file)\b|\b(?:did|have)\s+you\s+(?:receive|received|got)\b|\bconfirm\b.{0,50}\b(?:received|uploaded|file|document)\b/i;
 const DOCUMENT_OPERATION = /\b(?:analy[sz]e|review|summari[sz]e|quote|search|compare|explain|read)\b.{0,80}\b(?:file|order|document|pdf|page|clause|section)\b|\b(?:file|order|document|pdf|page|clause|section)\b.{0,80}\b(?:analy[sz]e|review|summari[sz]e|quote|search|compare|explain|read)\b/i;
 
 function normalize(value: string) {

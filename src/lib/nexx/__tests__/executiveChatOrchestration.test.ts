@@ -189,6 +189,23 @@ describe('operation-aware document capability', () => {
   });
 });
 
+describe('metadata-only document receipt operations', () => {
+  it('plans receipt confirmation without inventing a text citation requirement', () => {
+    const state = control();
+    const message = 'Confirm that you received this synthetic test document in one short sentence.';
+    const understanding = understandTurn({ message, controlState: state });
+    const transition = decideFocusTransition({ message, understanding, controlState: state });
+    const plan = buildExecutionPlan({
+      message, understanding, transition, taskId, focusRevision: 3,
+      routeMode: 'document_analysis', activeDocumentIds: [orderId],
+    });
+    expect(understanding.requestedOperation).toBe('document_capability');
+    expect(plan.questionKind).toBe('capability');
+    expect(plan.evidenceRequirements).toEqual(['authorized_document']);
+    expect(plan.capabilityRequirements).toEqual(['document_metadata']);
+  });
+});
+
 describe('hard response publication contract', () => {
   const state = control({ pendingAct: 'confirm' });
   const understanding = understandTurn({ message: 'please do so', controlState: state });

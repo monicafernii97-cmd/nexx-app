@@ -55,7 +55,7 @@ export function verifyResponseClaims(args: {
   if (GENERIC.test(content) && args.evidenceIds.length > 0) errors.push('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE');
   if (UNREADABLE_CLAIM.test(content) && readable && args.capabilityDecision.prohibitedClaims.includes('file_unreadable')) errors.push('RESP_FALSE_UNREADABLE_CLAIM');
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');
-  if (args.plan.selectedDocumentIds.length > 0 && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
+  if (args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
   if (args.expectedFocusRevision !== args.currentFocusRevision) errors.push('RESP_STALE_FOCUS');
   if (args.unresolvedReferent && args.plan.responseAct !== 'clarify') errors.push('RESP_UNRESOLVED_REFERENT');
   if (INTERNAL_PAYLOAD.test(content)) errors.push('RESP_INTERNAL_PAYLOAD');
@@ -82,4 +82,3 @@ export function verifyResponseClaims(args: {
     },
   };
 }
-

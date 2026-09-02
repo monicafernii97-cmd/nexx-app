@@ -786,7 +786,7 @@ function executionPlanFromContext(context: GenerationContext): TurnExecutionPlan
 
 function capabilityOperationForTurn(context: GenerationContext, plan: TurnExecutionPlan): CapabilityOperation {
     if (context.turn.analysisMode === 'full_document_review') return 'exhaustive_review';
-    if (plan.questionKind === 'capability') return 'identify_file';
+    if (plan.questionKind === 'capability' || isDocumentAvailabilityQuestion(context.turn.message)) return 'identify_file';
     if (/\b(?:compare|difference|versus|vs\.?|both)\b/i.test(context.turn.message)) return 'compare_documents';
     if (/\b(?:draft|write|compose|rewrite)\b/i.test(context.turn.message)) return 'draft_from_order';
     if (/\b(?:quote|page\s+\d+)\b/i.test(context.turn.message)) return 'quote_requested_page';
@@ -855,7 +855,7 @@ async function commitVerifiedResponse(args: {
         plan: canonicalPlan,
         authorizedEvidenceIds: args.evidenceIds,
     });
-    const hasDocumentRequirement = plan.selectedDocumentIds.length > 0;
+    const hasDocumentRequirement = plan.evidenceRequirements.includes('relevant_source_unit');
     const verification = verifyResponseClaims({
         content: args.content,
         plan,
@@ -2712,9 +2712,17 @@ async function generateWithFallbacks({
     const attachmentContextPrompt = promptBundle.attachmentContextPrompt;
     const hostedTools = buildHostedTools(promptBundle.routerResult, context.conversation?.vectorStoreId);
     const hostedToolTypes = (hostedTools ?? []).map((tool) => String(tool.type));
+    const capabilityAttachments = promptBundle.attachmentContexts.length > 0
+        ? promptBundle.attachmentContexts
+        : isDocumentAvailabilityQuestion(context.turn.message)
+            ? [...(context.attachmentContexts ?? []), ...(context.availableDocumentContexts ?? [])]
+                .filter((attachment, index, values) =>
+                    values.findIndex((candidate) => candidate.uploadedFileId.toString() === attachment.uploadedFileId.toString()) === index &&
+                    (context.turnExecutionPlan?.selectedDocumentIds ?? []).some((id) => id.toString() === attachment.uploadedFileId.toString()))
+            : [];
     const runtimeCapabilitySnapshot = capabilitySnapshotForAttachments({
         turnId: context.turn._id.toString(),
-        attachments: promptBundle.attachmentContexts,
+        attachments: capabilityAttachments,
         toolTypes: hostedToolTypes,
         outputContinuation: usePlainText,
     });

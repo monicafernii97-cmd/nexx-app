@@ -13,8 +13,8 @@ if (runtime === 'convex' && !isVercelBuild) {
 
 const secret = process.env.VERIFICATION_SECRET;
 let convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? process.env.CONVEX_URL;
-if (!secret && runtime === 'convex' && process.env.VERCEL_ENV !== 'production') {
-  process.stdout.write('[executive-chat-release] Preview manifest skipped because the protected release secret is not configured for Preview.\n');
+if (runtime === 'convex' && process.env.VERCEL_ENV !== 'production') {
+  process.stdout.write('[executive-chat-release] Preview manifest skipped; production manifests are published only from the production deployment pair.\n');
   process.exit(0);
 }
 if (!secret) throw new Error('release_manifest_secret_missing');

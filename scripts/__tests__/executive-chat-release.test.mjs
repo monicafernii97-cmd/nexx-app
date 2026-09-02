@@ -22,6 +22,6 @@ test('deployment drift blocks promotion', () => {
 
 test('preview deployment can omit the production-only release secret', () => {
   const script = fs.readFileSync(new URL('../publish-executive-chat-release.mjs', import.meta.url), 'utf8');
-  assert.match(script, /VERCEL_ENV !== 'production'/);
-  assert.match(script, /Preview manifest skipped/);
+  assert.match(script, /runtime === 'convex' && process\.env\.VERCEL_ENV !== 'production'/);
+  assert.match(script, /production manifests are published only/);
 });

@@ -7,6 +7,7 @@ import { getAuthenticatedConvexClient } from '@/lib/convexServer';
 import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
 import type { RouteMode } from '@/lib/types';
 import { isDocumentAnalysisMode, type DocumentAnalysisMode } from '@/lib/chat/documentAnalysisMode';
+import { getExecutiveChatFeatureFlags } from '@/lib/nexx/orchestration/featureFlags';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_REQUEST_ID_LENGTH = 256;
@@ -80,6 +81,7 @@ function isPlaceholderTitle(title: string | undefined) {
 
 /** Accept a chat turn and enqueue provider generation in Convex. */
 export async function POST(req: NextRequest) {
+  const executiveChatFlags = getExecutiveChatFeatureFlags();
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
     return Response.json({ error: 'Authentication required' }, { status: 401 });
@@ -217,6 +219,27 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Conversation not found or inaccessible' }, { status: 404 });
   }
 
+  let conversationControl: {
+    controlState: {
+      activeTaskId?: string;
+      activeTaskKind?: string;
+      activeDocumentIds: string[];
+      focusRevision: number;
+    } | null;
+  } | null = null;
+  try {
+    if (executiveChatFlags.controlState || executiveChatFlags.shadowUnderstanding) {
+      conversationControl = await convex.query(api.conversationControl.getForConversation, {
+        conversationId: typedConversationId,
+      });
+    }
+  } catch (error) {
+    // Additive rollout compatibility: admission will create authoritative
+    // control state transactionally even if an older backend is still active.
+    console.warn('[Chat] Conversation control snapshot unavailable; using migration fallback:', error);
+  }
+  const authoritativeControl = executiveChatFlags.controlState ? conversationControl : null;
+
   let sanitizedAttachments: ChatAttachmentRef[] = [];
   if (attachments !== undefined) {
     if (
@@ -265,10 +288,16 @@ export async function POST(req: NextRequest) {
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const activeRouteMode = conversation.routeMode as RouteMode | undefined;
+  const activeTaskKind = authoritativeControl?.controlState?.activeTaskKind;
+  const activeRouteMode = activeTaskKind === 'document_review' || activeTaskKind === 'document_question'
+    ? 'document_analysis' as RouteMode
+    : authoritativeControl?.controlState
+      ? undefined
+      : conversation.routeMode as RouteMode | undefined;
   const hasActiveDocumentContext =
     sanitizedAttachments.length > 0 ||
-    Boolean(conversation.activeUploadedFileId);
+    Boolean(conversation.activeUploadedFileId) ||
+    Boolean(authoritativeControl?.controlState?.activeDocumentIds.length);
   const routerResult = resolveTurnRoute({
     message,
     conversationSummary: conversation.conversationSummary ?? undefined,
@@ -285,6 +314,10 @@ export async function POST(req: NextRequest) {
     attachmentStatuses: sanitizedAttachments.map((attachment) => attachment.status),
     routeMode: routerResult.mode,
     analysisMode,
+    activeTaskId: authoritativeControl?.controlState?.activeTaskId,
+    focusRevision: authoritativeControl?.controlState?.focusRevision,
+    shadowTaskId: executiveChatFlags.shadowUnderstanding ? conversationControl?.controlState?.activeTaskId : undefined,
+    executiveChatControlEnabled: executiveChatFlags.controlState,
   });
   const routeModeToFeature: Record<
     string,

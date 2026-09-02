@@ -297,16 +297,31 @@ export default defineSchema({
             v.literal('accepted'),
             v.literal('queued'),
             v.literal('user_saved'),
+            v.literal('understanding_saved'),
+            v.literal('plan_saved'),
+            v.literal('evidence_ready'),
             v.literal('generating'),
             v.literal('streaming'),
             v.literal('assistant_draft_saved'),
+            v.literal('verification_failed'),
+            v.literal('repair_pending'),
+            v.literal('validated'),
             v.literal('assistant_saved'),
+            v.literal('clarification_saved'),
             v.literal('degraded_saved'),
+            v.literal('failed_recoverable'),
             v.literal('failed_retryable'),
             v.literal('failed_final'),
             v.literal('cancelled')
         ),
         routeMode: v.optional(routeModeValidator),
+        taskId: v.optional(v.string()),
+        focusRevision: v.optional(v.number()),
+        understandingId: v.optional(v.id('turnUnderstandings')),
+        executionPlanId: v.optional(v.id('turnExecutionPlans')),
+        capabilitySnapshotHash: v.optional(v.string()),
+        evidenceSetHash: v.optional(v.string()),
+        publicationEnvelopeId: v.optional(v.string()),
         analysisMode: v.optional(v.union(
             v.literal('full_document_review'),
             v.literal('obligations_and_deadlines'),
@@ -352,6 +367,8 @@ export default defineSchema({
             v.literal('queued'),
             v.literal('leased'),
             v.literal('running'),
+            v.literal('repair_pending'),
+            v.literal('failed_recoverable'),
             v.literal('completed'),
             v.literal('failed_retryable'),
             v.literal('failed_final'),
@@ -681,6 +698,212 @@ export default defineSchema({
         .index('by_conversation_status', ['conversationId', 'status'])
         .index('by_conversation_issue', ['conversationId', 'issueKey'])
         .index('by_user_updated', ['userId', 'updatedAt']),
+
+    conversationControlStates: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        schemaVersion: v.literal(1),
+        focusRevision: v.number(),
+        activeTaskId: v.optional(v.string()),
+        activeTaskKind: v.optional(v.union(
+            v.literal('document_review'),
+            v.literal('document_question'),
+            v.literal('legal_question'),
+            v.literal('draft'),
+            v.literal('strategy'),
+            v.literal('procedure'),
+            v.literal('relational'),
+            v.literal('general')
+        )),
+        activeIssueKey: v.optional(v.string()),
+        activeDocumentIds: v.array(v.id('uploadedFiles')),
+        activeEvidenceGenerationIds: v.array(v.id('documentMemoryGenerations')),
+        parentTaskId: v.optional(v.string()),
+        pendingAct: v.optional(v.union(
+            v.literal('select'),
+            v.literal('confirm'),
+            v.literal('continue'),
+            v.literal('clarify'),
+            v.literal('supply_detail')
+        )),
+        pendingOptionsJson: v.optional(v.string()),
+        pendingSourceTurnId: v.optional(v.id('chatTurns')),
+        lastAssistantOfferJson: v.optional(v.string()),
+        lastResolvedReferentsJson: v.optional(v.string()),
+        confidence: v.number(),
+        provenance: v.union(
+            v.literal('native_v1'),
+            v.literal('migrated_route'),
+            v.literal('migrated_issue'),
+            v.literal('recovered')
+        ),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_conversation', ['conversationId'])
+        .index('by_user_updated', ['userId', 'updatedAt'])
+        .index('by_active_task', ['conversationId', 'activeTaskId']),
+
+    conversationTasks: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        taskId: v.string(),
+        parentTaskId: v.optional(v.string()),
+        kind: v.union(
+            v.literal('document_review'),
+            v.literal('document_question'),
+            v.literal('legal_question'),
+            v.literal('draft'),
+            v.literal('strategy'),
+            v.literal('procedure'),
+            v.literal('relational'),
+            v.literal('general')
+        ),
+        status: v.union(
+            v.literal('provisional'),
+            v.literal('active'),
+            v.literal('waiting_user'),
+            v.literal('waiting_system'),
+            v.literal('completed'),
+            v.literal('superseded'),
+            v.literal('abandoned')
+        ),
+        goal: v.string(),
+        normalizedGoal: v.string(),
+        issueKey: v.optional(v.string()),
+        documentIds: v.array(v.id('uploadedFiles')),
+        evidenceGenerationIds: v.array(v.id('documentMemoryGenerations')),
+        originatingTurnId: v.id('chatTurns'),
+        latestTurnId: v.id('chatTurns'),
+        resultMessageId: v.optional(v.id('messages')),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_conversation_status', ['conversationId', 'status'])
+        .index('by_conversation_task', ['conversationId', 'taskId'])
+        .index('by_user_updated', ['userId', 'updatedAt']),
+
+    turnUnderstandings: defineTable({
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        schemaVersion: v.literal(1),
+        speechAct: v.union(
+            v.literal('ask'), v.literal('answer'), v.literal('select'),
+            v.literal('confirm'), v.literal('continue'), v.literal('clarify'),
+            v.literal('correct'), v.literal('challenge'), v.literal('reassess'),
+            v.literal('cancel'), v.literal('switch_topic'), v.literal('social'),
+            v.literal('unknown')
+        ),
+        continuity: v.union(
+            v.literal('same_task'), v.literal('related_task'),
+            v.literal('new_task'), v.literal('uncertain')
+        ),
+        requestedOperation: v.optional(v.string()),
+        referentsJson: v.string(),
+        candidateTasksJson: v.string(),
+        confidence: v.number(),
+        ambiguityMaterial: v.boolean(),
+        reasonCodes: v.array(v.string()),
+        resolverVersion: v.string(),
+        createdAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_conversation', ['conversationId']),
+
+    turnExecutionPlans: defineTable({
+        planId: v.string(),
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        schemaVersion: v.literal(1),
+        focusRevision: v.number(),
+        taskId: v.string(),
+        responseAct: v.union(
+            v.literal('answer'), v.literal('clarify'), v.literal('confirm'),
+            v.literal('correct'), v.literal('status'), v.literal('safe_limit')
+        ),
+        routeMode: routeModeValidator,
+        selectedDocumentIds: v.array(v.id('uploadedFiles')),
+        evidenceRequirements: v.array(v.string()),
+        retrievalQueries: v.array(v.string()),
+        capabilityRequirements: v.array(v.string()),
+        fallbackOrder: v.array(v.string()),
+        questionContractJson: v.string(),
+        status: v.union(
+            v.literal('planned'), v.literal('executing'), v.literal('superseded'),
+            v.literal('completed'), v.literal('failed_recoverable')
+        ),
+        plannerVersion: v.string(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_plan', ['planId'])
+        .index('by_conversation_status', ['conversationId', 'status']),
+
+    responsePublicationAudits: defineTable({
+        envelopeId: v.string(),
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        planId: v.string(),
+        taskId: v.string(),
+        focusRevision: v.number(),
+        decision: v.union(
+            v.literal('publish'), v.literal('publish_scoped'),
+            v.literal('ask_clarification'), v.literal('publish_limitation'),
+            v.literal('rejected')
+        ),
+        checksJson: v.string(),
+        rejectionCodes: v.array(v.string()),
+        capabilitySnapshotHash: v.string(),
+        evidenceSetHash: v.string(),
+        canonicalPlanHash: v.string(),
+        contentHash: v.string(),
+        validatorVersion: v.string(),
+        repairHistoryJson: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_envelope', ['envelopeId'])
+        .index('by_turn', ['turnId'])
+        .index('by_conversation', ['conversationId']),
+
+    releaseManifests: defineTable({
+        runtime: v.union(v.literal('web'), v.literal('convex')),
+        environment: v.union(v.literal('preview'), v.literal('production')),
+        gitSha: v.string(),
+        deploymentId: v.string(),
+        schemaVersion: v.string(),
+        controlVersion: v.string(),
+        capabilityVersion: v.string(),
+        validatorVersion: v.string(),
+        promptPolicyVersion: v.string(),
+        compatibleMinPeerVersion: v.string(),
+        active: v.boolean(),
+        deployedAt: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_runtime_environment', ['runtime', 'environment'])
+        .index('by_environment_active', ['environment', 'active']),
+
+    chatQualityCanaryRuns: defineTable({
+        scenarioId: v.string(),
+        status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
+        invariantCodes: v.array(v.string()),
+        failedInvariantCodes: v.array(v.string()),
+        phase: v.string(),
+        errorCode: v.optional(v.string()),
+        latencyMs: v.optional(v.number()),
+        startedAt: v.number(),
+        finishedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_status_created', ['status', 'createdAt'])
+        .index('by_scenario_created', ['scenarioId', 'createdAt']),
 
     documentRetrievalAudit: defineTable({
         conversationId: v.id('conversations'),

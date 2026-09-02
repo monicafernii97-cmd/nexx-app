@@ -49,5 +49,9 @@ export function buildCoverageGateMessage(attachments: FullDocumentReviewAttachme
       : 'I am not presenting a full court-order analysis yet because the current processing record does not prove that every source page was read.',
     ...attachmentLines,
     'NEXX will only describe this as a complete review after verified page-by-page coverage and real-page citations are available.',
+    coverageComplete
+      ? 'The extracted order text remains available for focused work while the exhaustive synthesis is pending.'
+      : 'Any extracted and page-anchored text remains available for focused work within its verified scope.',
+    'Which should I do now: answer a focused question, review a specific page or section, or retry the exhaustive review later?',
   ].join('\n\n');
 }

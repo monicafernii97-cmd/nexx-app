@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "controlVersion": "exec-chat-v1",
+  "capabilityVersion": "document-capability-v1",
+  "validatorVersion": "response-publication-v1",
+  "promptPolicyVersion": "exec-chat-prompt-v1",
+  "compatibleMinPeerVersion": "1.0.0"
+}

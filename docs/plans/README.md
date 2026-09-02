@@ -3,6 +3,11 @@
 > Plans from April 9–13 and July 16, 2026, organized chronologically.
 > Open any file below to read the full plan, then check off what's done.
 
+## Current response-integrity work
+
+- [Production Reconciliation — 2026-09-01](./14_production_reconciliation_2026-09-01.md) — verifies current `origin/main`, the successful production web release, and live Convex application definitions are aligned.
+- [Executive Chat Hardening — Full Implementation Specification](./15_executive_chat_hardening_full_spec.md) — authoritative P0 specification for durable task focus, referent resolution, capability truth, response verification, recovery, adversarial sequence testing, and release controls.
+
 ---
 
 ## 📋 The 11 Plans (in execution order)

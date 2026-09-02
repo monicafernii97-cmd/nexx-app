@@ -124,7 +124,7 @@ import {
     mintPublicationEnvelope,
     serializePublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
-import { decideRepair } from '../src/lib/nexx/response/repairPolicy';
+import { buildPublicationRepairContent, decideRepair } from '../src/lib/nexx/response/repairPolicy';
 import type { TurnExecutionPlan } from '../src/lib/nexx/orchestration/types';
 import { derivePendingInteraction } from '../src/lib/nexx/orchestration/pendingInteraction';
 import {
@@ -3765,17 +3765,21 @@ export const processChatGenerationJob = internalAction({
                 });
                 const supported = supportedResponseText(result.response);
                 const limitation = publication?.capabilityDecision.userSafeLimitations[0]?.text;
-                const repairedContent = [supported, limitation]
-                    .filter((value): value is string => Boolean(value?.trim()))
-                    .join('\n\n') || (repair.stage === 'clarification'
-                        ? 'Which part of the current request do you want me to handle? I will keep the same document and task active.'
-                        : 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.');
+                const repairedContent = buildPublicationRepairContent({
+                    errors: publication?.verification.errors ?? [],
+                    questionKind: publication?.plan.questionKind ?? 'other',
+                    supported,
+                    limitation,
+                    stage: repair.stage,
+                });
+                const repairedResponse = plainTextAssistantResponse(repairedContent);
+                repairedResponse.artifacts = result.response.artifacts;
                 publication = await commitVerifiedResponse({
                     ctx,
                     jobId: args.jobId,
                     leaseOwner,
                     context,
-                    response: result.response,
+                    response: repairedResponse,
                     content: repairedContent,
                     capabilitySnapshot: result.capabilitySnapshot,
                     evidenceIds: publicationEvidenceIds,

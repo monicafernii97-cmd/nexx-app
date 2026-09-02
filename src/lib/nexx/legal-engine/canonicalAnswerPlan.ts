@@ -110,6 +110,7 @@ export function buildCanonicalAnswerPlanV2(args: {
   evidenceIds: string[];
   capabilityDecision: CapabilityDecision;
   pendingOptions?: PendingOption[];
+  sourceEvidenceMap?: Record<string, string>;
 }): CanonicalAnswerPlanV2 {
   const directAnswer = responseDirectAnswer(args.response);
   const legal = args.response.legalInterpretation;
@@ -127,11 +128,14 @@ export function buildCanonicalAnswerPlanV2(args: {
   for (const [index, clause] of (legal?.controllingClauses ?? []).entries()) {
     const text = compactProposition(clause.quote || clause.label);
     if (!text) continue;
+    const clauseEvidenceIds = clause.sourceIds.map((sourceId) =>
+      args.sourceEvidenceMap?.[sourceId] ?? sourceId
+    );
     propositions.push({
       propositionId: `controlling_${index + 1}`,
       text,
       kind: 'document_fact',
-      evidenceIds: clause.sourceIds.length > 0 ? clause.sourceIds : evidenceIds,
+      evidenceIds: clauseEvidenceIds.length > 0 ? clauseEvidenceIds : evidenceIds,
       confidence: 'high',
     });
   }
@@ -159,8 +163,14 @@ export function buildCanonicalAnswerPlanV2(args: {
     directAnswer,
     answerStatus,
     propositions,
-    controllingClauses: (legal?.controllingClauses ?? []).map((clause) => ({ label: clause.label, sourceIds: clause.sourceIds })),
-    interactingClauses: (legal?.interactingClauses ?? []).map((clause) => ({ label: clause.label, sourceIds: clause.sourceIds })),
+    controllingClauses: (legal?.controllingClauses ?? []).map((clause) => ({
+      label: clause.label,
+      sourceIds: clause.sourceIds.map((sourceId) => args.sourceEvidenceMap?.[sourceId] ?? sourceId),
+    })),
+    interactingClauses: (legal?.interactingClauses ?? []).map((clause) => ({
+      label: clause.label,
+      sourceIds: clause.sourceIds.map((sourceId) => args.sourceEvidenceMap?.[sourceId] ?? sourceId),
+    })),
     scopeDisclosure: args.capabilityDecision.supportLevel === 'scoped'
       ? args.capabilityDecision.userSafeLimitations.find((item) => item.code === 'full_review_not_ready' || item.code === 'document_coverage_incomplete')?.text
       : undefined,

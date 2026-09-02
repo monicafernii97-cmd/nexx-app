@@ -818,6 +818,7 @@ async function commitVerifiedResponse(args: {
     content: string;
     capabilitySnapshot: DocumentCapabilitySnapshot;
     evidenceIds: string[];
+    sourceEvidenceMap?: Record<string, string>;
     providerResponseId?: string;
     metadata: Record<string, unknown>;
     artifactsJson?: string;
@@ -850,6 +851,7 @@ async function commitVerifiedResponse(args: {
         evidenceIds: args.evidenceIds,
         capabilityDecision,
         pendingOptions: pending.options,
+        sourceEvidenceMap: args.sourceEvidenceMap,
     });
     const canonicalVerification = verifyCanonicalAnswerPlanV2({
         plan: canonicalPlan,
@@ -3739,11 +3741,20 @@ export const processChatGenerationJob = internalAction({
                 content: result.response.message,
                 capabilitySnapshot: result.capabilitySnapshot,
                 evidenceIds: publicationEvidenceIds,
+                sourceEvidenceMap: Object.fromEntries(
+                    result.documentSourcePackets.map((packet) => [packet.sourceId, packet.chunkId])
+                ),
                 providerResponseId: result.responseId,
                 metadata: publicationMetadata,
                 artifactsJson: JSON.stringify(result.response.artifacts),
             });
             if (!publication?.committed) {
+                console.warn('[ChatWorker] Publication verification requested repair', {
+                    jobId: args.jobId,
+                    routeMode: result.routeMode,
+                    errorCodes: publication?.verification.errors ?? ['publication_result_missing'],
+                    capabilitySupport: publication?.capabilityDecision.supportLevel ?? 'unknown',
+                });
                 const repair = decideRepair({
                     errors: publication?.verification.errors ?? [],
                     attempt: 0,
@@ -3768,6 +3779,9 @@ export const processChatGenerationJob = internalAction({
                     content: repairedContent,
                     capabilitySnapshot: result.capabilitySnapshot,
                     evidenceIds: publicationEvidenceIds,
+                    sourceEvidenceMap: Object.fromEntries(
+                        result.documentSourcePackets.map((packet) => [packet.sourceId, packet.chunkId])
+                    ),
                     providerResponseId: result.responseId,
                     metadata: { ...publicationMetadata, publicationRepairStage: repair.stage },
                     artifactsJson: JSON.stringify(result.response.artifacts),
@@ -3776,6 +3790,11 @@ export const processChatGenerationJob = internalAction({
                 });
             }
             if (!publication?.committed) {
+                console.warn('[ChatWorker] Publication verification exhausted', {
+                    jobId: args.jobId,
+                    routeMode: result.routeMode,
+                    errorCodes: publication?.verification.errors ?? ['publication_result_missing'],
+                });
                 await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                     jobId: args.jobId,
                     leaseOwner,

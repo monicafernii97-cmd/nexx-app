@@ -8,6 +8,7 @@ import { understandTurn } from '../orchestration/turnUnderstanding';
 import { verifyResponseClaims } from '../response/claimVerifier';
 import { mintPublicationEnvelope, serializePublicationEnvelope, validatePersistedEnvelope } from '../response/publicationContract';
 import { decideRepair } from '../response/repairPolicy';
+import { buildCanonicalAnswerPlanV2, verifyCanonicalAnswerPlanV2 } from '../legal-engine/canonicalAnswerPlan';
 
 const orderId = 'order-1';
 const taskId = 'task-order';
@@ -228,6 +229,29 @@ describe('hard response publication contract', () => {
     }],
   });
   const decision = canPerformOperation('answer_focused_question', snapshot);
+
+  it('maps provider-safe source aliases back to authorized canonical chunk IDs', () => {
+    const canonical = buildCanonicalAnswerPlanV2({
+      executionPlan: plan,
+      response: {
+        message: 'The order sets out a supported possession term.',
+        legalInterpretation: {
+          directAnswer: 'The order sets out a supported possession term.',
+          controllingClauses: [{ label: 'Possession', quote: 'The supported clause text.', sourceIds: ['src_001'] }],
+          interactingClauses: [],
+        },
+      } as never,
+      evidenceIds: ['chunk-1'],
+      sourceEvidenceMap: { src_001: 'chunk-1' },
+      capabilityDecision: decision,
+    });
+
+    expect(canonical.propositions.find((item) => item.propositionId === 'controlling_1')?.evidenceIds).toEqual(['chunk-1']);
+    expect(verifyCanonicalAnswerPlanV2({ plan: canonical, authorizedEvidenceIds: ['chunk-1'] })).toEqual({
+      passed: true,
+      errors: [],
+    });
+  });
 
   it('rejects a false unreadability draft before commit', () => {
     const verification = verifyResponseClaims({

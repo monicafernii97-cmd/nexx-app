@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { renderVerifiedDocumentReview, verifyDocumentUnderstanding } from '../documentUnderstanding';
+import {
+  renderVerifiedDocumentReview,
+  verifyDocumentUnderstanding,
+  verifyDocumentUnderstandingNode,
+} from '../documentUnderstanding';
 
 const chunks = [
   { chunkIndex: 0, text: 'The Court ORDERS Mother to deliver the child on Friday.', pageStart: 1, pageEnd: 1 },
@@ -38,6 +42,19 @@ describe('document understanding verification', () => {
     });
     expect(result.passed).toBe(false);
     expect(result.errors[0]).toContain('invalid source ID');
+  });
+
+  it('strictly validates a nonzero contiguous map-node range', () => {
+    expect(verifyDocumentUnderstandingNode({
+      payload,
+      chunks: [chunks[1]],
+      provenance: { sourceChunkStart: 1, sourceChunkEnd: 1, sourceChunkCount: 1 },
+    })).toMatchObject({ passed: true, errors: [] });
+    expect(verifyDocumentUnderstandingNode({
+      payload,
+      chunks: [chunks[1]],
+      provenance: { sourceChunkStart: 0, sourceChunkEnd: 1, sourceChunkCount: 1 },
+    }).passed).toBe(false);
   });
 
   it('renders page citations and an explicit complete-coverage receipt', () => {

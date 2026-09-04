@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { v } from 'convex/values';
 import { makeFunctionReference, type FunctionReference } from 'convex/server';
-import { internalAction, internalMutation, internalQuery } from './_generated/server';
+import { internalAction, internalMutation, internalQuery, mutation, query, type ActionCtx } from './_generated/server';
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import {
@@ -9,15 +9,30 @@ import {
   buildDocumentUnderstandingReducePrompt,
   renderVerifiedDocumentReview,
   verifyDocumentUnderstanding,
+  verifyDocumentUnderstandingNode,
   type DocumentUnderstandingFinding,
   type DocumentUnderstandingPayload,
 } from '../src/lib/nexx/documentUnderstanding';
+import { stableCapabilityHash } from '../src/lib/nexx/capabilities/documentCapabilityLedger';
+import {
+  DURABLE_REVIEW_NODE_MAX_ATTEMPTS,
+  classifyDurableReviewFailure,
+  durableReviewNodeId,
+  durableReviewRetryDecision,
+  strictStructuredOutputReminder,
+  type DurableReviewFailureClass,
+} from '../src/lib/nexx/durableReviewPolicy';
+import { getAuthenticatedUser } from './lib/auth';
+import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 
-const UNDERSTANDING_VERSION = 'dur_v1';
+const LEGACY_UNDERSTANDING_VERSION = 'dur_v1';
+const UNDERSTANDING_VERSION = 'dur_v2';
 const UNDERSTANDING_MODEL = 'gpt-5.4';
 const MAP_CHUNKS = 6;
 const REDUCE_NODES = 6;
 const MAX_OUTPUT_TOKENS = 12_000;
+const STRICT_RETRY_OUTPUT_TOKENS = 6_000;
+const NODE_LEASE_MS = 120_000;
 const PROCESS_RUN_REFERENCE = makeFunctionReference<'action', { runId: Id<'documentUnderstandingRuns'> }, unknown>(
   'documentUnderstanding:processRun',
 ) as unknown as FunctionReference<'action', 'internal', { runId: Id<'documentUnderstandingRuns'> }, unknown>;
@@ -52,8 +67,19 @@ const DUR_SCHEMA = {
 } as const;
 
 type UnderstandingWork =
-  | { kind: 'map'; run: Doc<'documentUnderstandingRuns'>; file: Doc<'uploadedFiles'>; chunks: Doc<'documentChunks'>[] }
-  | { kind: 'reduce' | 'finalize'; run: Doc<'documentUnderstandingRuns'>; file: Doc<'uploadedFiles'>; nodes: Doc<'documentUnderstandingNodes'>[]; levelCount: number };
+  | { kind: 'map'; run: Doc<'documentUnderstandingRuns'>; file: Doc<'uploadedFiles'>; chunks: Doc<'documentChunks'>[]; outputNodeIndex: number }
+  | { kind: 'reduce' | 'finalize'; run: Doc<'documentUnderstandingRuns'>; file: Doc<'uploadedFiles'>; nodes: Doc<'documentUnderstandingNodes'>[]; levelCount: number; outputNodeIndex: number };
+
+class UnderstandingNodeGenerationError extends Error {
+  constructor(
+    message: string,
+    readonly outputJson?: string,
+    readonly providerRequestId?: string,
+  ) {
+    super(message);
+    this.name = 'UnderstandingNodeGenerationError';
+  }
+}
 
 function parsePayload(value: string): DocumentUnderstandingPayload {
   const parsed = JSON.parse(value) as Partial<DocumentUnderstandingPayload>;
@@ -81,19 +107,43 @@ function pageCitation(pageStart?: number, pageEnd?: number) {
   return pageEnd && pageEnd !== pageStart ? `[pp. ${pageStart}-${pageEnd}]` : `[p. ${pageStart}]`;
 }
 
-async function generateNode(prompt: string) {
+async function generateNode(prompt: string, options?: { strictRetry?: boolean }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
   const client = new OpenAI({ apiKey, maxRetries: 0, timeout: 110_000 });
+  const maxOutputTokens = options?.strictRetry ? STRICT_RETRY_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS;
   const response = await client.responses.create({
     model: UNDERSTANDING_MODEL,
     reasoning: { effort: 'high' },
-    max_output_tokens: MAX_OUTPUT_TOKENS,
-    input: prompt,
+    max_output_tokens: maxOutputTokens,
+    input: options?.strictRetry ? `${prompt}\n\n${strictStructuredOutputReminder()}` : prompt,
     text: { format: DUR_SCHEMA },
   });
+  if (response.status === 'incomplete') {
+    const reason = response.incomplete_details?.reason ?? 'unknown';
+    throw new UnderstandingNodeGenerationError(
+      `Understanding provider returned truncated or incomplete output: ${reason}.`,
+      response.output_text || undefined,
+      response.id,
+    );
+  }
   if (!response.output_text?.trim()) throw new Error('Understanding provider returned no output.');
-  return parsePayload(response.output_text);
+  let payload: DocumentUnderstandingPayload;
+  try {
+    payload = parsePayload(response.output_text);
+  } catch (error) {
+    throw new UnderstandingNodeGenerationError(
+      error instanceof Error ? error.message : String(error),
+      response.output_text,
+      response.id,
+    );
+  }
+  return {
+    payload,
+    outputJson: response.output_text,
+    providerRequestId: response.id,
+    maxOutputTokens,
+  };
 }
 
 export const startRun = internalMutation({
@@ -120,7 +170,32 @@ export const startRun = internalMutation({
       .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', generation._id))
       .collect();
     if (chunks.length === 0) throw new Error('Document has no canonical chunks.');
+    const understandingVersion = getExecutiveChatFeatureFlags().understandingResumeV2
+      ? UNDERSTANDING_VERSION
+      : LEGACY_UNDERSTANDING_VERSION;
+    const existingRun = (await ctx.db.query('documentUnderstandingRuns')
+      .withIndex('by_file_created', (q) => q.eq('uploadedFileId', file._id))
+      .order('desc')
+      .take(10))
+      .find((candidate) =>
+        candidate.memoryGenerationId === generation._id && candidate.version === understandingVersion
+      );
+    if (existingRun) {
+      if (!['ready', 'dead_letter', 'failed'].includes(existingRun.status)) {
+        await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: existingRun._id });
+      }
+      return {
+        runId: existingRun._id,
+        stableJobId: existingRun.stableJobId ?? `dur_legacy_${existingRun._id}`,
+      };
+    }
     const now = Date.now();
+    const stableJobId = `dur_${stableCapabilityHash({
+      uploadedFileId: file._id,
+      memoryGenerationId: generation._id,
+      coverageManifestId: manifest._id,
+      version: understandingVersion,
+    }).slice(0, 28)}`;
     const runId = await ctx.db.insert('documentUnderstandingRuns', {
       uploadedFileId: file._id,
       memoryGenerationId: generation._id,
@@ -131,12 +206,16 @@ export const startRun = internalMutation({
       uploadIndexingError: args.uploadIndexingError,
       clerkUserId: file.clerkUserId,
       status: 'queued',
-      version: UNDERSTANDING_VERSION,
+      version: understandingVersion,
       model: UNDERSTANDING_MODEL,
+      stableJobId,
       totalChunks: chunks.length,
       nextChunkIndex: 0,
       currentLevel: 0,
       nextNodeIndex: 0,
+      mapBatchSize: MAP_CHUNKS,
+      reduceBatchSize: REDUCE_NODES,
+      resumeCount: 0,
       createdAt: now,
       updatedAt: now,
     });
@@ -147,7 +226,7 @@ export const startRun = internalMutation({
       updatedAt: now,
     });
     await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId });
-    return { runId };
+    return { runId, stableJobId };
   },
 });
 
@@ -155,22 +234,372 @@ export const getWork = internalQuery({
   args: { runId: v.id('documentUnderstandingRuns') },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run || ['ready', 'partial', 'failed'].includes(run.status)) return null;
+    if (!run || ['ready', 'partial', 'failed', 'dead_letter'].includes(run.status)) return null;
     const file = await ctx.db.get(run.uploadedFileId);
     if (!file || file.activeUnderstandingRunId !== run._id || file.activeMemoryGenerationId !== run.memoryGenerationId) return null;
     if (run.status === 'queued' || run.status === 'mapping') {
-      const chunks = await ctx.db.query('documentChunks')
-        .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', run.memoryGenerationId).gte('chunkIndex', run.nextChunkIndex))
-        .take(MAP_CHUNKS);
-      return { kind: 'map' as const, run, file, chunks };
+      const [chunks, mappedNodes] = await Promise.all([
+        ctx.db.query('documentChunks')
+          .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', run.memoryGenerationId).gte('chunkIndex', run.nextChunkIndex))
+          .take(Math.max(1, run.mapBatchSize ?? MAP_CHUNKS)),
+        ctx.db.query('documentUnderstandingNodes')
+          .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', 0))
+          .collect(),
+      ]);
+      return { kind: 'map' as const, run, file, chunks, outputNodeIndex: mappedNodes.length };
     }
-    const nodes = await ctx.db.query('documentUnderstandingNodes')
-      .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', run.currentLevel).gte('nodeIndex', run.nextNodeIndex))
-      .take(REDUCE_NODES);
-    const levelCount = (await ctx.db.query('documentUnderstandingNodes')
-      .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', run.currentLevel))
-      .collect()).length;
-    return { kind: levelCount === 1 ? 'finalize' as const : 'reduce' as const, run, file, nodes, levelCount };
+    const [nodes, levelNodes, nextLevelNodes] = await Promise.all([
+      ctx.db.query('documentUnderstandingNodes')
+        .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', run.currentLevel).gte('nodeIndex', run.nextNodeIndex))
+        .take(Math.max(1, run.reduceBatchSize ?? REDUCE_NODES)),
+      ctx.db.query('documentUnderstandingNodes')
+        .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', run.currentLevel))
+        .collect(),
+      ctx.db.query('documentUnderstandingNodes')
+        .withIndex('by_run_level_node', (q) => q.eq('runId', run._id).eq('level', run.currentLevel + 1))
+        .collect(),
+    ]);
+    return {
+      kind: levelNodes.length === 1 ? 'finalize' as const : 'reduce' as const,
+      run,
+      file,
+      nodes,
+      levelCount: levelNodes.length,
+      outputNodeIndex: nextLevelNodes.length,
+    };
+  },
+});
+
+export const beginWorkNode = internalMutation({
+  args: {
+    runId: v.id('documentUnderstandingRuns'),
+    expectedStatus: v.union(v.literal('mapping'), v.literal('reducing')),
+    nodeId: v.string(),
+    phase: v.union(v.literal('map'), v.literal('reduce')),
+    level: v.number(),
+    nodeIndex: v.number(),
+    sourceStart: v.number(),
+    sourceEnd: v.number(),
+    batchSize: v.number(),
+    inputHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (
+      !run ||
+      (run.status !== args.expectedStatus && !(run.status === 'queued' && args.expectedStatus === 'mapping')) ||
+      ['ready', 'failed', 'dead_letter'].includes(run.status)
+    ) return { leased: false as const, reason: 'run_not_active' };
+
+    const now = Date.now();
+    let workNode = await ctx.db.query('documentUnderstandingWorkNodes')
+      .withIndex('by_node_id', (q) => q.eq('nodeId', args.nodeId))
+      .first();
+    if (workNode && (
+      workNode.runId !== run._id ||
+      workNode.inputHash !== args.inputHash ||
+      workNode.sourceStart !== args.sourceStart ||
+      workNode.sourceEnd !== args.sourceEnd
+    )) {
+      throw new Error('Durable review node identity collision.');
+    }
+    if (workNode?.status === 'verified' || workNode?.status === 'exhausted') {
+      return { leased: false as const, reason: workNode.status };
+    }
+    if (workNode?.status === 'running' && (workNode.leaseExpiresAt ?? 0) > now) {
+      return { leased: false as const, reason: 'already_leased' };
+    }
+    if (workNode?.status === 'running') {
+      const expiredAttempt = await ctx.db.query('documentUnderstandingNodeAttempts')
+        .withIndex('by_work_node_attempt', (q) =>
+          q.eq('workNodeId', workNode!._id).eq('attempt', workNode!.attemptCount)
+        )
+        .first();
+      if (expiredAttempt?.status === 'running') {
+        await ctx.db.patch(expiredAttempt._id, {
+          status: 'failed', validationState: 'failed',
+          validationErrors: ['worker_lease_expired'], failureClass: 'provider_transient',
+          errorMessage: 'The review worker stopped before committing this node.', finishedAt: now,
+        });
+      }
+    }
+
+    const cycleAttempt = (workNode?.cycleAttemptCount ?? workNode?.attemptCount ?? 0) + 1;
+    const attempt = (workNode?.attemptCount ?? 0) + 1;
+    if (cycleAttempt > DURABLE_REVIEW_NODE_MAX_ATTEMPTS) {
+      if (!workNode) return { leased: false as const, reason: 'attempt_budget_exhausted' };
+      const decision = durableReviewRetryDecision({
+        attempt: workNode.cycleAttemptCount ?? workNode.attemptCount,
+        batchSize: workNode.batchSize,
+        failureClass: 'provider_transient',
+      });
+      if (decision.kind === 'split_batch') {
+        await ctx.db.patch(workNode._id, {
+          status: 'exhausted', validationState: 'failed',
+          validationErrors: ['worker_lease_expired'], failureClass: 'provider_transient',
+          lastErrorMessage: 'The review worker repeatedly stopped before committing this node.',
+          leaseId: undefined, leaseExpiresAt: undefined, finishedAt: now, updatedAt: now,
+        });
+        await ctx.db.patch(run._id, {
+          mapBatchSize: workNode.phase === 'map' ? decision.nextBatchSize : run.mapBatchSize,
+          reduceBatchSize: workNode.phase === 'reduce' ? decision.nextBatchSize : run.reduceBatchSize,
+          errorCode: 'node_split_after_worker_lease_expired', updatedAt: now,
+        });
+        await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: run._id });
+        return { leased: false as const, reason: 'batch_split_after_expired_lease' };
+      }
+      await ctx.db.patch(workNode._id, {
+        status: 'exhausted', validationState: 'failed',
+        validationErrors: ['worker_lease_expired'], failureClass: 'provider_transient',
+        lastErrorMessage: 'The review worker repeatedly stopped before committing this node.',
+        leaseId: undefined, leaseExpiresAt: undefined, finishedAt: now, updatedAt: now,
+      });
+      await ctx.db.patch(run._id, {
+        status: 'dead_letter', deadLetterNodeId: workNode.nodeId,
+        deadLetterFailureClass: 'provider_transient', errorCode: 'node_exhausted_worker_lease_expired',
+        errorMessage: 'The review worker repeatedly stopped before committing this node.',
+        updatedAt: now, finishedAt: now,
+      });
+      await ctx.db.patch(run.uploadedFileId, { fullDocumentReviewStatus: 'failed', updatedAt: now });
+      return { leased: false as const, reason: 'dead_letter_after_expired_lease' };
+    }
+    const strictRetry = cycleAttempt >= 3;
+    const leaseId = crypto.randomUUID();
+    const workNodePatch = {
+      status: 'running' as const,
+      attemptCount: attempt,
+      cycleAttemptCount: cycleAttempt,
+      maxAttempts: DURABLE_REVIEW_NODE_MAX_ATTEMPTS,
+      strictRetry,
+      leaseId,
+      leaseExpiresAt: now + NODE_LEASE_MS,
+      validationState: 'pending' as const,
+      validationErrors: [],
+      startedAt: workNode?.startedAt ?? now,
+      updatedAt: now,
+    };
+    if (workNode) {
+      await ctx.db.patch(workNode._id, workNodePatch);
+      workNode = { ...workNode, ...workNodePatch };
+    } else {
+      const workNodeId = await ctx.db.insert('documentUnderstandingWorkNodes', {
+        nodeId: args.nodeId,
+        runId: run._id,
+        uploadedFileId: run.uploadedFileId,
+        memoryGenerationId: run.memoryGenerationId,
+        phase: args.phase,
+        level: args.level,
+        nodeIndex: args.nodeIndex,
+        sourceStart: args.sourceStart,
+        sourceEnd: args.sourceEnd,
+        batchSize: args.batchSize,
+        inputHash: args.inputHash,
+        model: run.model,
+        createdAt: now,
+        ...workNodePatch,
+      });
+      workNode = await ctx.db.get(workNodeId);
+    }
+    if (!workNode) throw new Error('Failed to create durable review work node.');
+    const mode = cycleAttempt === 1
+      ? (run.resumeCount ? 'operator_resume' as const : 'initial' as const)
+      : cycleAttempt === 2 ? 'same_input_retry' as const : 'strict_retry' as const;
+    const attemptId = await ctx.db.insert('documentUnderstandingNodeAttempts', {
+      workNodeId: workNode._id,
+      nodeId: args.nodeId,
+      runId: run._id,
+      attempt,
+      cycleAttempt,
+      mode,
+      inputHash: stableCapabilityHash({ baseInputHash: args.inputHash, strictRetry }),
+      status: 'running',
+      validationState: 'pending',
+      validationErrors: [],
+      model: run.model,
+      maxOutputTokens: strictRetry ? STRICT_RETRY_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS,
+      startedAt: now,
+    });
+    await ctx.db.patch(run._id, {
+      status: args.expectedStatus,
+      errorCode: undefined,
+      errorMessage: undefined,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(NODE_LEASE_MS + 5_000, PROCESS_RUN_REFERENCE, { runId: run._id });
+    return { leased: true as const, workNodeId: workNode._id, attemptId, leaseId, attempt, strictRetry };
+  },
+});
+
+export const persistVerifiedNode = internalMutation({
+  args: {
+    runId: v.id('documentUnderstandingRuns'),
+    workNodeId: v.id('documentUnderstandingWorkNodes'),
+    attemptId: v.id('documentUnderstandingNodeAttempts'),
+    leaseId: v.string(),
+    expectedStatus: v.union(v.literal('mapping'), v.literal('reducing')),
+    level: v.number(),
+    nodeIndex: v.number(),
+    sourceChunkStart: v.number(),
+    sourceChunkEnd: v.number(),
+    sourceChunkCount: v.number(),
+    pageStart: v.optional(v.number()),
+    pageEnd: v.optional(v.number()),
+    payloadJson: v.string(),
+    providerRequestId: v.optional(v.string()),
+    nextChunkIndex: v.optional(v.number()),
+    nextNodeIndex: v.optional(v.number()),
+    finishLevel: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const [run, workNode, attempt] = await Promise.all([
+      ctx.db.get(args.runId),
+      ctx.db.get(args.workNodeId),
+      ctx.db.get(args.attemptId),
+    ]);
+    if (
+      !run || !workNode || !attempt ||
+      workNode.runId !== run._id || attempt.workNodeId !== workNode._id ||
+      workNode.leaseId !== args.leaseId || workNode.status !== 'running' ||
+      (run.status !== args.expectedStatus && !(run.status === 'queued' && args.expectedStatus === 'mapping'))
+    ) return false;
+
+    const existing = await ctx.db.query('documentUnderstandingNodes')
+      .withIndex('by_run_level_node', (q) =>
+        q.eq('runId', run._id).eq('level', args.level).eq('nodeIndex', args.nodeIndex)
+      )
+      .first();
+    if (existing) {
+      if (
+        existing.sourceChunkStart !== args.sourceChunkStart ||
+        existing.sourceChunkEnd !== args.sourceChunkEnd ||
+        existing.payloadJson !== args.payloadJson
+      ) throw new Error('Durable review node output conflict.');
+    } else {
+      await ctx.db.insert('documentUnderstandingNodes', {
+        runId: run._id,
+        uploadedFileId: run.uploadedFileId,
+        memoryGenerationId: run.memoryGenerationId,
+        level: args.level,
+        nodeIndex: args.nodeIndex,
+        sourceChunkStart: args.sourceChunkStart,
+        sourceChunkEnd: args.sourceChunkEnd,
+        sourceChunkCount: args.sourceChunkCount,
+        pageStart: args.pageStart,
+        pageEnd: args.pageEnd,
+        payloadJson: args.payloadJson,
+        createdAt: Date.now(),
+      });
+    }
+    const now = Date.now();
+    await ctx.db.patch(workNode._id, {
+      status: 'verified', outputJson: args.payloadJson, validationState: 'verified',
+      validationErrors: [], providerRequestId: args.providerRequestId,
+      leaseId: undefined, leaseExpiresAt: undefined, finishedAt: now, updatedAt: now,
+    });
+    await ctx.db.patch(attempt._id, {
+      status: 'verified', outputJson: args.payloadJson, validationState: 'verified',
+      validationErrors: [], providerRequestId: args.providerRequestId, finishedAt: now,
+    });
+    const mappingFinished = args.expectedStatus === 'mapping' && args.nextChunkIndex === run.totalChunks;
+    await ctx.db.patch(run._id, {
+      status: mappingFinished ? 'reducing' : args.expectedStatus,
+      nextChunkIndex: args.nextChunkIndex ?? run.nextChunkIndex,
+      currentLevel: args.finishLevel ? run.currentLevel + 1 : run.currentLevel,
+      nextNodeIndex: args.finishLevel ? 0 : args.nextNodeIndex ?? run.nextNodeIndex,
+      reduceBatchSize: args.finishLevel ? REDUCE_NODES : run.reduceBatchSize,
+      lastVerifiedNodeId: workNode.nodeId,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: run._id });
+    return true;
+  },
+});
+
+export const recordNodeFailure = internalMutation({
+  args: {
+    runId: v.id('documentUnderstandingRuns'),
+    workNodeId: v.id('documentUnderstandingWorkNodes'),
+    attemptId: v.id('documentUnderstandingNodeAttempts'),
+    leaseId: v.string(),
+    failureClass: v.string(),
+    errorMessage: v.string(),
+    outputJson: v.optional(v.string()),
+    providerRequestId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const [run, workNode, attempt] = await Promise.all([
+      ctx.db.get(args.runId), ctx.db.get(args.workNodeId), ctx.db.get(args.attemptId),
+    ]);
+    if (
+      !run || !workNode || !attempt || workNode.runId !== run._id ||
+      attempt.workNodeId !== workNode._id || workNode.leaseId !== args.leaseId ||
+      workNode.status !== 'running'
+    ) return { disposition: 'stale' as const };
+    const failureClass = args.failureClass as DurableReviewFailureClass;
+    const decision = durableReviewRetryDecision({
+      attempt: workNode.cycleAttemptCount ?? workNode.attemptCount,
+      batchSize: workNode.batchSize,
+      failureClass,
+    });
+    const now = Date.now();
+    const errorMessage = args.errorMessage.slice(0, 2_000);
+    await ctx.db.patch(attempt._id, {
+      status: 'failed', validationState: 'failed', validationErrors: [failureClass],
+      failureClass, errorMessage, outputJson: args.outputJson,
+      providerRequestId: args.providerRequestId, finishedAt: now,
+    });
+    if (decision.kind === 'retry_same' || decision.kind === 'retry_strict') {
+      await ctx.db.patch(workNode._id, {
+        status: 'retryable_failed', validationState: 'failed', validationErrors: [failureClass],
+        failureClass, lastErrorMessage: errorMessage, leaseId: undefined, leaseExpiresAt: undefined,
+        outputJson: args.outputJson, providerRequestId: args.providerRequestId,
+        updatedAt: now,
+      });
+      await ctx.db.patch(run._id, {
+        errorCode: `node_${failureClass}`, errorMessage, updatedAt: now,
+      });
+      await ctx.scheduler.runAfter(1_000, PROCESS_RUN_REFERENCE, { runId: run._id });
+      return { disposition: decision.kind };
+    }
+    if (decision.kind === 'split_batch') {
+      await ctx.db.patch(workNode._id, {
+        status: 'exhausted', validationState: 'failed', validationErrors: [failureClass],
+        failureClass, lastErrorMessage: errorMessage, leaseId: undefined, leaseExpiresAt: undefined,
+        outputJson: args.outputJson, providerRequestId: args.providerRequestId,
+        finishedAt: now, updatedAt: now,
+      });
+      await ctx.db.patch(run._id, {
+        mapBatchSize: workNode.phase === 'map' ? decision.nextBatchSize : run.mapBatchSize,
+        reduceBatchSize: workNode.phase === 'reduce' ? decision.nextBatchSize : run.reduceBatchSize,
+        errorCode: `node_split_after_${failureClass}`, errorMessage, updatedAt: now,
+      });
+      await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: run._id });
+      return { disposition: decision.kind, nextBatchSize: decision.nextBatchSize };
+    }
+
+    await ctx.db.patch(workNode._id, {
+      status: 'exhausted', validationState: 'failed', validationErrors: [failureClass],
+      failureClass, lastErrorMessage: errorMessage, leaseId: undefined, leaseExpiresAt: undefined,
+      outputJson: args.outputJson, providerRequestId: args.providerRequestId,
+      finishedAt: now, updatedAt: now,
+    });
+    await ctx.db.patch(run._id, {
+      status: 'dead_letter', deadLetterNodeId: workNode.nodeId,
+      deadLetterFailureClass: failureClass, errorCode: `node_exhausted_${failureClass}`,
+      errorMessage, updatedAt: now, finishedAt: now,
+    });
+    await ctx.db.patch(run.uploadedFileId, { fullDocumentReviewStatus: 'failed', updatedAt: now });
+    if (run.uploadSessionId && run.processingLockId) {
+      const session = await ctx.db.get(run.uploadSessionId);
+      if (session?.processingLockId === run.processingLockId) {
+        await ctx.db.patch(run.uploadSessionId, {
+          status: 'partial', errorCode: `document_understanding_${failureClass}`,
+          errorMessage: `The exhaustive review paused at one isolated node (${failureClass}). Completed review nodes were preserved and can be resumed.`,
+          retryable: true, processingFinishedAt: now, updatedAt: now,
+        });
+      }
+    }
+    return { disposition: 'dead_letter' as const, failureClass };
   },
 });
 
@@ -231,7 +660,33 @@ export const finalizeRun = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run || run.status !== 'reducing') return false;
+    if (!run) return false;
+    const finalizationHash = stableCapabilityHash({
+      runId: run._id,
+      structuredJson: args.structuredJson,
+      sourceChunkIds: args.sourceChunkIds,
+      sourceChunkIndexes: args.sourceChunkIndexes,
+      checks: args.checks,
+    });
+    const existingRecord = await ctx.db.query('documentUnderstandingRecords')
+      .withIndex('by_run', (q) => q.eq('runId', run._id))
+      .first();
+    if (existingRecord) {
+      if (existingRecord.finalizationHash && existingRecord.finalizationHash !== finalizationHash) {
+        throw new Error('Document understanding finalization conflict.');
+      }
+      return run.status === 'ready';
+    }
+    if (run.status !== 'reducing') return false;
+    const expectedIndexes = Array.from({ length: run.totalChunks }, (_, index) => index);
+    const actualIndexes = Array.from(new Set(args.sourceChunkIndexes)).sort((a, b) => a - b);
+    if (
+      actualIndexes.length !== expectedIndexes.length ||
+      actualIndexes.some((value, index) => value !== expectedIndexes[index]) ||
+      args.sourceChunkIds.length !== run.totalChunks
+    ) {
+      throw new Error('Final review cannot be verified complete because canonical chunk coverage is incomplete.');
+    }
     const now = Date.now();
     const recordId = await ctx.db.insert('documentUnderstandingRecords', {
       runId: run._id,
@@ -246,6 +701,7 @@ export const finalizeRun = internalMutation({
       sourceChunkIndexes: args.sourceChunkIndexes,
       verificationStatus: 'verified',
       verificationChecks: args.checks,
+      finalizationHash,
       totalChunks: run.totalChunks,
       coveredChunks: args.sourceChunkIndexes.length,
       createdAt: now,
@@ -275,12 +731,25 @@ export const finalizeRun = internalMutation({
 });
 
 export const failRun = internalMutation({
-  args: { runId: v.id('documentUnderstandingRuns'), errorCode: v.string(), errorMessage: v.string() },
+  args: {
+    runId: v.id('documentUnderstandingRuns'),
+    errorCode: v.string(),
+    errorMessage: v.string(),
+    failureClass: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run || ['ready', 'failed'].includes(run.status)) return false;
+    if (!run || ['ready', 'failed', 'dead_letter'].includes(run.status)) return false;
     const now = Date.now();
-    await ctx.db.patch(run._id, { status: 'failed', errorCode: args.errorCode, errorMessage: args.errorMessage.slice(0, 2_000), updatedAt: now, finishedAt: now });
+    const deadLetter = run.version === UNDERSTANDING_VERSION;
+    await ctx.db.patch(run._id, {
+      status: deadLetter ? 'dead_letter' : 'failed',
+      deadLetterFailureClass: deadLetter ? args.failureClass ?? 'unknown' : undefined,
+      errorCode: args.errorCode,
+      errorMessage: args.errorMessage.slice(0, 2_000),
+      updatedAt: now,
+      finishedAt: now,
+    });
     await ctx.db.patch(run.uploadedFileId, { fullDocumentReviewStatus: 'failed', updatedAt: now });
     if (run.uploadSessionId && run.processingLockId) {
       const session = await ctx.db.get(run.uploadSessionId);
@@ -296,45 +765,162 @@ export const failRun = internalMutation({
   },
 });
 
+async function processLegacyWork(ctx: ActionCtx, work: UnderstandingWork) {
+  if (work.kind === 'map') {
+    if (work.chunks.length === 0) throw new Error('Map phase ended without a complete chunk range.');
+    const first = work.chunks[0];
+    const last = work.chunks[work.chunks.length - 1];
+    const source = work.chunks.map((chunk) =>
+      `SOURCE_CHUNK_${chunk.chunkIndex} | ${pageCitation(chunk.pageStart, chunk.pageEnd)}\n${chunk.text}`).join('\n\n');
+    const generated = await generateNode(buildDocumentUnderstandingMapPrompt(source));
+    await ctx.runMutation(internal.documentUnderstanding.persistNode, {
+      runId: work.run._id, expectedStatus: 'mapping', level: 0,
+      nodeIndex: work.outputNodeIndex,
+      sourceChunkStart: first.chunkIndex, sourceChunkEnd: last.chunkIndex,
+      sourceChunkCount: work.chunks.length,
+      pageStart: first.pageStart, pageEnd: last.pageEnd ?? last.pageStart,
+      payloadJson: JSON.stringify(generated.payload), nextChunkIndex: last.chunkIndex + 1,
+    });
+    return { phase: 'mapping', throughChunk: last.chunkIndex };
+  }
+  if (work.kind === 'reduce') {
+    if (work.nodes.length === 0) throw new Error('Reduce phase found no nodes.');
+    const first = work.nodes[0];
+    const last = work.nodes[work.nodes.length - 1];
+    const generated = await generateNode(buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson)));
+    const consumed = first.nodeIndex + work.nodes.length;
+    await ctx.runMutation(internal.documentUnderstanding.persistNode, {
+      runId: work.run._id, expectedStatus: 'reducing', level: work.run.currentLevel + 1,
+      nodeIndex: work.outputNodeIndex,
+      sourceChunkStart: first.sourceChunkStart, sourceChunkEnd: last.sourceChunkEnd,
+      sourceChunkCount: work.nodes.reduce((sum, node) => sum + node.sourceChunkCount, 0),
+      pageStart: first.pageStart, pageEnd: last.pageEnd,
+      payloadJson: JSON.stringify(generated.payload), nextNodeIndex: consumed,
+      finishLevel: consumed >= work.levelCount,
+    });
+    return { phase: 'reducing', level: work.run.currentLevel };
+  }
+  return null;
+}
+
 export const processRun = internalAction({
   args: { runId: v.id('documentUnderstandingRuns') },
   handler: async (ctx, args): Promise<Record<string, unknown> | null> => {
     try {
       const work = await ctx.runQuery(internal.documentUnderstanding.getWork, args) as UnderstandingWork | null;
       if (!work) return null;
+      if (work.run.version !== UNDERSTANDING_VERSION) {
+        const legacyResult = await processLegacyWork(ctx, work);
+        if (legacyResult) return legacyResult;
+      }
       if (work.kind === 'map') {
         if (work.chunks.length === 0) throw new Error('Map phase ended without a complete chunk range.');
         const first = work.chunks[0];
         const last = work.chunks[work.chunks.length - 1];
         const source = work.chunks.map((chunk) =>
           `SOURCE_CHUNK_${chunk.chunkIndex} | ${pageCitation(chunk.pageStart, chunk.pageEnd)}\n${chunk.text}`).join('\n\n');
-        const payload = await generateNode(buildDocumentUnderstandingMapPrompt(source));
-        await ctx.runMutation(internal.documentUnderstanding.persistNode, {
-          runId: work.run._id, expectedStatus: 'mapping', level: 0,
-          nodeIndex: Math.floor(first.chunkIndex / MAP_CHUNKS),
-          sourceChunkStart: first.chunkIndex, sourceChunkEnd: last.chunkIndex,
-          sourceChunkCount: work.chunks.length,
-          pageStart: first.pageStart, pageEnd: last.pageEnd ?? last.pageStart,
-          payloadJson: JSON.stringify(payload), nextChunkIndex: last.chunkIndex + 1,
+        const prompt = buildDocumentUnderstandingMapPrompt(source);
+        const inputHash = stableCapabilityHash(prompt);
+        const nodeId = durableReviewNodeId({
+          stableJobId: work.run.stableJobId ?? `dur_legacy_${work.run._id}`,
+          phase: 'map', level: 0, sourceStart: first.chunkIndex, sourceEnd: last.chunkIndex, inputHash,
         });
-        return { phase: 'mapping', throughChunk: last.chunkIndex };
+        const lease = await ctx.runMutation(internal.documentUnderstanding.beginWorkNode, {
+          runId: work.run._id, expectedStatus: 'mapping', nodeId, phase: 'map', level: 0,
+          nodeIndex: work.outputNodeIndex, sourceStart: first.chunkIndex, sourceEnd: last.chunkIndex,
+          batchSize: work.chunks.length, inputHash,
+        });
+        if (!lease.leased) return { phase: 'mapping', disposition: lease.reason };
+        try {
+          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry });
+          const verification = verifyDocumentUnderstandingNode({
+            payload: generated.payload,
+            chunks: work.chunks,
+            provenance: {
+              sourceChunkStart: first.chunkIndex,
+              sourceChunkEnd: last.chunkIndex,
+              sourceChunkCount: work.chunks.length,
+            },
+          });
+          if (!verification.passed) throw new Error(`Node schema validation failed: ${verification.errors.join(' | ')}`);
+          await ctx.runMutation(internal.documentUnderstanding.persistVerifiedNode, {
+            runId: work.run._id, workNodeId: lease.workNodeId, attemptId: lease.attemptId,
+            leaseId: lease.leaseId, expectedStatus: 'mapping', level: 0,
+            nodeIndex: work.outputNodeIndex, sourceChunkStart: first.chunkIndex, sourceChunkEnd: last.chunkIndex,
+            sourceChunkCount: work.chunks.length, pageStart: first.pageStart,
+            pageEnd: last.pageEnd ?? last.pageStart, payloadJson: JSON.stringify(generated.payload),
+            providerRequestId: generated.providerRequestId, nextChunkIndex: last.chunkIndex + 1,
+          });
+          return { phase: 'mapping', throughChunk: last.chunkIndex, attempt: lease.attempt };
+        } catch (error) {
+          const failureClass = classifyDurableReviewFailure(error);
+          const outcome = await ctx.runMutation(internal.documentUnderstanding.recordNodeFailure, {
+            runId: work.run._id, workNodeId: lease.workNodeId, attemptId: lease.attemptId,
+            leaseId: lease.leaseId, failureClass,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            outputJson: error instanceof UnderstandingNodeGenerationError ? error.outputJson : undefined,
+            providerRequestId: error instanceof UnderstandingNodeGenerationError ? error.providerRequestId : undefined,
+          });
+          return { phase: 'mapping', failureClass, ...outcome };
+        }
       }
       if (work.kind === 'reduce') {
         if (work.nodes.length === 0) throw new Error('Reduce phase found no nodes.');
         const first = work.nodes[0];
         const last = work.nodes[work.nodes.length - 1];
-        const payload = await generateNode(buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson)));
-        const consumed = first.nodeIndex + work.nodes.length;
-        await ctx.runMutation(internal.documentUnderstanding.persistNode, {
-          runId: work.run._id, expectedStatus: 'reducing', level: work.run.currentLevel + 1,
-          nodeIndex: Math.floor(first.nodeIndex / REDUCE_NODES),
-          sourceChunkStart: first.sourceChunkStart, sourceChunkEnd: last.sourceChunkEnd,
-          sourceChunkCount: work.nodes.reduce((sum, node) => sum + node.sourceChunkCount, 0),
-          pageStart: first.pageStart, pageEnd: last.pageEnd,
-          payloadJson: JSON.stringify(payload), nextNodeIndex: consumed,
-          finishLevel: consumed >= work.levelCount,
+        const prompt = buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson));
+        const inputHash = stableCapabilityHash(prompt);
+        const nodeId = durableReviewNodeId({
+          stableJobId: work.run.stableJobId ?? `dur_legacy_${work.run._id}`,
+          phase: 'reduce', level: work.run.currentLevel + 1,
+          sourceStart: first.nodeIndex, sourceEnd: last.nodeIndex, inputHash,
         });
-        return { phase: 'reducing', level: work.run.currentLevel };
+        const lease = await ctx.runMutation(internal.documentUnderstanding.beginWorkNode, {
+          runId: work.run._id, expectedStatus: 'reducing', nodeId, phase: 'reduce',
+          level: work.run.currentLevel + 1, nodeIndex: work.outputNodeIndex,
+          sourceStart: first.nodeIndex, sourceEnd: last.nodeIndex,
+          batchSize: work.nodes.length, inputHash,
+        });
+        if (!lease.leased) return { phase: 'reducing', disposition: lease.reason };
+        const consumed = first.nodeIndex + work.nodes.length;
+        try {
+          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry });
+          const allChunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
+          const chunks = allChunks.filter((chunk) =>
+            chunk.chunkIndex >= first.sourceChunkStart && chunk.chunkIndex <= last.sourceChunkEnd
+          );
+          const verification = verifyDocumentUnderstandingNode({
+            payload: generated.payload,
+            chunks,
+            provenance: {
+              sourceChunkStart: first.sourceChunkStart,
+              sourceChunkEnd: last.sourceChunkEnd,
+              sourceChunkCount: work.nodes.reduce((sum, node) => sum + node.sourceChunkCount, 0),
+            },
+          });
+          if (!verification.passed) throw new Error(`Node schema validation failed: ${verification.errors.join(' | ')}`);
+          await ctx.runMutation(internal.documentUnderstanding.persistVerifiedNode, {
+            runId: work.run._id, workNodeId: lease.workNodeId, attemptId: lease.attemptId,
+            leaseId: lease.leaseId, expectedStatus: 'reducing', level: work.run.currentLevel + 1,
+            nodeIndex: work.outputNodeIndex, sourceChunkStart: first.sourceChunkStart,
+            sourceChunkEnd: last.sourceChunkEnd,
+            sourceChunkCount: work.nodes.reduce((sum, node) => sum + node.sourceChunkCount, 0),
+            pageStart: first.pageStart, pageEnd: last.pageEnd,
+            payloadJson: JSON.stringify(generated.payload), providerRequestId: generated.providerRequestId,
+            nextNodeIndex: consumed, finishLevel: consumed >= work.levelCount,
+          });
+          return { phase: 'reducing', level: work.run.currentLevel, attempt: lease.attempt };
+        } catch (error) {
+          const failureClass = classifyDurableReviewFailure(error);
+          const outcome = await ctx.runMutation(internal.documentUnderstanding.recordNodeFailure, {
+            runId: work.run._id, workNodeId: lease.workNodeId, attemptId: lease.attemptId,
+            leaseId: lease.leaseId, failureClass,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            outputJson: error instanceof UnderstandingNodeGenerationError ? error.outputJson : undefined,
+            providerRequestId: error instanceof UnderstandingNodeGenerationError ? error.providerRequestId : undefined,
+          });
+          return { phase: 'reducing', failureClass, ...outcome };
+        }
       }
       const root = work.nodes[0];
       const chunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
@@ -360,12 +946,14 @@ export const processRun = internalAction({
       });
       return { phase: 'ready', chunks: chunks.length, findings: payload.findings.length };
     } catch (error) {
+      const failureClass = classifyDurableReviewFailure(error);
       await ctx.runMutation(internal.documentUnderstanding.failRun, {
         runId: args.runId,
-        errorCode: 'understanding_failed',
+        errorCode: `understanding_${failureClass}`,
         errorMessage: error instanceof Error ? error.message : String(error),
+        failureClass,
       });
-      return { phase: 'failed' };
+      return { phase: 'failed', failureClass };
     }
   },
 });
@@ -409,5 +997,139 @@ export const getActiveRecord = internalQuery({
     const record = await ctx.db.get(file.activeUnderstandingRecordId);
     if (!record || record.memoryGenerationId !== file.activeMemoryGenerationId || record.verificationStatus !== 'verified') return null;
     return record;
+  },
+});
+
+export const getOwnedRunStatus = query({
+  args: { runId: v.id('documentUnderstandingRuns') },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+    const run = await ctx.db.get(args.runId);
+    if (!run || run.clerkUserId !== user.clerkId) throw new Error('Not authorized to inspect this review run.');
+    const nodes = await ctx.db.query('documentUnderstandingWorkNodes')
+      .withIndex('by_run_status', (q) => q.eq('runId', run._id))
+      .collect();
+    return {
+      runId: run._id,
+      stableJobId: run.stableJobId,
+      status: run.status,
+      totalChunks: run.totalChunks,
+      nextChunkIndex: run.nextChunkIndex,
+      currentLevel: run.currentLevel,
+      verifiedNodes: nodes.filter((node) => node.status === 'verified').length,
+      retryingNodes: nodes.filter((node) => node.status === 'retryable_failed' || node.status === 'running').length,
+      exhaustedNodes: nodes.filter((node) => node.status === 'exhausted').length,
+      failureClass: run.deadLetterFailureClass,
+      errorCode: run.errorCode,
+      canResume: run.status === 'dead_letter' || run.status === 'failed' || run.status === 'partial',
+      resumeCount: run.resumeCount ?? 0,
+      updatedAt: run.updatedAt,
+    };
+  },
+});
+
+export const resumeOwnedRun = mutation({
+  args: { runId: v.id('documentUnderstandingRuns') },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+    const run = await ctx.db.get(args.runId);
+    if (!run || run.clerkUserId !== user.clerkId) throw new Error('Not authorized to resume this review run.');
+    if (!['dead_letter', 'failed', 'partial'].includes(run.status)) {
+      return { resumed: false, status: run.status, reason: 'run_not_failed' };
+    }
+    const file = await ctx.db.get(run.uploadedFileId);
+    if (!file || file.clerkUserId !== user.clerkId || file.activeMemoryGenerationId !== run.memoryGenerationId) {
+      throw new Error('The failed review no longer matches the active document version.');
+    }
+    const now = Date.now();
+    if (run.deadLetterNodeId) {
+      const node = await ctx.db.query('documentUnderstandingWorkNodes')
+        .withIndex('by_node_id', (q) => q.eq('nodeId', run.deadLetterNodeId!))
+        .first();
+      if (node?.runId === run._id) {
+        await ctx.db.patch(node._id, {
+          status: 'retryable_failed', cycleAttemptCount: 0, strictRetry: false,
+          leaseId: undefined, leaseExpiresAt: undefined,
+          validationState: 'pending', validationErrors: [],
+          failureClass: undefined, lastErrorMessage: undefined,
+          finishedAt: undefined, updatedAt: now,
+        });
+      }
+    }
+    const resumedStatus = run.nextChunkIndex < run.totalChunks ? 'mapping' as const : 'reducing' as const;
+    await ctx.db.patch(run._id, {
+      status: resumedStatus,
+      resumeCount: (run.resumeCount ?? 0) + 1,
+      lastResumedByUserId: user._id,
+      lastResumedAt: now,
+      deadLetterNodeId: undefined,
+      deadLetterFailureClass: undefined,
+      errorCode: undefined,
+      errorMessage: undefined,
+      finishedAt: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.patch(file._id, { fullDocumentReviewStatus: 'building', updatedAt: now });
+    await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: run._id });
+    return { resumed: true, status: resumedStatus, priorFailureClass: run.deadLetterFailureClass };
+  },
+});
+
+export const restartOwnedDocumentVersion = mutation({
+  args: { uploadedFileId: v.id('uploadedFiles') },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+    const file = await ctx.db.get(args.uploadedFileId);
+    if (!file || file.clerkUserId !== user.clerkId) throw new Error('Not authorized to restart this document review.');
+    if (!file.activeMemoryGenerationId) throw new Error('Document has no active memory generation.');
+    const generation = await ctx.db.get(file.activeMemoryGenerationId);
+    if (!generation?.coverageManifestId) throw new Error('Document has no complete coverage manifest.');
+    const manifest = await ctx.db.get(generation.coverageManifestId);
+    if (!manifest || manifest.status !== 'complete') throw new Error('Document coverage is not complete.');
+    const chunks = await ctx.db.query('documentChunks')
+      .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', generation._id))
+      .collect();
+    if (chunks.length === 0) throw new Error('Document has no canonical chunks.');
+    const priorRuns = await ctx.db.query('documentUnderstandingRuns')
+      .withIndex('by_file_created', (q) => q.eq('uploadedFileId', file._id))
+      .collect();
+    const restartNumber = priorRuns.filter((candidate) => candidate.memoryGenerationId === generation._id).length;
+    const now = Date.now();
+    const stableJobId = `dur_${stableCapabilityHash({
+      uploadedFileId: file._id,
+      memoryGenerationId: generation._id,
+      coverageManifestId: manifest._id,
+      version: UNDERSTANDING_VERSION,
+      restartNumber,
+    }).slice(0, 28)}`;
+    const runId = await ctx.db.insert('documentUnderstandingRuns', {
+      uploadedFileId: file._id,
+      memoryGenerationId: generation._id,
+      coverageManifestId: manifest._id,
+      clerkUserId: file.clerkUserId,
+      status: 'queued',
+      version: UNDERSTANDING_VERSION,
+      model: UNDERSTANDING_MODEL,
+      stableJobId,
+      totalChunks: chunks.length,
+      nextChunkIndex: 0,
+      currentLevel: 0,
+      nextNodeIndex: 0,
+      mapBatchSize: MAP_CHUNKS,
+      reduceBatchSize: REDUCE_NODES,
+      resumeCount: 0,
+      lastResumedByUserId: user._id,
+      lastResumedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(file._id, {
+      activeUnderstandingRunId: runId,
+      activeUnderstandingRecordId: undefined,
+      fullDocumentReviewStatus: 'building',
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId });
+    return { runId, stableJobId, restartNumber };
   },
 });

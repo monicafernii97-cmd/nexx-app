@@ -86,6 +86,45 @@ export function verifyDocumentUnderstanding(args: {
   };
 }
 
+export function verifyDocumentUnderstandingNode(args: {
+  payload: DocumentUnderstandingPayload;
+  chunks: UnderstandingSourceChunk[];
+  provenance: { sourceChunkStart: number; sourceChunkEnd: number; sourceChunkCount: number };
+}) {
+  const errors: string[] = [];
+  const expectedIndexes = args.chunks.map((chunk) => chunk.chunkIndex).sort((a, b) => a - b);
+  const expectedStart = expectedIndexes[0];
+  const expectedEnd = expectedIndexes[expectedIndexes.length - 1];
+  const contiguous = expectedIndexes.every((index, position) => index === (expectedStart ?? 0) + position);
+  if (
+    expectedStart === undefined || expectedEnd === undefined || !contiguous ||
+    args.provenance.sourceChunkStart !== expectedStart ||
+    args.provenance.sourceChunkEnd !== expectedEnd ||
+    args.provenance.sourceChunkCount !== args.chunks.length
+  ) {
+    errors.push('Understanding node provenance does not match its contiguous source range.');
+  }
+  const chunksByIndex = new Map(args.chunks.map((chunk) => [chunk.chunkIndex, chunk]));
+  for (const finding of args.payload.findings) {
+    const indexes = finding.sourceIds.map(understandingSourceIndex);
+    if (indexes.length === 0 || indexes.some((index) => index === null || !chunksByIndex.has(index))) {
+      errors.push(`Finding has an invalid source ID for this node: ${finding.title}`);
+      continue;
+    }
+    const quote = normalizeEvidence(finding.quote);
+    if (quote.length < 8 || !indexes.some((index) => normalizeEvidence(chunksByIndex.get(index!)!.text).includes(quote))) {
+      errors.push(`Finding quote is not present in this node's cited source: ${finding.title}`);
+    }
+  }
+  return {
+    passed: errors.length === 0,
+    errors,
+    checks: errors.length === 0
+      ? ['contiguous_node_provenance', 'node_source_ids_valid', 'node_finding_quotes_verified']
+      : [],
+  };
+}
+
 function pageCitation(pageStart?: number, pageEnd?: number, sourceUrl?: string) {
   if (!pageStart) return '[source location unavailable]';
   const label = pageEnd && pageEnd !== pageStart ? `pp. ${pageStart}-${pageEnd}` : `p. ${pageStart}`;

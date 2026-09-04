@@ -8,6 +8,7 @@ export type ExecutiveChatFeatureFlags = {
   documentActivationV2: boolean;
   publicationGateV2: boolean;
   selfCorrectionV2: boolean;
+  understandingResumeV2: boolean;
 };
 
 function enabled(value: string | undefined, fallback: boolean) {
@@ -32,6 +33,7 @@ export function getExecutiveChatFeatureFlags(
     documentActivationV2: enabled(env.EXEC_CHAT_DOCUMENT_ACTIVATION_V2, false),
     publicationGateV2: enabled(env.EXEC_CHAT_PUBLICATION_V2, false),
     selfCorrectionV2: enabled(env.EXEC_CHAT_SELF_CORRECTION_V2, false),
+    understandingResumeV2: enabled(env.EXEC_CHAT_UNDERSTANDING_RESUME_V2, true),
   };
 }
 

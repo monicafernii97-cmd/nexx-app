@@ -129,6 +129,17 @@ describe('publication quality v2', () => {
     }).errors).toContain('RESP_UNREQUESTED_DOCUMENT_USE');
   });
 
+  it('rejects latent document context on an unrelated current turn', () => {
+    expect(verify('If you mean the signed order, upload it and I can review it.', {
+      speechAct: 'unknown',
+      documentContextAllowed: false,
+      plan: plan({ responseAct: 'clarify' }),
+    }).errors).toEqual(expect.arrayContaining([
+      'RESP_LATENT_DOCUMENT_CONTEXT_SURFACED',
+      'RESP_UNREQUESTED_DOCUMENT_USE',
+    ]));
+  });
+
   it('rejects the captured file-reference disclaimer on a social turn', () => {
     const content = 'Because right now I can see the file reference/name, but I do not have the actual readable page text in front of me.';
     expect(verify(content, { speechAct: 'social' }).errors)
@@ -275,6 +286,13 @@ describe('publication quality v2', () => {
       stage: 'deterministic_repair',
       requestedOperation: 'await_upload',
     })).toContain('fresh extraction from that copy');
+    expect(buildPublicationRepairContent({
+      errors: ['RESP_LATENT_DOCUMENT_CONTEXT_SURFACED'],
+      questionKind: 'other',
+      stage: 'clarification',
+      speechAct: 'unknown',
+      userMessage: 'ZQX?',
+    })).toBe('What do you mean by “ZQX”?');
   });
 
   it('allows one v2 regeneration for a non-narrow generic failure and then stops retrying', () => {

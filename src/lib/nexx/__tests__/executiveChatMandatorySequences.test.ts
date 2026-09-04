@@ -197,6 +197,9 @@ describe('all 58 mandatory executive-chat sequences', () => {
   it('42 unknown acronyms clarify without route corruption', () => {
     const flow = scenario('unknown').givenDocument('order', readable).user('Review it', { attach: 'order' }).user('ZQX?');
     flow.expectNoReplacement().expectFocus({ documents: ['order'] });
+    const understanding = understandTurn({ message: 'ZQX?', controlState: activeControl({ activeDocumentIds: ['order'] }) });
+    expect(understanding.speechAct).toBe('unknown');
+    expect(understanding.ambiguityMaterial).toBe(true);
   });
 
   it.each([

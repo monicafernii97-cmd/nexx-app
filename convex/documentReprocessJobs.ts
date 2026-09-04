@@ -1,6 +1,8 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
+import { isDocumentEligibleForChat } from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 const reprocessReasonValidator = v.union(
   v.literal('user_requested'),
@@ -23,7 +25,8 @@ export const requestDocumentReprocess = mutation({
     if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
 
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile || uploadedFile.clerkUserId !== user.clerkId) {
+    if (!uploadedFile || uploadedFile.clerkUserId !== user.clerkId ||
+      !isDocumentEligibleForChat(uploadedFile, isUploadE2ERobotEmail(user.email))) {
       throw new Error('Document not found or not authorized');
     }
     if (!uploadedFile.storageId && !uploadedFile.fullTextStorageId) {
@@ -61,7 +64,8 @@ export const listForDocument = query({
     if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
 
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile || uploadedFile.clerkUserId !== user.clerkId) {
+    if (!uploadedFile || uploadedFile.clerkUserId !== user.clerkId ||
+      !isDocumentEligibleForChat(uploadedFile, isUploadE2ERobotEmail(user.email))) {
       throw new Error('Document not found or not authorized');
     }
 

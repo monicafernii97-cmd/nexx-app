@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation } from './lib/auth';
 import { canAccessDocumentSource } from '../src/lib/nexx/documentSourceAccess';
+import { classifyCreationProvenance, isDocumentEligibleForChat, qaRunIdFromFilename } from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 /**
  * Uploaded Files — metadata for user-uploaded documents.
@@ -34,6 +36,17 @@ export const create = mutation({
             throw new Error('Authenticated user is missing clerkId');
         }
         const clerkUserId = user.clerkId;
+        const filenameRunId = qaRunIdFromFilename(args.filename);
+        const registeredRun = filenameRunId
+            ? await ctx.db.query('chatUploadE2ERuns')
+                .withIndex('by_user_run', (q) => q.eq('clerkUserId', clerkUserId).eq('runId', filenameRunId))
+                .first()
+            : null;
+        const provenance = classifyCreationProvenance({
+            email: user.email,
+            filename: args.filename,
+            registeredQaRunId: registeredRun?.runId,
+        });
 
         // Verify conversation ownership if provided
         if (args.conversationId) {
@@ -43,6 +56,10 @@ export const create = mutation({
         // Status is always 'uploaded' — clients cannot set terminal states
         return await ctx.db.insert('uploadedFiles', {
             clerkUserId,
+            dataProvenance: provenance.dataProvenance,
+            qaRunId: provenance.qaRunId,
+            qaNamespace: provenance.dataProvenance === 'production' ? undefined : `qa:${clerkUserId}`,
+            provenanceClassifiedAt: Date.now(),
             conversationId: args.conversationId,
             filename: args.filename,
             mimeType: args.mimeType,
@@ -73,6 +90,7 @@ export const _updateStatusInternal = internalMutation({
     handler: async (ctx, args) => {
         const file = await ctx.db.get(args.fileId);
         if (!file) throw new Error('File not found');
+        if (file.status === 'quarantined') throw new Error('Quarantined files cannot be updated');
 
         const patch: {
             status: 'uploaded' | 'processing' | 'ready' | 'failed';
@@ -163,11 +181,12 @@ export const getByUser = query({
         }
         const clerkUserId = user.clerkId;
 
-        return await ctx.db
+        const allowQa = isUploadE2ERobotEmail(user.email);
+        return (await ctx.db
             .query('uploadedFiles')
             .withIndex('by_clerkUserId', (q) => q.eq('clerkUserId', clerkUserId))
             .order('desc')
-            .collect();
+            .collect()).filter((file) => isDocumentEligibleForChat(file, allowQa));
     },
 });
 
@@ -177,13 +196,14 @@ export const getByConversation = query({
     },
     handler: async (ctx, args) => {
         // Server-derived auth
-        await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+        const { user } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+        const allowQa = isUploadE2ERobotEmail(user.email);
 
-        return await ctx.db
+        return (await ctx.db
             .query('uploadedFiles')
             .withIndex('by_conversationId', (q) => q.eq('conversationId', args.conversationId))
             .order('desc')
-            .collect();
+            .collect()).filter((file) => isDocumentEligibleForChat(file, allowQa));
     },
 });
 
@@ -199,7 +219,8 @@ export const getAuthorizedSourceFileInternal = internalQuery({
         if (!user.clerkId) return null;
         const clerkUserId = user.clerkId;
         const file = await ctx.db.get(args.uploadedFileId);
-        if (!file || !file.storageId || file.deletedAt || file.status === 'deleted' || file.status === 'quarantined') {
+        const allowQa = isUploadE2ERobotEmail(user.email);
+        if (!file || !file.storageId || !isDocumentEligibleForChat(file, allowQa)) {
             return null;
         }
 

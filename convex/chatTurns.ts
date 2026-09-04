@@ -72,6 +72,7 @@ import {
     type PersistedPublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
 import { stableCapabilityHash } from '../src/lib/nexx/capabilities/documentCapabilityLedger';
+import { isDocumentEligibleForChat } from './lib/qaProvenance';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -672,6 +673,7 @@ export const hydrateSemanticDocumentChunks = internalQuery({
         if (!turn || !uploadedFile?.activeMemoryGenerationId) return [];
         const [user, conversation] = await Promise.all([ctx.db.get(turn.userId), ctx.db.get(turn.conversationId)]);
         if (!user?.clerkId || !conversation || conversation.userId !== turn.userId) return [];
+        if (!isDocumentEligibleForChat(uploadedFile, isUploadE2ERobotEmail(user.email))) return [];
         const granted = await hasActiveUserChatGrant(ctx, {
             clerkUserId: user.clerkId,
             uploadedFileId: uploadedFile._id,
@@ -1063,6 +1065,7 @@ export const acceptChatTurn = mutation({
         const executiveChatFlags = getExecutiveChatFeatureFlags();
         const { user, conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
         const now = Date.now();
         const attachments = args.attachments ?? [];
         const validatedAttachments = [];
@@ -1079,6 +1082,7 @@ export const acceptChatTurn = mutation({
                 uploadedFile.conversationId !== args.conversationId ||
                 uploadedFile.uploadSessionId !== attachment.uploadSessionId ||
                 uploadedFile.storageId !== attachment.storageId ||
+                !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
                 (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
             ) {
                 throw new Error('Attachment is not ready or does not belong to this conversation.');
@@ -1086,6 +1090,8 @@ export const acceptChatTurn = mutation({
             validatedAttachments.push({
                 uploadedFileId: uploadedFile._id,
                 uploadSessionId: uploadedFile.uploadSessionId,
+                dataProvenance: uploadedFile.dataProvenance,
+                qaRunId: uploadedFile.qaRunId,
                 storageId: uploadedFile.storageId,
                 filename: uploadedFile.filename,
                 mimeType: uploadedFile.mimeType,
@@ -1421,6 +1427,8 @@ export const acceptChatTurn = mutation({
                     conversationId: args.conversationId,
                     uploadedFileId: attachment.uploadedFileId,
                     uploadSessionId: attachment.uploadSessionId,
+                    dataProvenance: attachment.dataProvenance,
+                    qaRunId: attachment.qaRunId,
                     filename: attachment.filename,
                     mimeType: attachment.mimeType,
                     byteSize: attachment.byteSize,
@@ -1728,6 +1736,7 @@ export const getGenerationContext = internalQuery({
                 : currentDocumentReference
             : detectDocumentReference(contextualFollowUpMessage);
         const clerkUserId = user.clerkId;
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
         const activeCaseId = conversation.caseId;
         const grantedUploadedFiles = clerkUserId
             ? await getGrantedUploadedFilesForChat(ctx, {
@@ -1749,7 +1758,7 @@ export const getGenerationContext = internalQuery({
         const attachmentContexts = [];
         for (const attachment of attachmentRows) {
             const uploadedFile = await ctx.db.get(attachment.uploadedFileId);
-            if (!uploadedFile) continue;
+            if (!uploadedFile || !isDocumentEligibleForChat(uploadedFile, allowQaDocuments)) continue;
             const context = buildUploadedFileContext(
                 uploadedFile,
                 'current_turn',
@@ -1803,6 +1812,7 @@ export const getGenerationContext = internalQuery({
             const uploadedFile = await ctx.db.get(uploadedFileId);
             if (
                 uploadedFile &&
+                isDocumentEligibleForChat(uploadedFile, allowQaDocuments) &&
                 (uploadedFile.clerkUserId === user?.clerkId ||
                     grantedUploadedFileIds.includes(uploadedFile._id.toString()))
             ) {
@@ -1864,7 +1874,11 @@ export const getGenerationContext = internalQuery({
         const accessibleMemoryFiles: Doc<'uploadedFiles'>[] = [];
         for (const uploadedFile of candidateMemoryFiles) {
             const uploadedFileId = uploadedFile._id.toString();
-            if (seenCandidateFileIds.has(uploadedFileId) || !accessScope) continue;
+            if (
+                seenCandidateFileIds.has(uploadedFileId) ||
+                !accessScope ||
+                !isDocumentEligibleForChat(uploadedFile, allowQaDocuments)
+            ) continue;
             seenCandidateFileIds.add(uploadedFileId);
             if (!canUseDocumentMemoryCandidate({
                 uploadedFileId,
@@ -2325,12 +2339,14 @@ export const recordRetrievalRun = internalMutation({
             })).map((grant) => grant.uploadedFileId.toString()),
         };
         let authorizationRecheckPassed = true;
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
         for (const chunkId of uniqueChunkIds) {
             const chunk = await ctx.db.get(chunkId);
             const uploadedFile = chunk ? await ctx.db.get(chunk.uploadedFileId) : null;
             if (
                 !chunk ||
                 !uploadedFile ||
+                !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
                 !chunkMatchesActiveDocumentMemory(chunk, uploadedFile) ||
                 !canUseDocumentMemoryCandidate(uploadedFileAccessCandidate(uploadedFile), accessScope)
             ) {
@@ -2381,6 +2397,7 @@ export const resolveFullReviewEvidence = internalQuery({
             ctx.db.query('messageAttachments').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
         ]);
         if (!conversation || !user?.clerkId) return [];
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
         const attachedFileIds = new Set(attachmentRows.map((row) => row.uploadedFileId.toString()));
         const results: Array<{
             sourceId: string;
@@ -2396,6 +2413,7 @@ export const resolveFullReviewEvidence = internalQuery({
                 if (
                     !chunk ||
                     !uploadedFile ||
+                    !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
                     !attachedFileIds.has(uploadedFile._id.toString()) ||
                     (uploadedFile.clerkUserId !== user.clerkId && !(await hasActiveUserChatGrant(ctx, {
                         clerkUserId: user.clerkId,
@@ -2448,6 +2466,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
             ctx.db.get(turn.userId),
         ]);
         if (!conversation || !user?.clerkId) return null;
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
 
         const seenUploadedFileIds = new Set<string>();
         const verifiedSources = [];
@@ -2464,6 +2483,7 @@ export const recordDocumentAnswerEvidence = internalMutation({
                 : false;
             if (
                 !uploadedFile ||
+                !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
                 (uploadedFile.clerkUserId !== user.clerkId && !hasSharedGrant) ||
                 (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
             ) {

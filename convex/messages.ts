@@ -3,6 +3,8 @@ import { v } from 'convex/values';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
 import { routeModeValidator } from './lib/routeModeValidator';
 import { paginationOptsValidator } from 'convex/server';
+import { isDocumentEligibleForChat } from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 const MAX_CITATIONS_PER_MESSAGE = 50;
 const MAX_CITATIONS_PER_PAGE = 500;
@@ -329,6 +331,7 @@ export const list = query({
         ]);
         const uploadedFilesById = new Map(uploadedFileEntries);
         const chunksById = new Map(chunkEntries);
+        const allowQaDocuments = isUploadE2ERobotEmail(user.email);
         const sourcesByMessageId = new Map<string, typeof scopedAnswerSources>();
         for (const source of scopedAnswerSources) {
             if (!source.messageId) continue;
@@ -369,6 +372,7 @@ export const list = query({
                 if (
                     !uploadedFile ||
                     uploadedFile.clerkUserId !== user.clerkId ||
+                    !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
                     !chunk ||
                     chunk.uploadedFileId !== uploadedFile._id ||
                     chunk.clerkUserId !== user.clerkId

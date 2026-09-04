@@ -273,7 +273,7 @@ export const insertDocumentPageBatch = internalMutation({
   handler: async (ctx, args) => {
     assertBatchSize(args.pages.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
     const fallbackCanonicalSource = canonicalSourceForUploadedFile(uploadedFile);
@@ -330,7 +330,7 @@ export const insertDocumentBlockBatch = internalMutation({
   handler: async (ctx, args) => {
     assertBatchSize(args.blocks.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const pageIdByNumber = new Map(args.pageRefs.map((page) => [page.pageNumber, page.pageId]));
     const now = Date.now();
@@ -402,7 +402,7 @@ export const insertDocumentTableBatch = internalMutation({
   handler: async (ctx, args) => {
     assertBatchSize(args.tables.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const pageIdByNumber = new Map(args.pageRefs.map((page) => [page.pageNumber, page.pageId]));
     const blockKey = (pageNumber: number, blockIndex: number) => `${pageNumber}:${blockIndex}`;
@@ -468,7 +468,7 @@ export const insertDocumentChunkBatch = internalMutation({
   handler: async (ctx, args) => {
     assertBatchSize(args.chunks.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     await getOptionalGeneration(ctx, args.uploadedFileId, args.memoryGenerationId);
     const now = Date.now();
 
@@ -476,6 +476,8 @@ export const insertDocumentChunkBatch = internalMutation({
       assertChunkRange(chunk);
       await ctx.db.insert('documentChunks', {
         uploadedFileId: args.uploadedFileId,
+        dataProvenance: uploadedFile.dataProvenance ?? 'production',
+        qaRunId: uploadedFile.qaRunId,
         memoryGenerationId: args.memoryGenerationId,
         orgId: uploadedFile.orgId,
         accountId: uploadedFile.accountId,
@@ -525,7 +527,7 @@ export const finalizeDocumentMemory = internalMutation({
   },
   handler: async (ctx, args) => {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     const now = Date.now();
 
     await ctx.db.patch(args.uploadedFileId, {
@@ -549,7 +551,7 @@ export const replaceDocumentAliases = internalMutation({
   handler: async (ctx, args) => {
     assertBatchSize(args.aliases.length);
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     const existing = await ctx.db
       .query('documentAliases')
       .withIndex('by_uploaded_file', (q) => q.eq('uploadedFileId', args.uploadedFileId))

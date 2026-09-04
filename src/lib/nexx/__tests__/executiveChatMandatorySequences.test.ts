@@ -243,7 +243,8 @@ describe('seeded orchestration properties and rollout contract', () => {
   });
 
   it('safety flags are independently reversible and default safe', () => {
-    expect(getExecutiveChatFeatureFlags({})).toMatchObject({ publicationGate: true, capabilityLedger: true, semanticArbiter: false, documentActivationV2: false, publicationGateV2: false, selfCorrectionV2: false });
+    expect(getExecutiveChatFeatureFlags({})).toMatchObject({ publicationGate: true, capabilityLedger: true, semanticArbiter: false, documentActivationV2: false, publicationGateV2: false, selfCorrectionV2: false, understandingResumeV2: true });
     expect(getExecutiveChatFeatureFlags({ EXEC_CHAT_REPAIR_POLICY: 'off', EXEC_CHAT_CONTROL_STATE: '1' })).toMatchObject({ repairPolicy: false, controlState: true });
+    expect(getExecutiveChatFeatureFlags({ EXEC_CHAT_UNDERSTANDING_RESUME_V2: 'off' }).understandingResumeV2).toBe(false);
   });
 });

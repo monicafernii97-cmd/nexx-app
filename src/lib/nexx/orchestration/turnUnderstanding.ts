@@ -1,6 +1,6 @@
 import { hasExplicitNewIssueSignal } from '../legal-engine/legalSignals';
 import { isAwaitingUploadTurn } from './documentActivation';
-import { ORCHESTRATION_POLICY_VERSION, clampConfidence } from './policy';
+import { ORCHESTRATION_POLICY_VERSION, ORCHESTRATION_POLICY_V2_VERSION, clampConfidence } from './policy';
 import { resolveReferents } from './referentResolver';
 import type { SpeechAct, TurnUnderstanding, TurnUnderstandingInput } from './types';
 
@@ -108,6 +108,6 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     confidence,
     ambiguityMaterial,
     reasonCodes,
-    resolverVersion: ORCHESTRATION_POLICY_VERSION,
+    resolverVersion: input.foregroundIntentV2 ? ORCHESTRATION_POLICY_V2_VERSION : ORCHESTRATION_POLICY_VERSION,
   };
 }

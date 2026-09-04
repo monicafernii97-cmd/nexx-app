@@ -28,6 +28,8 @@ const manifestArgs = {
   deployedAt: v.number(),
 };
 
+const manifestObject = v.object(manifestArgs);
+
 async function writeManifest(ctx: MutationCtx, args: {
   runtime: 'web' | 'convex'; environment: 'preview' | 'production'; gitSha: string; deploymentId: string;
   schemaVersion: string; controlVersion: string; capabilityVersion: string; validatorVersion: string;
@@ -63,6 +65,40 @@ export const upsertFromRelease = mutation({
   },
 });
 
+/** Register the exact deployed web/backend pair in one transaction. */
+export const upsertPairFromRelease = mutation({
+  args: { secret: v.string(), web: manifestObject, convex: manifestObject },
+  handler: async (ctx, args) => {
+    requireReleaseSecret(args.secret);
+    if (args.web.runtime !== 'web' || args.convex.runtime !== 'convex') {
+      throw new Error('release_manifest_pair_runtime_invalid');
+    }
+    if (args.web.environment !== args.convex.environment) {
+      throw new Error('release_manifest_pair_environment_mismatch');
+    }
+    if (args.web.gitSha !== args.convex.gitSha) {
+      throw new Error('release_manifest_pair_git_sha_mismatch');
+    }
+    for (const field of ['schemaVersion', 'controlVersion', 'capabilityVersion', 'validatorVersion', 'promptPolicyVersion', 'compatibleMinPeerVersion'] as const) {
+      if (args.convex[field] !== CURRENT_EXECUTIVE_CHAT_RELEASE_CONTRACT[field]) {
+        throw new Error(`release_manifest_backend_${field}_mismatch`);
+      }
+    }
+    if (
+      !releaseContractsCompatible(args.web, args.convex) ||
+      args.web.controlVersion !== args.convex.controlVersion ||
+      args.web.capabilityVersion !== args.convex.capabilityVersion ||
+      args.web.validatorVersion !== args.convex.validatorVersion ||
+      args.web.promptPolicyVersion !== args.convex.promptPolicyVersion
+    ) {
+      throw new Error('release_manifest_pair_contract_mismatch');
+    }
+    await writeManifest(ctx, args.convex);
+    await writeManifest(ctx, args.web);
+    return compatibility(ctx, args.web.environment);
+  },
+});
+
 async function compatibility(ctx: Parameters<typeof getAuthenticatedUser>[0], environment: 'preview' | 'production') {
   const active = await ctx.db.query('releaseManifests')
     .withIndex('by_environment_active', (q) => q.eq('environment', environment).eq('active', true))
@@ -85,6 +121,7 @@ async function compatibility(ctx: Parameters<typeof getAuthenticatedUser>[0], en
       ...(web && convex && web.controlVersion !== convex.controlVersion ? ['control_version_mismatch'] : []),
       ...(web && convex && web.capabilityVersion !== convex.capabilityVersion ? ['capability_version_mismatch'] : []),
       ...(web && convex && web.validatorVersion !== convex.validatorVersion ? ['validator_version_mismatch'] : []),
+      ...(web && convex && web.promptPolicyVersion !== convex.promptPolicyVersion ? ['prompt_policy_version_mismatch'] : []),
     ],
     manifests: active.map((manifest) => ({
       runtime: manifest.runtime,

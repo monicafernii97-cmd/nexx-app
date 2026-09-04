@@ -330,6 +330,9 @@ export default defineSchema({
         capabilitySnapshotHash: v.optional(v.string()),
         evidenceSetHash: v.optional(v.string()),
         publicationEnvelopeId: v.optional(v.string()),
+        rolloutConfigVersion: v.optional(v.number()),
+        rolloutModesJson: v.optional(v.string()),
+        rolloutSelectionReason: v.optional(v.string()),
         analysisMode: v.optional(v.union(
             v.literal('full_document_review'),
             v.literal('obligations_and_deadlines'),
@@ -364,6 +367,7 @@ export default defineSchema({
         .index('by_conversation', ['conversationId'])
         .index('by_request', ['conversationId', 'requestId'])
         .index('by_status', ['status'])
+        .index('by_created', ['createdAt'])
         .index('by_conversation_turn', ['conversationId', 'turnNumber']),
 
     chatGenerationJobs: defineTable({
@@ -880,11 +884,15 @@ export default defineSchema({
         contentHash: v.string(),
         validatorVersion: v.string(),
         repairHistoryJson: v.optional(v.string()),
+        rolloutConfigVersion: v.optional(v.number()),
+        rolloutMode: v.optional(v.union(v.literal('off'), v.literal('shadow'), v.literal('enforce'))),
+        shadowRejectionCodes: v.optional(v.array(v.string())),
         createdAt: v.number(),
     })
         .index('by_envelope', ['envelopeId'])
         .index('by_turn', ['turnId'])
-        .index('by_conversation', ['conversationId']),
+        .index('by_conversation', ['conversationId'])
+        .index('by_created', ['createdAt']),
 
     conversationRepairAudits: defineTable({
         repairId: v.string(),
@@ -921,7 +929,8 @@ export default defineSchema({
         .index('by_current_turn', ['currentTurnId'])
         .index('by_target_message', ['targetMessageId'])
         .index('by_conversation_created', ['conversationId', 'createdAt'])
-        .index('by_response_fingerprint', ['conversationId', 'responseFingerprint']),
+        .index('by_response_fingerprint', ['conversationId', 'responseFingerprint'])
+        .index('by_created', ['createdAt']),
 
     productionStateRepairRuns: defineTable({
         repairRunId: v.string(),
@@ -1047,8 +1056,78 @@ export default defineSchema({
         .index('by_runtime_environment', ['runtime', 'environment'])
         .index('by_environment_active', ['environment', 'active']),
 
+    executiveChatRolloutConfigs: defineTable({
+        version: v.number(),
+        environment: v.union(v.literal('preview'), v.literal('production')),
+        status: v.union(v.literal('draft'), v.literal('approved'), v.literal('active'), v.literal('superseded')),
+        schemaVersion: v.string(),
+        controlVersion: v.string(),
+        capabilityVersion: v.string(),
+        validatorVersion: v.string(),
+        promptPolicyVersion: v.string(),
+        featureModesJson: v.string(),
+        defaultMode: v.union(v.literal('off'), v.literal('shadow'), v.literal('enforce')),
+        cohortPercentage: v.number(),
+        allowlistedUserIds: v.array(v.string()),
+        allowlistedOrgIds: v.array(v.string()),
+        allowlistedCaseIds: v.array(v.string()),
+        allowlistedConversationIds: v.array(v.string()),
+        denylistedUserIds: v.array(v.string()),
+        denylistedOrgIds: v.array(v.string()),
+        denylistedCaseIds: v.array(v.string()),
+        denylistedConversationIds: v.array(v.string()),
+        cohortSalt: v.string(),
+        activationStartsAt: v.number(),
+        expiresAt: v.optional(v.number()),
+        emergencyDisabled: v.boolean(),
+        creator: v.string(),
+        approver: v.optional(v.string()),
+        reason: v.string(),
+        changeTicket: v.string(),
+        idempotencyKey: v.string(),
+        approvedAt: v.optional(v.number()),
+        activatedAt: v.optional(v.number()),
+        supersededAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_environment_version', ['environment', 'version'])
+        .index('by_environment_status', ['environment', 'status'])
+        .index('by_idempotency', ['idempotencyKey']),
+
+    executiveChatRolloutEvents: defineTable({
+        configId: v.id('executiveChatRolloutConfigs'),
+        configVersion: v.number(),
+        environment: v.union(v.literal('preview'), v.literal('production')),
+        eventType: v.string(),
+        actor: v.string(),
+        reason: v.string(),
+        changeTicket: v.string(),
+        detailJson: v.string(),
+        createdAt: v.number(),
+    })
+        .index('by_config_created', ['configId', 'createdAt'])
+        .index('by_environment_created', ['environment', 'createdAt']),
+
+    executiveChatReleaseAssuranceRuns: defineTable({
+        environment: v.union(v.literal('preview'), v.literal('production')),
+        gitSha: v.string(),
+        webDeploymentId: v.string(),
+        convexDeploymentId: v.string(),
+        status: v.union(v.literal('succeeded'), v.literal('failed')),
+        suites: v.array(v.string()),
+        reportDigest: v.string(),
+        workflowRunId: v.optional(v.string()),
+        completedAt: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_environment_completed', ['environment', 'completedAt'])
+        .index('by_git_environment', ['gitSha', 'environment']),
+
     chatQualityCanaryRuns: defineTable({
         scenarioId: v.string(),
+        qaNamespace: v.optional(v.string()),
+        dataProvenance: v.optional(v.union(v.literal('qa'), v.literal('synthetic'))),
         status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
         invariantCodes: v.array(v.string()),
         failedInvariantCodes: v.array(v.string()),
@@ -1062,6 +1141,22 @@ export default defineSchema({
     })
         .index('by_status_created', ['status', 'createdAt'])
         .index('by_scenario_created', ['scenarioId', 'createdAt']),
+
+    executiveChatOperationalSnapshots: defineTable({
+        environment: v.union(v.literal('preview'), v.literal('production')),
+        windowStartedAt: v.number(),
+        windowEndedAt: v.number(),
+        releaseGitSha: v.optional(v.string()),
+        rolloutConfigVersion: v.optional(v.number()),
+        metricsJson: v.string(),
+        segmentsJson: v.string(),
+        hardStopCodes: v.array(v.string()),
+        softStopCodes: v.array(v.string()),
+        healthy: v.boolean(),
+        createdAt: v.number(),
+    })
+        .index('by_environment_created', ['environment', 'createdAt'])
+        .index('by_healthy_created', ['healthy', 'createdAt']),
 
     documentRetrievalAudit: defineTable({
         conversationId: v.id('conversations'),
@@ -1091,6 +1186,7 @@ export default defineSchema({
         .index('by_conversation', ['conversationId'])
         .index('by_turn', ['turnId'])
         .index('by_user_created', ['userId', 'createdAt'])
+        .index('by_created', ['createdAt'])
         .index('by_expiresAt', ['expiresAt']),
 
     documentAnswerEvidence: defineTable({
@@ -1504,7 +1600,8 @@ export default defineSchema({
     })
         .index('by_file_created', ['uploadedFileId', 'createdAt'])
         .index('by_generation_status', ['memoryGenerationId', 'status'])
-        .index('by_status_updated', ['status', 'updatedAt']),
+        .index('by_status_updated', ['status', 'updatedAt'])
+        .index('by_created', ['createdAt']),
 
     documentUnderstandingNodes: defineTable({
         runId: v.id('documentUnderstandingRuns'),

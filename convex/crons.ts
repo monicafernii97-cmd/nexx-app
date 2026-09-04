@@ -99,6 +99,13 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  'snapshot executive chat rollout health',
+  { minutes: 5 },
+  internal.executiveChatOperations.audit,
+  {},
+);
+
 crons.daily(
   'clean up executive chat quality canary runs',
   { hourUTC: 6, minuteUTC: 40 },

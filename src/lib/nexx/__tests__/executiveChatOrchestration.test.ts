@@ -281,7 +281,8 @@ describe('hard response publication contract', () => {
       errors: ['RESP_UNRESOLVED_REFERENT'], questionKind: 'confirmation',
       supported: 'Stale provider answer that assumes a choice.', stage: 'clarification',
     });
-    expect(content).toMatch(/^Which part/);
+    expect(content).toBe('Could you clarify what you mean?');
+    expect(content).not.toMatch(/\b(?:document|file|order|task)\b/i);
     expect(content).not.toContain('Stale provider answer');
   });
 

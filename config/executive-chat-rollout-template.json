@@ -1,0 +1,28 @@
+{
+  "environment": "production",
+  "featureModes": {
+    "foreground_intent_v2": "shadow",
+    "document_activation_v2": "shadow",
+    "publication_v2": "shadow",
+    "self_correction_v1": "off",
+    "qa_provenance_v1": "enforce",
+    "understanding_resume_v2": "enforce"
+  },
+  "defaultMode": "off",
+  "cohortPercentage": 0,
+  "allowlistedUserIds": [],
+  "allowlistedOrgIds": [],
+  "allowlistedCaseIds": [],
+  "allowlistedConversationIds": [],
+  "denylistedUserIds": [],
+  "denylistedOrgIds": [],
+  "denylistedCaseIds": [],
+  "denylistedConversationIds": [],
+  "cohortSalt": "replace-with-release-specific-stable-salt",
+  "activationStartsAt": 0,
+  "emergencyDisabled": false,
+  "creator": "replace-with-creator-identity",
+  "reason": "Replace with the approved rollout reason.",
+  "changeTicket": "replace-with-change-ticket",
+  "idempotencyKey": "replace-with-unique-idempotency-key"
+}

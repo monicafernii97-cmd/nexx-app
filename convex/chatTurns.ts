@@ -64,7 +64,8 @@ import { routeModeValidator } from './lib/routeModeValidator';
 import { loadConversationControlContext, persistTurnOrchestration } from './conversationControl';
 import { understandTurn } from '../src/lib/nexx/orchestration/turnUnderstanding';
 import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
-import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
+import { featureFlagsForPersistedRollout, featureFlagsForRollout, getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
+import { resolveRolloutForSubject } from './executiveChatRollout';
 import {
     PUBLICATION_VALIDATOR_VERSION,
     PUBLICATION_VALIDATOR_V2_VERSION,
@@ -186,6 +187,16 @@ function isTerminalTurnStatus(status: string) {
 /** Build the stable request id used for an assistant message in a turn. */
 function assistantRequestId(requestId: string) {
     return `${requestId}-assistant`;
+}
+
+function persistedRolloutMode(turn: { rolloutModesJson?: string }, feature: string) {
+    if (!turn.rolloutModesJson) return undefined;
+    try {
+        const mode = (JSON.parse(turn.rolloutModesJson) as Record<string, unknown>)[feature];
+        return mode === 'off' || mode === 'shadow' || mode === 'enforce' ? mode : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 async function insertChatAuditEvent(
@@ -1062,10 +1073,16 @@ export const acceptChatTurn = mutation({
         attachments: v.optional(v.array(attachmentRefValidator)),
     },
     handler: async (ctx, args) => {
-        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const { user, conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
         const allowQaDocuments = isUploadE2ERobotEmail(user.email);
+        const rolloutDecision = await resolveRolloutForSubject(ctx, {
+            userId: user._id.toString(),
+            caseId: conversation.caseId?.toString(),
+            conversationId: conversation._id.toString(),
+            qaSynthetic: allowQaDocuments,
+        });
+        const executiveChatFlags = featureFlagsForRollout(rolloutDecision);
         const now = Date.now();
         const attachments = args.attachments ?? [];
         const validatedAttachments = [];
@@ -1267,11 +1284,41 @@ export const acceptChatTurn = mutation({
             conversationSummary: conversationSummary?.summary,
             foregroundIntentV2: executiveChatFlags.documentActivationV2,
         });
+        const shadowV2 = !executiveChatFlags.documentActivationV2 && (
+            rolloutDecision.modes.foreground_intent_v2 === 'shadow' ||
+            rolloutDecision.modes.document_activation_v2 === 'shadow'
+        );
+        const shadowUnderstanding = shadowV2
+            ? understandTurn({
+                message: effectiveMessage,
+                controlState: preliminaryControl,
+                activeTasks: existingControlContext.tasks,
+                recentUserTurns: recentConversationMessages.filter((message) => message.role === 'user').map((message) => ({ id: message._id.toString(), content: message.content })),
+                recentAssistantTurns: recentConversationMessages.filter((message) => message.role === 'assistant').map((message) => ({ id: message._id.toString(), content: message.content })),
+                conversationSummary: conversationSummary?.summary,
+                foregroundIntentV2: true,
+              })
+            : null;
         const preliminaryDocumentActivation = executiveChatFlags.documentActivationV2
             ? decideDocumentActivation({
                 message: effectiveMessage,
                 speechAct: preliminaryUnderstanding.speechAct,
                 requestedOperation: preliminaryUnderstanding.requestedOperation,
+                detection: detectDocumentReference(effectiveMessage),
+                pendingAct: preliminaryControl?.pendingAct,
+                hasCurrentAttachments: validatedAttachments.length > 0,
+                hasActiveDocumentContext,
+                hasPendingDocumentAction: Boolean(
+                    preliminaryControl?.pendingOptions.some((option) => option.documentIds.length > 0) ||
+                    preliminaryControl?.lastAssistantOffer?.documentIds.length
+                ),
+              })
+            : null;
+        const shadowDocumentActivation = shadowUnderstanding
+            ? decideDocumentActivation({
+                message: effectiveMessage,
+                speechAct: shadowUnderstanding.speechAct,
+                requestedOperation: shadowUnderstanding.requestedOperation,
                 detection: detectDocumentReference(effectiveMessage),
                 pendingAct: preliminaryControl?.pendingAct,
                 hasCurrentAttachments: validatedAttachments.length > 0,
@@ -1337,6 +1384,9 @@ export const acceptChatTurn = mutation({
             temperature,
             userContextJson: args.userContextJson,
             attachmentRefsJson: validatedAttachments.length > 0 ? JSON.stringify(validatedAttachments) : undefined,
+            rolloutConfigVersion: rolloutDecision.configVersion,
+            rolloutModesJson: JSON.stringify(rolloutDecision.modes),
+            rolloutSelectionReason: rolloutDecision.selectionReason,
             createdAt: now,
             updatedAt: now,
         });
@@ -1359,6 +1409,7 @@ export const acceptChatTurn = mutation({
                 .map((message) => ({ role: message.role, content: message.content })),
             conversationSummary: conversationSummary?.summary,
             now,
+            executiveChatFlags,
         });
         await ctx.db.patch(turnId, {
             taskId: orchestration.taskId,
@@ -1490,6 +1541,15 @@ export const acceptChatTurn = mutation({
                 speechAct: orchestration.understanding.speechAct,
                 continuity: orchestration.understanding.continuity,
                 transition: orchestration.transition.kind,
+                rolloutConfigVersion: rolloutDecision.configVersion,
+                rolloutSelectionReason: rolloutDecision.selectionReason,
+                shadowV2: shadowUnderstanding ? {
+                    speechAct: shadowUnderstanding.speechAct,
+                    requestedOperation: shadowUnderstanding.requestedOperation,
+                    documentActive: shadowDocumentActivation?.active ?? false,
+                    disagreed: shadowUnderstanding.speechAct !== preliminaryUnderstanding.speechAct ||
+                        shadowUnderstanding.requestedOperation !== preliminaryUnderstanding.requestedOperation,
+                } : undefined,
             },
         });
 
@@ -1628,9 +1688,9 @@ export const leaseGenerationJob = internalMutation({
 export const getGenerationContext = internalQuery({
     args: { turnId: v.id('chatTurns') },
     handler: async (ctx, args) => {
-        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return null;
+        const executiveChatFlags = featureFlagsForPersistedRollout(turn);
 
         const [
             conversation,
@@ -3119,13 +3179,14 @@ export const commitValidatedAssistant = internalMutation({
         providerResponseId: v.optional(v.string()),
         metadataJson: v.optional(v.string()),
         repairHistoryJson: v.optional(v.string()),
+        shadowRejectionCodes: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
-        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const now = Date.now();
         const job = await ctx.db.get(args.jobId);
         if (!job || job.leaseOwner !== args.leaseOwner) return null;
         const turn = await ctx.db.get(job.turnId);
+        const executiveChatFlags = turn ? featureFlagsForPersistedRollout(turn) : getExecutiveChatFeatureFlags();
         if (!turn || !turn.executionPlanId || !turn.taskId || turn.focusRevision === undefined) {
             throw new Error('publication_orchestration_context_missing');
         }
@@ -3177,6 +3238,9 @@ export const commitValidatedAssistant = internalMutation({
                 contentHash: stableCapabilityHash(envelope.content ?? ''),
                 validatorVersion: envelope.validatorVersion ?? 'missing',
                 repairHistoryJson: args.repairHistoryJson,
+                rolloutConfigVersion: turn.rolloutConfigVersion,
+                rolloutMode: persistedRolloutMode(turn, 'publication_v2'),
+                shadowRejectionCodes: args.shadowRejectionCodes,
                 createdAt: now,
             });
             await ctx.db.patch(turn._id, { status: 'repair_pending', errorCode: 'publication_validation_failed', updatedAt: now });
@@ -3203,6 +3267,9 @@ export const commitValidatedAssistant = internalMutation({
             contentHash: stableCapabilityHash(envelope.content),
             validatorVersion: envelope.validatorVersion,
             repairHistoryJson: args.repairHistoryJson,
+            rolloutConfigVersion: turn.rolloutConfigVersion,
+            rolloutMode: persistedRolloutMode(turn, 'publication_v2'),
+            shadowRejectionCodes: args.shadowRejectionCodes,
             createdAt: now,
         });
         await ctx.db.patch(turn._id, {

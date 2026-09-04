@@ -19,7 +19,7 @@ jobs:
       github.event.deployment.environment == 'Production' &&
       github.event.deployment.creator.login == 'vercel[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: Production
     env:
       E2E_BASE_URL: https://nexproof.io
@@ -29,7 +29,11 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       VERCEL_DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+      EXPECTED_RELEASE_GIT_SHA: ${{ github.event.deployment.sha }}
       VERIFICATION_SECRET: ${{ secrets.VERIFICATION_SECRET }}
+      RECORD_RELEASE_ASSURANCE: "true"
+      RELEASE_ASSURANCE_SUITES: upload-release,executive-chat-critical-matrix
+      CONVEX_DEPLOYMENT: ${{ vars.CONVEX_DEPLOYMENT }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
@@ -43,8 +47,10 @@ jobs:
         run: npm run test:e2e:upload:release
       - name: Run executive chat continuity journey
         run: npm run test:e2e:executive-chat:release
-      - name: Register web release and block backend drift
-        run: node scripts/publish-executive-chat-release.mjs web
+      - name: Register exact release pair and record passing smoke suite
+        run: node scripts/publish-executive-chat-release.mjs pair
+      - name: Enforce executive chat hard-stop dashboard
+        run: npm run report:executive-chat-health
       - name: Build owner-facing operations envelope
         if: always()
         env:

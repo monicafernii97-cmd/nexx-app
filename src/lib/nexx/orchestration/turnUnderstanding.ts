@@ -1,6 +1,6 @@
 import { hasExplicitNewIssueSignal } from '../legal-engine/legalSignals';
 import { isAwaitingUploadTurn } from './documentActivation';
-import { ORCHESTRATION_POLICY_VERSION, clampConfidence } from './policy';
+import { ORCHESTRATION_POLICY_VERSION, ORCHESTRATION_POLICY_V2_VERSION, clampConfidence } from './policy';
 import { resolveReferents } from './referentResolver';
 import type { SpeechAct, TurnUnderstanding, TurnUnderstandingInput } from './types';
 
@@ -14,6 +14,7 @@ const CLARIFY = /^(?:which|what|why|how|huh|what\s+do\s+you\s+mean|which\s+one|w
 const SOCIAL = /^(?:hi|hello|hey|thanks|thank\s+you|got\s+it|k|lol|👍|👌|🙏)[!. ]*$/iu;
 const CAPABILITY = /\b(?:can|could|do)\s+you\s+(?:read|access|see|search|review|open)|\bdo\s+you\s+have\s+(?:access|the\s+file)\b|\b(?:did|have)\s+you\s+(?:receive|received|got)\b|\bconfirm\b.{0,50}\b(?:received|uploaded|file|document)\b/i;
 const DOCUMENT_OPERATION = /\b(?:analy[sz]e|review|summari[sz]e|quote|search|compare|explain|read)\b.{0,80}\b(?:file|order|document|pdf|page|clause|section)\b|\b(?:file|order|document|pdf|page|clause|section)\b.{0,80}\b(?:analy[sz]e|review|summari[sz]e|quote|search|compare|explain|read)\b/i;
+const OPAQUE_TERM_QUERY = /^[A-Z][A-Z0-9._-]{1,20}[?!.]?$/;
 
 function normalize(value: string) {
   return value.normalize('NFKC').replace(/\s+/g, ' ').trim();
@@ -42,6 +43,7 @@ function inferSpeechAct(message: string, input: TurnUnderstandingInput): SpeechA
   if (SOCIAL.test(message)) return 'social';
   if (input.controlState?.pendingAct === 'select') return 'select';
   if (input.controlState?.pendingAct === 'supply_detail') return 'answer';
+  if (OPAQUE_TERM_QUERY.test(message)) return 'unknown';
   if (/[?]$/.test(message) || /^(?:what|when|where|why|how|who|can|could|does|do|is|are|should|would)\b/i.test(message)) return 'ask';
   if (DOCUMENT_OPERATION.test(message)) return 'ask';
   return message.split(/\s+/).length <= 3 ? 'unknown' : 'ask';
@@ -108,6 +110,6 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     confidence,
     ambiguityMaterial,
     reasonCodes,
-    resolverVersion: ORCHESTRATION_POLICY_VERSION,
+    resolverVersion: input.foregroundIntentV2 ? ORCHESTRATION_POLICY_V2_VERSION : ORCHESTRATION_POLICY_VERSION,
   };
 }

@@ -20,6 +20,7 @@ export type ClaimVerificationError =
   | 'RESP_SPEECH_ACT_MISMATCH'
   | 'RESP_ROUTE_INAPPROPRIATE'
   | 'RESP_UNREQUESTED_DOCUMENT_USE'
+  | 'RESP_LATENT_DOCUMENT_CONTEXT_SURFACED'
   | 'RESP_FUTURE_ACTION_EXECUTED_EARLY'
   | 'RESP_INTENT_NOT_FULFILLED'
   | 'RESP_GENERIC_MULTI_SENTENCE'
@@ -76,6 +77,7 @@ export function verifyResponseClaims(args: {
   publicationV2?: boolean;
   speechAct?: string;
   requestedOperation?: string;
+  documentContextAllowed?: boolean;
   citationVerificationPassed?: boolean;
   usedDocumentIds?: string[];
   selfCorrectionV2?: boolean;
@@ -120,6 +122,14 @@ export function verifyResponseClaims(args: {
     DOCUMENT_CONTEXT_MENTION.test(content) || DOCUMENT_ANALYSIS_CLAIM.test(content)
   )) {
     errors.push('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN', 'RESP_SPEECH_ACT_MISMATCH', 'RESP_UNREQUESTED_DOCUMENT_USE');
+  }
+  if (
+    args.publicationV2 &&
+    args.documentContextAllowed === false &&
+    args.speechAct !== 'social' &&
+    DOCUMENT_CONTEXT_MENTION.test(content)
+  ) {
+    errors.push('RESP_LATENT_DOCUMENT_CONTEXT_SURFACED', 'RESP_UNREQUESTED_DOCUMENT_USE');
   }
   if (args.publicationV2 && args.requestedOperation === 'await_upload') {
     if (!INPUT_WAIT_ACKNOWLEDGMENT.test(content)) {
@@ -181,6 +191,7 @@ export function verifyResponseClaims(args: {
         !has('RESP_SPEECH_ACT_MISMATCH') &&
         !has('RESP_ROUTE_INAPPROPRIATE') &&
         !has('RESP_UNREQUESTED_DOCUMENT_USE') &&
+        !has('RESP_LATENT_DOCUMENT_CONTEXT_SURFACED') &&
         !has('RESP_WRONG_DOCUMENT_SCOPE') &&
         !has('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN') &&
         !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD'),

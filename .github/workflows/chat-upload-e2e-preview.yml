@@ -17,7 +17,7 @@ jobs:
       github.event.deployment_status.state == 'success' &&
       github.event.deployment.environment == 'Preview'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     environment: Preview
     env:
       E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
@@ -37,6 +37,8 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run signed-in preview upload journey
         run: npm run test:e2e:upload:pr
+      - name: Run preview executive chat critical matrix
+        run: npm run test:e2e:executive-chat:release
       - name: Build owner-facing operations envelope
         if: always()
         env:

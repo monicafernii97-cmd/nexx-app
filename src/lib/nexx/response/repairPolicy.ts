@@ -76,6 +76,12 @@ export function buildPublicationRepairContent(args: {
     if (/\b(?:bye|goodbye|see you)\b/i.test(args.userMessage ?? '')) return 'Take care.';
     return 'Hi! How can I help?';
   }
+  if (args.errors.includes('RESP_LATENT_DOCUMENT_CONTEXT_SURFACED')) {
+    const latest = (args.userMessage ?? '').replace(/\s+/g, ' ').trim().replace(/[?!.]+$/, '');
+    return latest
+      ? `What do you mean by “${latest.slice(0, 80)}”?`
+      : 'What do you mean?';
+  }
   if (args.errors.includes('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE') && args.questionKind === 'open_analysis') {
     return [
       'Which review would you like:',
@@ -85,7 +91,10 @@ export function buildPublicationRepairContent(args: {
     ].join('\n');
   }
   if (args.stage === 'clarification') {
-    return 'Which part of the current request do you want me to handle? I will keep the same document and task active.';
+    const latest = (args.userMessage ?? '').replace(/\s+/g, ' ').trim().replace(/[?!.]+$/, '');
+    return latest
+      ? `Could you clarify what you mean by “${latest.slice(0, 80)}”?`
+      : 'Could you clarify what you mean?';
   }
   const grounded = [args.supported, args.limitation]
     .filter((value): value is string => Boolean(value?.trim()))

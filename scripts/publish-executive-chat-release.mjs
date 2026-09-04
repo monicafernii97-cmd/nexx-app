@@ -1,76 +1,84 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { ConvexHttpClient } from 'convex/browser';
 import { anyApi } from 'convex/server';
 
 const runtime = process.argv[2];
-if (!['web', 'convex'].includes(runtime)) throw new Error('release_runtime_must_be_web_or_convex');
-
-const isVercelBuild = Boolean(process.env.VERCEL_ENV);
-if (runtime === 'convex' && !isVercelBuild) {
-  process.stdout.write('[executive-chat-release] Skipped outside Vercel deployment.\n');
-  process.exit(0);
-}
+if (runtime !== 'pair') throw new Error('release_runtime_must_be_pair');
 
 const secret = process.env.VERIFICATION_SECRET;
-let convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? process.env.CONVEX_URL;
-if (runtime === 'convex' && process.env.VERCEL_ENV !== 'production') {
-  process.stdout.write('[executive-chat-release] Preview manifest skipped; production manifests are published only from the production deployment pair.\n');
-  process.exit(0);
-}
-if (!secret && runtime === 'convex') {
-  process.stderr.write('[executive-chat-release] Convex manifest publication deferred; the production assurance job will enforce registration and compatibility after deployment.\n');
-  process.exit(0);
-}
 if (!secret) throw new Error('release_manifest_secret_missing');
+
+const baseUrl = (process.env.E2E_BASE_URL ?? process.env.RELEASE_BASE_URL ?? '').replace(/\/$/, '');
+if (!baseUrl) throw new Error('release_base_url_missing');
+
+const response = await fetch(`${baseUrl}/api/internal/release-manifest`, {
+  headers: { authorization: `Bearer ${secret}` },
+});
+if (!response.ok) throw new Error(`web_release_manifest_http_${response.status}`);
+
+const web = await response.json();
+if (web.runtime !== 'web') throw new Error('web_release_manifest_runtime_invalid');
+if (web.environment !== 'production') throw new Error('web_release_manifest_environment_invalid');
+if (!/^[a-f0-9]{7,64}$/i.test(web.gitSha ?? '')) throw new Error('web_release_manifest_git_sha_invalid');
+if (!web.deploymentId || web.deploymentId === 'local') throw new Error('web_release_manifest_deployment_id_missing');
+if (!web.convexUrl) throw new Error('web_release_manifest_convex_url_missing');
+
+const expectedGitSha = process.env.EXPECTED_RELEASE_GIT_SHA ?? process.env.GITHUB_SHA;
+if (expectedGitSha && web.gitSha !== expectedGitSha) {
+  throw new Error(`release_git_sha_mismatch:${expectedGitSha.slice(0, 12)}:${String(web.gitSha).slice(0, 12)}`);
+}
+
 const contract = JSON.parse(fs.readFileSync(new URL('../config/executive-chat-release-contract.json', import.meta.url), 'utf8'));
-
-function environment(value) {
-  if (value === 'production') return 'production';
-  return 'preview';
-}
-
-let manifest;
-if (runtime === 'web') {
-  const baseUrl = (process.env.E2E_BASE_URL ?? process.env.RELEASE_BASE_URL ?? '').replace(/\/$/, '');
-  if (!baseUrl) throw new Error('release_base_url_missing');
-  const response = await fetch(`${baseUrl}/api/internal/release-manifest`, {
-    headers: { authorization: `Bearer ${secret}` },
-  });
-  if (!response.ok) throw new Error(`web_release_manifest_http_${response.status}`);
-  manifest = await response.json();
-  convexUrl ??= manifest.convexUrl;
-} else {
-  const gitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
-  if (!gitSha) throw new Error('convex_release_git_sha_missing');
-  if (!convexUrl) throw new Error('convex_release_url_missing');
-  manifest = {
-    runtime: 'convex',
-    environment: environment(process.env.VERCEL_ENV),
-    gitSha,
-    deploymentId: process.env.CONVEX_DEPLOYMENT ?? new URL(convexUrl).hostname,
-    ...contract,
-  };
-}
-
-if (!convexUrl) throw new Error('release_manifest_convex_url_missing');
-const client = new ConvexHttpClient(convexUrl);
-
-const normalized = {
-  ...manifest,
-  environment: environment(manifest.environment),
-  deployedAt: Date.now(),
+const convex = {
+  runtime: 'convex',
+  environment: 'production',
+  gitSha: web.gitSha,
+  deploymentId: process.env.CONVEX_DEPLOYMENT ?? new URL(web.convexUrl).hostname,
+  ...contract,
 };
-delete normalized.convexUrl;
-try {
-  await client.mutation(anyApi.releaseManifest.upsertFromRelease, { secret, ...normalized });
-  const compatibility = await client.query(anyApi.releaseManifest.getCompatibilityForRelease, {
+
+const normalizedWeb = { ...web, deployedAt: Date.now() };
+delete normalizedWeb.convexUrl;
+const normalizedConvex = { ...convex, deployedAt: Date.now() };
+const client = new ConvexHttpClient(web.convexUrl);
+const compatibility = await client.mutation(anyApi.releaseManifest.upsertPairFromRelease, {
+  secret,
+  web: normalizedWeb,
+  convex: normalizedConvex,
+});
+
+if (compatibility.compatible && process.env.RECORD_RELEASE_ASSURANCE === 'true') {
+  const suites = (process.env.RELEASE_ASSURANCE_SUITES ?? 'upload-release,executive-chat-critical-matrix')
+    .split(',').map((value) => value.trim()).filter(Boolean);
+  const reportDigest = createHash('sha256').update(JSON.stringify({
+    gitSha: web.gitSha,
+    webDeploymentId: web.deploymentId,
+    convexDeploymentId: convex.deploymentId,
+    suites,
+    workflowRunId: process.env.GITHUB_RUN_ID,
+  })).digest('hex');
+  await client.mutation(anyApi.executiveChatRollout.recordReleaseAssurance, {
     secret,
-    environment: normalized.environment,
+    environment: 'production',
+    gitSha: web.gitSha,
+    webDeploymentId: web.deploymentId,
+    convexDeploymentId: convex.deploymentId,
+    status: 'succeeded',
+    suites,
+    reportDigest,
+    workflowRunId: process.env.GITHUB_RUN_ID,
+    completedAt: Date.now(),
   });
-  process.stdout.write(`${JSON.stringify({ runtime, environment: normalized.environment, compatible: compatibility.compatible, reasonCodes: compatibility.reasonCodes })}\n`);
-  if (runtime === 'web' && !compatibility.compatible) process.exitCode = 1;
-} catch (error) {
-  if (runtime !== 'convex') throw error;
-  const reason = error instanceof Error ? error.message.split('\n', 1)[0] : 'unknown_error';
-  process.stderr.write(`[executive-chat-release] Convex manifest publication deferred (${reason}); the production assurance job remains fail-closed.\n`);
 }
+
+process.stdout.write(`${JSON.stringify({
+  runtime,
+  environment: 'production',
+  gitSha: web.gitSha,
+  webDeploymentId: web.deploymentId,
+  convexDeploymentId: convex.deploymentId,
+  compatible: compatibility.compatible,
+  reasonCodes: compatibility.reasonCodes,
+})}\n`);
+if (!compatibility.compatible) process.exitCode = 1;

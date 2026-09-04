@@ -97,7 +97,7 @@ function documentReferents(input: TurnUnderstandingInput): TurnReferent[] {
   const ordinalMatch = message.match(/\b(first|1st|one|second|2nd|two|third|3rd|three|last|latest)\b/);
   if (results.length === 0 && ordinalMatch && descriptors.length > 0) {
     const requestedIndex = ORDINALS[ordinalMatch[1]];
-    const selected = requestedIndex === -1 ? descriptors.at(-1) : descriptors[requestedIndex];
+    const selected = requestedIndex === -1 ? descriptors[descriptors.length - 1] : descriptors[requestedIndex];
     if (selected) {
       results.push({
         text: ordinalMatch[1],
@@ -153,9 +153,10 @@ function scoreTasks(input: TurnUnderstandingInput) {
 
 export function resolveReferents(input: TurnUnderstandingInput) {
   const focusRevision = input.controlState?.focusRevision ?? 0;
+  const recentAssistantTurns = input.recentAssistantTurns ?? [];
   const liveOptions = [
     ...(input.controlState?.pendingOptions ?? []),
-    ...((input.recentAssistantTurns ?? []).at(-1)?.pendingOptions ?? []),
+    ...(recentAssistantTurns[recentAssistantTurns.length - 1]?.pendingOptions ?? []),
   ].filter((item, index, values) => values.findIndex((candidate) => candidate.optionId === item.optionId) === index);
   const optionCandidates = liveOptions
     .map((option) => ({ option, ...optionScore(input.message, option, focusRevision) }))

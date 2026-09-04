@@ -36,6 +36,7 @@ jobs:
       E2E_ALLOW_PRODUCTION: "true"
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      VERIFICATION_SECRET: ${{ secrets.VERIFICATION_SECRET }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - uses: ./.github/actions/setup-node
@@ -48,6 +49,10 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run daily production upload journey
         run: npm run test:e2e:upload:daily
+      - name: Run isolated executive chat semantic canary
+        run: npm run test:e2e:executive-chat:release
+      - name: Check executive chat hard-stop dashboard
+        run: npm run report:executive-chat-health
       - name: Build owner-facing operations envelope
         if: always()
         env:

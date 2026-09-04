@@ -8,7 +8,7 @@ import { decideFocusTransition } from '../src/lib/nexx/orchestration/focusTransi
 import { buildExecutionPlan } from '../src/lib/nexx/orchestration/executionPlan';
 import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
 import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
-import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
+import { getExecutiveChatFeatureFlags, type ExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 import type {
   AssistantOffer,
   ConversationControlSnapshot,
@@ -140,8 +140,9 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
   recentMessages: Array<{ role: 'user' | 'assistant'; content: string }>;
   conversationSummary?: string;
   now: number;
+  executiveChatFlags?: ExecutiveChatFeatureFlags;
 }) {
-  const executiveChatFlags = getExecutiveChatFeatureFlags();
+  const executiveChatFlags = args.executiveChatFlags ?? getExecutiveChatFeatureFlags();
   const loaded = await loadConversationControlContext(ctx, {
     conversationId: args.conversation._id,
     userId: args.userId,

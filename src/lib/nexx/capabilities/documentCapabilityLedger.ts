@@ -6,7 +6,7 @@ import type {
   DocumentCapabilitySnapshot,
 } from './types';
 
-export const CAPABILITY_LEDGER_VERSION = 'document-capability-v1';
+export const CAPABILITY_LEDGER_VERSION = 'document-capability-v2';
 
 function stableSerialize(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);

@@ -2,12 +2,12 @@
   "name": "nexx-app",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.11.0",
   "scripts": {
     "predev": "node scripts/check-convex-env.mjs development",
     "dev": "next dev",
     "prebuild": "node scripts/check-convex-env.mjs build",
     "build": "next build",
-    "postbuild": "node scripts/publish-executive-chat-release.mjs convex",
     "start": "next start",
     "lint": "eslint",
     "check:env": "node scripts/check-convex-env.mjs development",
@@ -23,7 +23,9 @@
     "test:e2e:upload:list": "playwright test --list",
     "e2e:fixtures": "node scripts/generate-upload-e2e-fixtures.mjs",
     "e2e:report:daily": "node scripts/report-upload-e2e-status.mjs --lane daily --format markdown",
-    "verify:executive-chat-release": "node scripts/verify-executive-chat-release.mjs"
+    "verify:executive-chat-release": "node scripts/verify-executive-chat-release.mjs",
+    "report:executive-chat-health": "node scripts/report-executive-chat-health.mjs",
+    "manage:executive-chat-rollout": "node scripts/manage-executive-chat-rollout.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
@@ -38,7 +40,7 @@
     "@types/diff": "^7.0.2",
     "ai": "^6.0.116",
     "clsx": "^2.1.1",
-    "convex": "^1.32.0",
+    "convex": "1.36.1",
     "date-fns": "^4.1.0",
     "diff": "^9.0.0",
     "dompurify": "^3.3.2",
@@ -67,7 +69,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^28.0.0",
-    "@types/node": "^20",
+    "@types/node": "24.10.13",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
@@ -78,6 +80,6 @@
     "vitest": "^4.1.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   }
 }

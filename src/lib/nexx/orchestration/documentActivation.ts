@@ -55,6 +55,17 @@ export function decideDocumentActivation(args: {
     };
   }
 
+  if (args.hasCurrentAttachments) {
+    return {
+      active: true,
+      preserveFocus: true,
+      source: 'current_attachment',
+      referenceStrength: 'explicit',
+      useCurrentAttachmentsOnly: true,
+      reasonCodes: ['current_turn_attachment', 'current_attachments_only'],
+    };
+  }
+
   if (args.speechAct === 'social') {
     return {
       active: false,
@@ -63,17 +74,6 @@ export function decideDocumentActivation(args: {
       referenceStrength: 'none',
       useCurrentAttachmentsOnly: false,
       reasonCodes: ['social_turn', 'document_focus_retained_silently'],
-    };
-  }
-
-  if (args.pendingAct === 'await_upload' && args.hasCurrentAttachments) {
-    return {
-      active: true,
-      preserveFocus: true,
-      source: 'current_attachment',
-      referenceStrength: 'carried',
-      useCurrentAttachmentsOnly: true,
-      reasonCodes: ['awaited_upload_arrived', 'current_attachments_only'],
     };
   }
 

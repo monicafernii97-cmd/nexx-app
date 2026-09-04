@@ -1061,12 +1061,14 @@ export default function MessageBubble({
                     <AnalysisStatusCard isLight={isLight} routeMode={metadataRouteMode} />
                 ) : structuredViewModel && !isStreaming ? (
                     <>
-                        <AssistantMessageCard
-                            viewModel={structuredViewModel}
-                            patterns={detectedPatterns}
-                            procedureInfo={procedureInfo}
-                            onAction={(action, content) => onAction?.(action, content)}
-                        />
+                        <div data-testid="assistant-message-content">
+                            <AssistantMessageCard
+                                viewModel={structuredViewModel}
+                                patterns={detectedPatterns}
+                                procedureInfo={procedureInfo}
+                                onAction={(action, content) => onAction?.(action, content)}
+                            />
+                        </div>
                         {showDocumentEvidencePanel && (
                             <DocumentEvidencePanel sources={documentSources} citations={documentCitations} isLight={isLight} />
                         )}
@@ -1078,7 +1080,7 @@ export default function MessageBubble({
                     </>
                 ) : (
                     <>
-                <div className={`text-[15px] leading-7 font-normal prose max-w-none w-full break-words ${isLight
+                <div data-testid="assistant-message-content" className={`text-[15px] leading-7 font-normal prose max-w-none w-full break-words ${isLight
                     ? 'text-gray-800 prose-blue'
                     : 'text-white/90 prose-invert'
                     }`}>

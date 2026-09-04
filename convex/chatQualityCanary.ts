@@ -4,6 +4,9 @@ import { internal } from './_generated/api';
 import { understandTurn } from '../src/lib/nexx/orchestration/turnUnderstanding';
 import { decideFocusTransition } from '../src/lib/nexx/orchestration/focusTransition';
 import { buildCapabilitySnapshot, canPerformOperation } from '../src/lib/nexx/capabilities/documentCapabilityLedger';
+import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
+import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
+import { assessGenericAnswer } from '../src/lib/nexx/legal-engine/genericAnswerPolicy';
 import type { ConversationControlSnapshot } from '../src/lib/nexx/orchestration/types';
 
 const REQUIRED_INVARIANTS = [
@@ -12,14 +15,19 @@ const REQUIRED_INVARIANTS = [
   'INV-CAP-001',
   'INV-CAP-002',
   'INV-PUB-001',
+  'INV-PUB-002',
 ] as const;
+
+const SCENARIO_ID = 'executive-chat-critical-matrix-v2';
 
 export const runExecutiveChatCanary = internalMutation({
   args: {},
   handler: async (ctx) => {
     const startedAt = Date.now();
     const runId = await ctx.db.insert('chatQualityCanaryRuns', {
-      scenarioId: 'analyze-which-please-do-so',
+      scenarioId: SCENARIO_ID,
+      qaNamespace: 'system:executive-chat-canary',
+      dataProvenance: 'synthetic',
       status: 'running',
       invariantCodes: [...REQUIRED_INVARIANTS],
       failedInvariantCodes: [],
@@ -55,6 +63,44 @@ export const runExecutiveChatCanary = internalMutation({
       const confirmTransition = decideFocusTransition({ message: 'please do so', understanding: confirm, controlState: control });
       if (confirmTransition.kind !== 'refine') failed.push('INV-FOCUS-001');
 
+      for (const message of ['hey', 'thanks']) {
+        const understanding = understandTurn({ message, controlState: control, foregroundIntentV2: true });
+        const activation = decideDocumentActivation({
+          message,
+          speechAct: understanding.speechAct,
+          requestedOperation: understanding.requestedOperation,
+          detection: detectDocumentReference(message),
+          pendingAct: control.pendingAct,
+          hasCurrentAttachments: false,
+          hasActiveDocumentContext: true,
+          hasPendingDocumentAction: true,
+        });
+        if (understanding.speechAct !== 'social' || activation.active || !activation.preserveFocus) {
+          failed.push('INV-FOCUS-002');
+        }
+      }
+
+      for (const message of ['I will reupload it', 'Hold on while I attach the new version']) {
+        const understanding = understandTurn({ message, controlState: control, foregroundIntentV2: true });
+        const activation = decideDocumentActivation({
+          message,
+          speechAct: understanding.speechAct,
+          requestedOperation: understanding.requestedOperation,
+          detection: detectDocumentReference(message),
+          pendingAct: control.pendingAct,
+          hasCurrentAttachments: false,
+          hasActiveDocumentContext: true,
+          hasPendingDocumentAction: true,
+        });
+        if (understanding.requestedOperation !== 'await_upload' || activation.active || !activation.reasonCodes.includes('historical_document_activation_suppressed')) {
+          failed.push('INV-FOCUS-002');
+        }
+      }
+
+      const unknown = understandTurn({ message: 'ZQX?', controlState: control, foregroundIntentV2: true });
+      const unknownTransition = decideFocusTransition({ message: 'ZQX?', understanding: unknown, controlState: control });
+      if (unknownTransition.kind === 'replace') failed.push('INV-FOCUS-001');
+
       await ctx.db.patch(runId, { phase: 'capability', updatedAt: Date.now() });
       const snapshot = buildCapabilitySnapshot({
         turnId: 'synthetic-turn',
@@ -76,6 +122,8 @@ export const runExecutiveChatCanary = internalMutation({
       const exhaustive = canPerformOperation('exhaustive_review', snapshot);
       if (!focused.allowed || exhaustive.allowed) failed.push('INV-CAP-001');
       if (!focused.prohibitedClaims.includes('file_unreadable')) failed.push('INV-CAP-002');
+      const generic = assessGenericAnswer('This order contains the following relevant provisions. Here are some relevant details.');
+      if (!generic.isGeneric || generic.sentenceCount < 2) failed.push('INV-PUB-001', 'INV-PUB-002');
 
       const uniqueFailed = Array.from(new Set(failed));
       const finishedAt = Date.now();
@@ -110,7 +158,7 @@ export const auditExecutiveChatCanary = internalMutation({
   handler: async (ctx, args) => {
     const maxAgeMs = Math.max(5 * 60_000, args.maxAgeMs ?? 30 * 60_000);
     const latest = await ctx.db.query('chatQualityCanaryRuns')
-      .withIndex('by_scenario_created', (q) => q.eq('scenarioId', 'analyze-which-please-do-so'))
+      .withIndex('by_scenario_created', (q) => q.eq('scenarioId', SCENARIO_ID))
       .order('desc')
       .first();
     const stale = !latest || Date.now() - latest.createdAt > maxAgeMs;

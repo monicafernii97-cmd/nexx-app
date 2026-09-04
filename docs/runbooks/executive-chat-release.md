@@ -1,39 +1,57 @@
-# Executive chat release and rollback
+# Executive chat release
 
 ## Release contract
 
-The Vercel build deploys Convex from the same checkout before building Next.js. Its `postbuild` publishes the Convex release manifest with the Vercel commit SHA. After Vercel reports a successful production deployment, the production assurance workflow reads the protected web manifest, registers it, and compares both runtime manifests. A missing manifest, different commit, incompatible schema, or different control/capability/validator/prompt-policy version fails the release job.
+Node.js is pinned to 24.14.1 in the repository and CI, and Vercel must remain on Node.js 24.x. The Convex package is pinned in `package.json` and the Vercel CLI is pinned in deployment workflows. Do not approve a release with a changed lockfile unless CI, production build, and the browser matrix all pass on the pinned runtime.
 
-Required protected environment values:
+The Vercel project build command is `sh vercel.sh`. That script deploys Convex from the same checkout and then builds the web application. `postbuild` is deliberately not a release-manifest publisher.
 
-- `VERIFICATION_SECRET` in both Vercel and Convex, with the same value.
-- `NEXT_PUBLIC_CONVEX_URL` in the GitHub `Production` environment.
-- Existing browser-test identity and Clerk values used by the production assurance lane.
+After Vercel reports a successful production deployment, the production assurance workflow:
 
-Manifest endpoints and mutations never return credentials or document content. Rotate `VERIFICATION_SECRET` if it appears in logs or is otherwise exposed.
+1. checks the approved robot identity and production lane;
+2. runs the durable upload smoke test;
+3. runs the executive-chat critical browser matrix in isolated synthetic scope;
+4. reads the protected web manifest from the deployed site;
+5. atomically registers the exact web and Convex artifact identities;
+6. records a successful smoke result for that release pair;
+7. evaluates the hard-stop operations dashboard.
 
-The production build's Convex-manifest publication is deliberately bootstrap-safe. If the shared secret or newly introduced manifest mutation is not available yet, the build records a warning and continues so the additive backend and web code can deploy. This does not approve the release: the post-deployment production assurance workflow publishes both manifests again and fails closed unless the protected endpoint, shared secret, release pair, and every compatibility field agree.
+Rollout activation is refused unless the active web/backend manifests agree on git SHA and every contract version and a successful smoke record for that SHA is less than 24 hours old.
 
-## Rollout order
+Required protected values are `VERIFICATION_SECRET`, the Clerk browser-test credentials, and the approved robot identity. `CONVEX_DEPLOYMENT` is recommended so the backend identity is a deployment name rather than its URL hostname. Never print or store these values in artifacts.
 
-1. Deploy additive schema and code with semantic arbitration disabled.
-2. Verify the protected web manifest and Convex compatibility query are green.
-3. Run the synthetic `Analyze file → which → please do so` browser journey.
-4. Enable shadow understanding and inspect redacted decision timelines.
-5. Enable control state for internal/synthetic traffic, then stable conversation cohorts at 5%, 25%, 50%, and 100%.
-6. Keep the capability ledger and publication gate enabled wherever control state is authoritative.
+## Release procedure
 
-## Automatic pause conditions
+Before merge:
 
-Pause rollout for any cross-scope reference, false unreadability publication, publication without an envelope, manifest mismatch, two consecutive canary failures, repair exhaustion above 2%, or added p95 latency above 300 ms for 15 minutes.
+- Confirm the branch is based on the current production/main SHA and has no unrelated user changes.
+- Run tests, type checking, lint, production build, schema/code generation, and the preview browser matrix.
+- Confirm the preview uses an isolated Convex deployment and robot account.
+- Review the production pollution audit. Classification is not permission to quarantine.
+- Confirm there is no active executive-chat release or repair run.
 
-## Rollback
+After merge:
 
-Set the affected `EXEC_CHAT_*` flag to `off` and redeploy. Schema additions and audit records remain. Never delete control state during rollback. The publication gate is a safety boundary: if its surrounding orchestration is disabled, responses must still use validated publication or a fixed recovery notice; do not restore an arbitrary-content completion path.
+- Wait for the Vercel production deployment and production assurance workflow.
+- Record the web deployment ID, Convex deployment ID, git SHA, workflow run, and operations snapshot.
+- Confirm the release pair is compatible and the hard-stop list is empty.
+- Keep customer behavior off/shadow until the data-repair report and rollout configuration receive their separate approvals.
 
-After rollback, confirm:
+## Automatic no-go conditions
 
-1. The production canary is stable or deliberately paused.
-2. No active manifest claims incompatible web/backend versions.
-3. Existing conversations and uploaded documents remain available.
-4. Redacted decision timelines contain no raw document text or credentials.
+Do not activate or expand a cohort when any of these exists:
+
+- web/backend manifest identity mismatch;
+- published assistant response without a compatible publication envelope;
+- repeated self-correction beyond its budget;
+- two consecutive semantic-canary failures;
+- QA/synthetic evidence in a production answer;
+- cross-tenant evidence access;
+- destructive or unauthorized repair;
+- missing or stale production smoke evidence.
+
+Pause expansion for fallback rate above 1%, repair exhaustion above 0.5%, publication rejection above 1% pending adjudication, document activation on a social turn, retrieval while awaiting a future upload, or durable-review completion below 99% after allowed retries.
+
+## Artifact rollback
+
+Use the previously recorded compatible web and Convex deployment IDs. Roll back both artifacts as a pair; do not point one runtime at an incompatible peer. Register the restored pair, rerun production smoke, and verify a fresh operations snapshot before reactivation. Additive schema and audit history stay in place for the full rollback window.

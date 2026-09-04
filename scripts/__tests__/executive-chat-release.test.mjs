@@ -21,26 +21,16 @@ test('deployment drift blocks promotion', () => {
   assert.ok(result.reasonCodes.includes('git_sha_mismatch'));
 });
 
-test('preview deployment can omit the production-only release secret', () => {
+test('release publication is an atomic post-deployment pair operation', () => {
   const script = fs.readFileSync(new URL('../publish-executive-chat-release.mjs', import.meta.url), 'utf8');
-  assert.match(script, /runtime === 'convex' && process\.env\.VERCEL_ENV !== 'production'/);
-  assert.match(script, /production manifests are published only/);
+  const packageJson = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
+  assert.match(script, /runtime !== 'pair'/);
+  assert.match(script, /upsertPairFromRelease/);
+  assert.equal(packageJson.scripts.postbuild, undefined);
 });
 
-test('production Convex bootstrap defers publication when the shared secret is absent', () => {
-  const result = spawnSync(process.execPath, ['scripts/publish-executive-chat-release.mjs', 'convex'], {
-    cwd: new URL('../..', import.meta.url),
-    env: { ...process.env, VERCEL_ENV: 'production', VERIFICATION_SECRET: '' },
-    encoding: 'utf8',
-  });
-
-  assert.equal(result.status, 0);
-  assert.match(result.stderr, /manifest publication deferred/);
-  assert.match(result.stderr, /production assurance job/);
-});
-
-test('web assurance remains fail-closed when the shared secret is absent', () => {
-  const result = spawnSync(process.execPath, ['scripts/publish-executive-chat-release.mjs', 'web'], {
+test('pair assurance remains fail-closed when the shared secret is absent', () => {
+  const result = spawnSync(process.execPath, ['scripts/publish-executive-chat-release.mjs', 'pair'], {
     cwd: new URL('../..', import.meta.url),
     env: { ...process.env, VERIFICATION_SECRET: '' },
     encoding: 'utf8',

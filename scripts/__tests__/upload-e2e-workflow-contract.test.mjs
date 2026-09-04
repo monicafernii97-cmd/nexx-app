@@ -68,3 +68,27 @@ test("release assurance cannot loop on GitHub environment deployments", () => {
     /github\.event\.deployment\.ref == github\.event\.repository\.default_branch/,
   );
 });
+
+test("release assurance atomically registers a passing pair before checking hard stops", () => {
+  const source = fs.readFileSync(
+    path.join(workflowDir, "chat-upload-e2e-release.yml"),
+    "utf8",
+  );
+  assert.match(source, /publish-executive-chat-release\.mjs pair/);
+  assert.match(source, /report:executive-chat-health/);
+  assert.ok(
+    source.indexOf("test:e2e:executive-chat:release") < source.indexOf("publish-executive-chat-release.mjs pair"),
+  );
+  assert.ok(
+    source.indexOf("publish-executive-chat-release.mjs pair") < source.indexOf("report:executive-chat-health"),
+  );
+});
+
+test("Node and release dependencies are pinned to the production runtime", () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve("package.json"), "utf8"));
+  const action = fs.readFileSync(path.resolve(".github/actions/setup-node/action.yml"), "utf8");
+  assert.equal(packageJson.engines.node, "24.x");
+  assert.equal(packageJson.packageManager, "npm@11.11.0");
+  assert.equal(packageJson.dependencies.convex, "1.36.1");
+  assert.match(action, /default: '24\.14\.1'/);
+});

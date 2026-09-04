@@ -121,6 +121,8 @@ import {
 import type { CapabilityOperation, DocumentCapabilitySnapshot } from '../src/lib/nexx/capabilities/types';
 import { verifyResponseClaims } from '../src/lib/nexx/response/claimVerifier';
 import {
+    PUBLICATION_VALIDATOR_VERSION,
+    PUBLICATION_VALIDATOR_V2_VERSION,
     mintPublicationEnvelope,
     serializePublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
@@ -640,6 +642,10 @@ type GenerationContext = {
         fallbackOrder: string[];
         questionContractJson: string;
     } | null;
+    publicationRepair?: {
+        attempt: 1;
+        reasonCodes: string[];
+    };
     documentAmbiguity?: StoredDocumentAmbiguity | null;
     attachmentContexts?: AttachmentContext[];
     availableDocumentContexts?: AttachmentContext[];
@@ -821,6 +827,8 @@ async function commitVerifiedResponse(args: {
     capabilitySnapshot: DocumentCapabilitySnapshot;
     evidenceIds: string[];
     sourceEvidenceMap?: Record<string, string>;
+    citationVerificationPassed?: boolean;
+    usedDocumentIds?: string[];
     providerResponseId?: string;
     metadata: Record<string, unknown>;
     artifactsJson?: string;
@@ -868,11 +876,13 @@ async function commitVerifiedResponse(args: {
         evidenceIds: args.evidenceIds,
         expectedFocusRevision: plan.focusRevision,
         currentFocusRevision: args.context.conversationControlState.focusRevision,
-        supportedPropositions: canonicalPlan.propositions
-            .filter((proposition) => proposition.kind !== 'limitation')
-            .map((proposition) => proposition.text),
         requiresDirectAnswer: plan.responseAct === 'answer' && args.decision !== 'publish_limitation',
         unresolvedReferent: Boolean(args.context.turnUnderstanding?.ambiguityMaterial && plan.responseAct !== 'clarify'),
+        publicationV2: getExecutiveChatFeatureFlags().publicationGateV2,
+        speechAct: args.context.turnUnderstanding?.speechAct,
+        requestedOperation: args.context.turnUnderstanding?.requestedOperation,
+        citationVerificationPassed: args.citationVerificationPassed,
+        usedDocumentIds: args.usedDocumentIds,
     });
 
     if (!canonicalVerification.passed) {
@@ -901,6 +911,7 @@ async function commitVerifiedResponse(args: {
     const effectiveResponseAct = args.decision === 'ask_clarification' || pending.pendingAct === 'select' || pending.pendingAct === 'clarify'
         ? 'clarify' as const
         : plan.responseAct;
+    const publicationV2 = getExecutiveChatFeatureFlags().publicationGateV2;
     const envelope = mintPublicationEnvelope({
         turnId: args.context.turn._id.toString(),
         planId: plan.planId,
@@ -916,6 +927,10 @@ async function commitVerifiedResponse(args: {
         capabilitySnapshotHash: args.capabilitySnapshot.snapshotHash,
         evidenceSetHash: eHash,
         canonicalPlanHash: stableCapabilityHash(canonicalPlan),
+    }, {
+        validatorVersion: publicationV2
+            ? PUBLICATION_VALIDATOR_V2_VERSION
+            : PUBLICATION_VALIDATOR_VERSION,
     });
     const completion = await args.ctx.runMutation(internal.chatTurns.commitValidatedAssistant, {
         jobId: args.jobId,
@@ -930,6 +945,7 @@ async function commitVerifiedResponse(args: {
             capabilitySnapshot: args.capabilitySnapshot,
             publicationDecision: envelope.decision,
             publicationValidatorVersion: envelope.validatorVersion,
+            publicationDiagnostics: verification.diagnostics,
         }),
         repairHistoryJson: args.repairHistory ? JSON.stringify(args.repairHistory) : undefined,
     });
@@ -1685,6 +1701,15 @@ function buildInput(
     ].filter(Boolean).join('\n');
     const outsideGuidancePrompt = guidancePlaybookPrompt(context.turn.message);
     const reassessmentPrompt = reassessmentTarget ? buildReassessmentPrompt(reassessmentTarget) : '';
+    const publicationRepairPrompt = context.publicationRepair
+        ? [
+            '<publication_repair>',
+            `Attempt: ${context.publicationRepair.attempt} of 1.`,
+            `Rejected for: ${context.publicationRepair.reasonCodes.join(', ')}.`,
+            'Regenerate the answer for the current user turn and authoritative execution plan. Correct every listed defect. Do not discuss this validation instruction or expose internal reason codes.',
+            '</publication_repair>',
+          ].join('\n')
+        : '';
     const plainTextResponsePrompt = plainTextResponse
         ? 'Return only the natural user-facing answer in Markdown. Do not return JSON, an artifacts object, schema fields, or backend metadata.'
         : '';
@@ -1795,6 +1820,9 @@ function buildInput(
                 : []),
             ...(reassessmentPrompt
                 ? [{ role: 'developer' as const, content: reassessmentPrompt }]
+                : []),
+            ...(publicationRepairPrompt
+                ? [{ role: 'developer' as const, content: publicationRepairPrompt }]
                 : []),
             { role: 'developer', content: contextPrompt },
             ...(attachmentContextPrompt
@@ -3707,7 +3735,7 @@ export const processChatGenerationJob = internalAction({
             }
 
             workerStage = 'generating_provider_response';
-            const result = await generateWithFallbacks({
+            let result = await generateWithFallbacks({
                 ctx,
                 context,
                 jobId: args.jobId,
@@ -3731,37 +3759,62 @@ export const processChatGenerationJob = internalAction({
                 });
                 return null;
             }
-            const publicationMetadata = {
-                    routeMode: result.routeMode,
-                    agenticOutcome: result.response.agenticOutcome ?? completeAgenticOutcome(),
-                    localResourceLookup: result.response.localResourceLookup,
-                    legalAuthorities: result.response.legalAuthorities,
-                    proSeDraftingReadiness: result.response.proSeDraftingReadiness,
-                    orderVersion: result.response.orderVersion,
-                    legalBasis: result.response.legalBasis,
-                    deadlineAnalysis: result.response.deadlineAnalysis,
-                    responseCompositionTrace: result.response.responseCompositionTrace,
+            const commitCandidate = async (
+                candidate: typeof result,
+                options?: {
+                    response?: NexxAssistantResponse;
+                    content?: string;
+                    decision?: 'publish' | 'publish_scoped' | 'ask_clarification' | 'publish_limitation';
+                    repairStage?: string;
+                    repairHistory?: string[];
+                    citationVerificationPassed?: boolean;
+                    usedDocumentIds?: string[];
+                },
+            ) => {
+                const response = options?.response ?? candidate.response;
+                const evidenceIds = Array.from(new Set([
+                    ...uniqueDocumentChunkIds(candidate.attachmentContexts).map(String),
+                    ...candidate.citationVerification.verifiedCitations.map((citation) => citation.chunkId.toString()),
+                ]));
+                return commitVerifiedResponse({
+                    ctx,
+                    jobId: args.jobId,
+                    leaseOwner,
+                    context,
+                    response,
+                    content: options?.content ?? response.message,
+                    capabilitySnapshot: candidate.capabilitySnapshot,
+                    evidenceIds,
+                    sourceEvidenceMap: Object.fromEntries(
+                        candidate.documentSourcePackets.map((packet) => [packet.sourceId, packet.chunkId])
+                    ),
+                    citationVerificationPassed: options?.citationVerificationPassed ?? candidate.citationVerification.passed,
+                    usedDocumentIds: options?.usedDocumentIds ?? Array.from(new Set(
+                        candidate.citationVerification.verifiedCitations.flatMap((citation) =>
+                            candidate.documentSourcePackets
+                                .filter((packet) => packet.sourceId === citation.sourceId)
+                                .map((packet) => packet.fileId)
+                        )
+                    )),
+                    providerResponseId: candidate.responseId,
+                    metadata: {
+                        routeMode: candidate.routeMode,
+                        agenticOutcome: response.agenticOutcome ?? completeAgenticOutcome(),
+                        localResourceLookup: response.localResourceLookup,
+                        legalAuthorities: response.legalAuthorities,
+                        proSeDraftingReadiness: response.proSeDraftingReadiness,
+                        orderVersion: response.orderVersion,
+                        legalBasis: response.legalBasis,
+                        deadlineAnalysis: response.deadlineAnalysis,
+                        responseCompositionTrace: response.responseCompositionTrace,
+                        publicationRepairStage: options?.repairStage,
+                    },
+                    artifactsJson: JSON.stringify(response.artifacts),
+                    decision: options?.decision,
+                    repairHistory: options?.repairHistory,
+                });
             };
-            const publicationEvidenceIds = Array.from(new Set([
-                ...uniqueDocumentChunkIds(result.attachmentContexts).map(String),
-                ...result.citationVerification.verifiedCitations.map((citation) => citation.chunkId.toString()),
-            ]));
-            let publication = await commitVerifiedResponse({
-                ctx,
-                jobId: args.jobId,
-                leaseOwner,
-                context,
-                response: result.response,
-                content: result.response.message,
-                capabilitySnapshot: result.capabilitySnapshot,
-                evidenceIds: publicationEvidenceIds,
-                sourceEvidenceMap: Object.fromEntries(
-                    result.documentSourcePackets.map((packet) => [packet.sourceId, packet.chunkId])
-                ),
-                providerResponseId: result.responseId,
-                metadata: publicationMetadata,
-                artifactsJson: JSON.stringify(result.response.artifacts),
-            });
+            let publication = await commitCandidate(result);
             if (!publication?.committed) {
                 console.warn('[ChatWorker] Publication verification requested repair', {
                     jobId: args.jobId,
@@ -3769,43 +3822,83 @@ export const processChatGenerationJob = internalAction({
                     errorCodes: publication?.verification.errors ?? ['publication_result_missing'],
                     capabilitySupport: publication?.capabilityDecision.supportLevel ?? 'unknown',
                 });
-                const repair = decideRepair({
-                    errors: publication?.verification.errors ?? [],
+                const initialErrors = publication?.verification.errors ?? [];
+                let repair = decideRepair({
+                    errors: initialErrors,
                     attempt: 0,
                     hasCanonicalPlan: Boolean(result.response.documentAnswer || result.response.legalInterpretation),
                     hasSupportedPropositions: Boolean(supportedResponseText(result.response)),
                     ambiguityMaterial: context.turnUnderstanding?.ambiguityMaterial ?? false,
                     capabilityAllowed: publication?.capabilityDecision.allowed ?? false,
+                    publicationV2: getExecutiveChatFeatureFlags().publicationGateV2,
                 });
-                const supported = supportedResponseText(result.response);
-                const limitation = publication?.capabilityDecision.userSafeLimitations[0]?.text;
-                const repairedContent = buildPublicationRepairContent({
-                    errors: publication?.verification.errors ?? [],
-                    questionKind: publication?.plan.questionKind ?? 'other',
-                    supported,
-                    limitation,
-                    stage: repair.stage,
-                });
-                const repairedResponse = plainTextAssistantResponse(repairedContent);
-                repairedResponse.artifacts = result.response.artifacts;
-                publication = await commitVerifiedResponse({
-                    ctx,
-                    jobId: args.jobId,
-                    leaseOwner,
-                    context,
-                    response: repairedResponse,
-                    content: repairedContent,
-                    capabilitySnapshot: result.capabilitySnapshot,
-                    evidenceIds: publicationEvidenceIds,
-                    sourceEvidenceMap: Object.fromEntries(
-                        result.documentSourcePackets.map((packet) => [packet.sourceId, packet.chunkId])
-                    ),
-                    providerResponseId: result.responseId,
-                    metadata: { ...publicationMetadata, publicationRepairStage: repair.stage },
-                    artifactsJson: JSON.stringify(result.response.artifacts),
-                    decision: repair.stage === 'clarification' ? 'ask_clarification' : 'publish_scoped',
-                    repairHistory: [repair.stage, ...(publication?.verification.errors ?? [])],
-                });
+                if (getExecutiveChatFeatureFlags().publicationGateV2 && repair.stage === 'single_regeneration') {
+                    console.info('[ChatWorker] Running bounded publication regeneration', {
+                        jobId: args.jobId,
+                        attempt: 1,
+                        errorCodes: initialErrors,
+                    });
+                    const regenerated = await generateWithFallbacks({
+                        ctx,
+                        context: {
+                            ...context,
+                            publicationRepair: { attempt: 1, reasonCodes: initialErrors },
+                        },
+                        jobId: args.jobId,
+                        leaseOwner,
+                    });
+                    if (!regenerated.degraded) {
+                        result = regenerated;
+                        publication = await commitCandidate(result, {
+                            repairStage: 'single_regeneration',
+                            repairHistory: ['single_regeneration', ...initialErrors],
+                        });
+                    }
+                }
+
+                if (publication?.committed) {
+                    repair = { stage: 'stop', reasonCodes: ['regeneration_passed'], retryBudgetRemaining: 0 };
+                } else if (repair.stage === 'single_regeneration') {
+                    repair = decideRepair({
+                        errors: publication?.verification.errors ?? initialErrors,
+                        attempt: 1,
+                        hasCanonicalPlan: Boolean(result.response.documentAnswer || result.response.legalInterpretation),
+                        hasSupportedPropositions: Boolean(supportedResponseText(result.response)),
+                        ambiguityMaterial: context.turnUnderstanding?.ambiguityMaterial ?? false,
+                        capabilityAllowed: publication?.capabilityDecision.allowed ?? false,
+                        publicationV2: true,
+                    });
+                }
+
+                if (!publication?.committed) {
+                    const supported = result.citationVerification.passed
+                        ? supportedResponseText(result.response)
+                        : '';
+                    const limitation = publication?.capabilityDecision.userSafeLimitations[0]?.text;
+                    const repairedContent = buildPublicationRepairContent({
+                        errors: publication?.verification.errors ?? [],
+                        questionKind: publication?.plan.questionKind ?? 'other',
+                        supported,
+                        limitation,
+                        stage: repair.stage,
+                        speechAct: context.turnUnderstanding?.speechAct,
+                        requestedOperation: context.turnUnderstanding?.requestedOperation,
+                        userMessage: context.turn.message,
+                    });
+                    const repairedResponse = plainTextAssistantResponse(repairedContent);
+                    repairedResponse.artifacts = result.response.artifacts;
+                    publication = await commitCandidate(result, {
+                        response: repairedResponse,
+                        content: repairedContent,
+                        decision: repair.stage === 'clarification' ? 'ask_clarification' : 'publish_scoped',
+                        repairStage: repair.stage,
+                        repairHistory: [repair.stage, ...(publication?.verification.errors ?? [])],
+                        citationVerificationPassed: true,
+                        usedDocumentIds: supported
+                            ? undefined
+                            : [],
+                    });
+                }
             }
             if (!publication?.committed) {
                 console.warn('[ChatWorker] Publication verification exhausted', {

@@ -1,6 +1,10 @@
 import { stableCapabilityHash } from '../capabilities/documentCapabilityLedger';
 
 export const PUBLICATION_VALIDATOR_VERSION = 'response-publication-v1';
+export const PUBLICATION_VALIDATOR_V2_VERSION = 'response-publication-v2';
+export type PublicationValidatorVersion =
+  | typeof PUBLICATION_VALIDATOR_VERSION
+  | typeof PUBLICATION_VALIDATOR_V2_VERSION;
 
 export type PublicationCheckName =
   | 'responsiveness'
@@ -41,7 +45,10 @@ export type PublicationCandidate = Omit<ValidatedPublicationEnvelope, typeof val
   checks: Record<PublicationCheckName, boolean>;
 };
 
-export function mintPublicationEnvelope(candidate: PublicationCandidate): ValidatedPublicationEnvelope {
+export function mintPublicationEnvelope(
+  candidate: PublicationCandidate,
+  options?: { validatorVersion?: PublicationValidatorVersion },
+): ValidatedPublicationEnvelope {
   const failed = (Object.entries(candidate.checks) as Array<[PublicationCheckName, boolean]>)
     .filter(([, passed]) => passed !== true)
     .map(([name]) => name);
@@ -60,7 +67,7 @@ export function mintPublicationEnvelope(candidate: PublicationCandidate): Valida
     ...candidate,
     schemaVersion: 1,
     envelopeId,
-    validatorVersion: PUBLICATION_VALIDATOR_VERSION,
+    validatorVersion: options?.validatorVersion ?? PUBLICATION_VALIDATOR_VERSION,
     mintedAt,
     checks: candidate.checks as PublicationChecks,
     [validatedEnvelopeBrand]: true,
@@ -85,11 +92,14 @@ export function validatePersistedEnvelope(args: {
   focusRevision: number;
   capabilitySnapshotHash: string;
   evidenceSetHash: string;
+  expectedValidatorVersion?: PublicationValidatorVersion;
 }) {
   const { envelope } = args;
   const errors: string[] = [];
   if (envelope.schemaVersion !== 1) errors.push('publication_schema_unsupported');
-  if (envelope.validatorVersion !== PUBLICATION_VALIDATOR_VERSION) errors.push('publication_validator_incompatible');
+  if (envelope.validatorVersion !== (args.expectedValidatorVersion ?? PUBLICATION_VALIDATOR_VERSION)) {
+    errors.push('publication_validator_incompatible');
+  }
   if (envelope.turnId !== args.turnId) errors.push('publication_turn_mismatch');
   if (envelope.planId !== args.planId) errors.push('publication_plan_mismatch');
   if (envelope.taskId !== args.taskId) errors.push('publication_task_mismatch');

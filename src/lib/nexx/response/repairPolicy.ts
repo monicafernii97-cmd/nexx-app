@@ -23,10 +23,18 @@ export function decideRepair(args: {
   hasSupportedPropositions: boolean;
   ambiguityMaterial: boolean;
   capabilityAllowed: boolean;
+  publicationV2?: boolean;
 }): RepairDecision {
-  const remaining = Math.max(0, 2 - args.attempt);
+  const retryLimit = args.publicationV2 ? 1 : 2;
+  const remaining = Math.max(0, retryLimit - args.attempt);
   if (args.errors.length === 0) return { stage: 'stop', reasonCodes: ['verification_passed'], retryBudgetRemaining: remaining };
-  if (args.errors.includes('RESP_INTERNAL_PAYLOAD') || args.errors.includes('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE')) {
+  const deterministicNarrowCase = args.errors.includes('RESP_INTERNAL_PAYLOAD') ||
+    args.errors.includes('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN') ||
+    args.errors.includes('RESP_AWAITED_INPUT_NOT_ACKNOWLEDGED') ||
+    args.errors.includes('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD') ||
+    args.errors.includes('RESP_FALSE_ACTION_COMPLETION') ||
+    (!args.publicationV2 && args.errors.includes('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE'));
+  if (deterministicNarrowCase) {
     return { stage: 'deterministic_repair', reasonCodes: args.errors, retryBudgetRemaining: remaining };
   }
   if (args.hasCanonicalPlan && args.attempt === 0) {
@@ -50,7 +58,24 @@ export function buildPublicationRepairContent(args: {
   supported?: string;
   limitation?: string;
   stage: RepairStage;
+  speechAct?: string;
+  requestedOperation?: string;
+  userMessage?: string;
 }) {
+  if (args.requestedOperation === 'await_upload' || args.errors.some((error) => [
+    'RESP_AWAITED_INPUT_NOT_ACKNOWLEDGED',
+    'RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD',
+    'RESP_FALSE_ACTION_COMPLETION',
+    'RESP_FUTURE_ACTION_EXECUTED_EARLY',
+    'RESP_INTENT_NOT_FULFILLED',
+  ].includes(error))) {
+    return 'Sounds good—upload the new file when you are ready, and I will perform a fresh extraction from that copy.';
+  }
+  if (args.speechAct === 'social' || args.errors.includes('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN')) {
+    if (/\b(?:thank you|thanks|thx)\b/i.test(args.userMessage ?? '')) return 'You are welcome.';
+    if (/\b(?:bye|goodbye|see you)\b/i.test(args.userMessage ?? '')) return 'Take care.';
+    return 'Hi! How can I help?';
+  }
   if (args.errors.includes('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE') && args.questionKind === 'open_analysis') {
     return [
       'Which review would you like:',

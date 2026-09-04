@@ -3,13 +3,16 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const vercelConfigUrl = new URL('../../vercel.json', import.meta.url);
+const vercelBuildUrl = new URL('../../vercel.sh', import.meta.url);
 
 test('preview builds recreate isolated Convex deployments without changing production targeting', async () => {
   const config = JSON.parse(await readFile(vercelConfigUrl, 'utf8'));
-  const command = config.buildCommand;
+  const script = await readFile(vercelBuildUrl, 'utf8');
 
-  assert.match(command, /\[ \"\$VERCEL_ENV\" = \"preview\" \]/);
-  assert.match(command, /--preview-create \"\$VERCEL_GIT_COMMIT_REF\"/);
-  assert.match(command, /else npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL/);
-  assert.equal(command.match(/--preview-create/g)?.length, 1);
+  assert.equal(config.buildCommand, 'sh vercel.sh');
+  assert.match(script, /\[ "\$\{VERCEL_ENV:-\}" = "preview" \]/);
+  assert.match(script, /--preview-create "\$VERCEL_GIT_COMMIT_REF"/);
+  assert.match(script, /VERCEL_GIT_COMMIT_REF is required/);
+  assert.equal(script.match(/--preview-create/g)?.length, 1);
+  assert.equal(script.match(/exec npx convex deploy/g)?.length, 2);
 });

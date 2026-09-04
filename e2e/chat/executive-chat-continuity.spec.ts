@@ -12,7 +12,9 @@ async function sendAndWait(page: import('@playwright/test').Page, text: string) 
   const answer = assistants.last();
   await expect(answer).toHaveAttribute('data-message-streaming', 'false', { timeout: 4 * 60 * 1000 });
   await expect(answer).not.toHaveAttribute('data-message-status', 'degraded');
-  return answer;
+  const content = answer.getByTestId('assistant-message-content');
+  await expect(content).toBeVisible();
+  return content;
 }
 
 async function expectNoHistoricalDocumentWork(answer: import('@playwright/test').Locator) {

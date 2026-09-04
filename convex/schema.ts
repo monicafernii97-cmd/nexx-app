@@ -974,6 +974,10 @@ export default defineSchema({
         referenceCategories: v.array(v.string()),
         referenceSummaryJson: v.string(),
         selectedForRepair: v.boolean(),
+        adjudicatedBy: v.optional(v.string()),
+        adjudicationApprovalId: v.optional(v.string()),
+        adjudicatedAt: v.optional(v.number()),
+        adjudicationEvidenceJson: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })

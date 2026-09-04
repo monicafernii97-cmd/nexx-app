@@ -15,6 +15,7 @@ const MAX_APPROVED_TARGETS = 20;
 const MAX_SNAPSHOT_BATCH = 50;
 const REPAIR_CONFIRMATION = 'AUTHORIZE_QA_QUARANTINE';
 const RESTORE_CONFIRMATION = 'AUTHORIZE_CONFLICT_SAFE_RESTORE';
+const ADJUDICATION_CONFIRMATION = 'ATTEST_LEGACY_FIXTURE_EVIDENCE';
 
 type SnapshotTable =
   | 'uploadedFiles'
@@ -175,7 +176,9 @@ export const auditUploadedFilesBatch = internalMutation({
   handler: async (ctx, args) => {
     const run = await getRun(ctx, args.repairRunId);
     if (run.status !== 'auditing') throw new Error(`Repair run is not auditing (${run.status})`);
-    if ((args.cursor ?? undefined) !== run.auditCursor) throw new Error('Audit cursor is stale or does not belong to this run');
+    if (args.cursor !== undefined && args.cursor !== run.auditCursor) {
+      throw new Error('Audit cursor is stale or does not belong to this run');
+    }
     const page = await ctx.db.query('uploadedFiles').paginate({
       cursor: args.cursor ?? run.auditCursor ?? null,
       numItems: bounded(args.batchSize, 10, MAX_AUDIT_BATCH),
@@ -255,6 +258,85 @@ export const getAuditReport = internalQuery({
       .withIndex('by_run_selected', (q) => q.eq('repairRunId', args.repairRunId))
       .paginate({ cursor: args.cursor ?? null, numItems: bounded(args.pageSize, 50, 100) });
     return { run, items };
+  },
+});
+
+export const adjudicateLegacyFixture = internalMutation({
+  args: {
+    repairRunId: v.string(),
+    uploadedFileId: v.id('uploadedFiles'),
+    operatorId: v.string(),
+    approvalId: v.string(),
+    evidenceSummary: v.string(),
+    confirmation: v.literal(ADJUDICATION_CONFIRMATION),
+  },
+  handler: async (ctx, args) => {
+    const run = await getRun(ctx, args.repairRunId);
+    if (run.status !== 'awaiting_approval') throw new Error(`Repair run cannot be adjudicated from ${run.status}`);
+    if (!args.operatorId.trim() || !args.approvalId.trim() || args.evidenceSummary.trim().length < 12) {
+      throw new Error('Operator identity, approval ID, and a meaningful evidence summary are required');
+    }
+    const [file, item] = await Promise.all([
+      ctx.db.get(args.uploadedFileId),
+      ctx.db.query('productionStateRepairItems')
+        .withIndex('by_run_file', (q) => q.eq('repairRunId', args.repairRunId).eq('uploadedFileId', args.uploadedFileId))
+        .unique(),
+    ]);
+    if (!file || !item || item.classification !== 'unclassified') {
+      throw new Error('Only an unclassified audit item can be adjudicated');
+    }
+    if (file.dataProvenance === 'production') {
+      throw new Error('Explicit production provenance requires manual incident escalation');
+    }
+
+    const evidence: string[] = [];
+    if (/^synthetic[-_].+\.(pdf|docx?|txt)$/i.test(file.filename.trim())) evidence.push('synthetic_fixture_filename');
+    if (file.storageSha256) {
+      const sameHash = await ctx.db.query('uploadedFiles')
+        .withIndex('by_clerk_storage_hash', (q) => q.eq('clerkUserId', file.clerkUserId).eq('storageSha256', file.storageSha256!))
+        .take(10);
+      if (sameHash.length >= 2) evidence.push('repeated_fixture_hash');
+    }
+    if (file.conversationId) {
+      const [conversation, messages] = await Promise.all([
+        ctx.db.get(file.conversationId),
+        ctx.db.query('messages').withIndex('by_conversation', (q) => q.eq('conversationId', file.conversationId!)).take(25),
+      ]);
+      if (conversation && /synthetic|test fixture/i.test(conversation.title)) evidence.push('test_conversation_title');
+      if (messages.some((message) => /synthetic test|not a real case|test (?:court )?order/i.test(message.content))) {
+        evidence.push('explicit_test_message');
+      }
+    }
+    const corroborated = evidence.length >= 2 &&
+      (evidence.includes('repeated_fixture_hash') || evidence.includes('explicit_test_message'));
+    if (!corroborated) {
+      throw new Error('Legacy fixture evidence is not sufficiently corroborated for high-confidence classification');
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(item._id, {
+      classification: 'confirmed_synthetic',
+      confidence: 'high',
+      discoveryReasons: uniqueStrings([...item.discoveryReasons, ...evidence, 'operator_evidence_adjudication']),
+      adjudicatedBy: args.operatorId,
+      adjudicationApprovalId: args.approvalId,
+      adjudicatedAt: now,
+      adjudicationEvidenceJson: JSON.stringify({ evidence, summary: args.evidenceSummary.trim().slice(0, 500) }),
+      updatedAt: now,
+    });
+    await ctx.db.patch(run._id, {
+      candidateCount: run.candidateCount + 1,
+      unclassifiedCount: Math.max(0, run.unclassifiedCount - 1),
+      updatedAt: now,
+    });
+    await insertEvent(ctx, {
+      repairRunId: args.repairRunId,
+      eventType: 'legacy_fixture_adjudicated',
+      operatorId: args.operatorId,
+      approvalId: args.approvalId,
+      detail: { uploadedFileId: args.uploadedFileId, evidence },
+    });
+    return { classification: 'confirmed_synthetic' as const, confidence: 'high' as const, evidence };
   },
 });
 

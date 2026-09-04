@@ -148,6 +148,8 @@ describe('all 58 mandatory executive-chat sequences', () => {
   it.each([
     ['29', "That's wrong; look again.", 'challenge'], ['30', 'No, I meant the second clause.', 'correct'],
     ['31', 'New evidence changes that conclusion; reassess it.', 'ask'], ['36', 'Are you sure? Recheck it.', 'challenge'],
+    ['37', 'Why did you analyze the order when I only said hey?', 'challenge'],
+    ['38', 'Why is the exhaustive review marked failed?', 'challenge'],
   ] as const)('%s invokes reassessment semantics', (_n, message, act) => {
     expect(understandTurn({ message, controlState: activeControl() }).speechAct).toBe(act);
   });
@@ -241,7 +243,7 @@ describe('seeded orchestration properties and rollout contract', () => {
   });
 
   it('safety flags are independently reversible and default safe', () => {
-    expect(getExecutiveChatFeatureFlags({})).toMatchObject({ publicationGate: true, capabilityLedger: true, semanticArbiter: false, documentActivationV2: false, publicationGateV2: false });
+    expect(getExecutiveChatFeatureFlags({})).toMatchObject({ publicationGate: true, capabilityLedger: true, semanticArbiter: false, documentActivationV2: false, publicationGateV2: false, selfCorrectionV2: false });
     expect(getExecutiveChatFeatureFlags({ EXEC_CHAT_REPAIR_POLICY: 'off', EXEC_CHAT_CONTROL_STATE: '1' })).toMatchObject({ repairPolicy: false, controlState: true });
   });
 });

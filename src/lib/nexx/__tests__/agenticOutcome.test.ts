@@ -7,6 +7,14 @@ import {
 } from '../agenticOutcome';
 
 describe('agentic outcome and recovery policy', () => {
+  it.each([
+    'Why did you analyze the order when I only said hey?',
+    'Please audit your last response.',
+    'Why is the exhaustive review marked failed?',
+  ])('recognizes diagnostic requests: %s', (message) => {
+    expect(isReassessmentRequest(message)).toBe(true);
+  });
+
   it('detects natural challenge language and targets the latest active answer', () => {
     expect(isReassessmentRequest('That is not what the order says. Look again.')).toBe(true);
     expect(findReassessmentTarget('Are you sure?', [

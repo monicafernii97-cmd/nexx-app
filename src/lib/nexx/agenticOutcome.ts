@@ -30,6 +30,9 @@ const CHALLENGE_PATTERNS = [
   /\bnot\s+what\s+(?:the\s+)?(?:order|document|filing|record)\s+says\b/i,
   /\byou\s+said\s+(?:the\s+)?opposite\b/i,
   /\bcontradict(?:s|ed|ion)?\b/i,
+  /\bwhy\s+(?:did|do|are|were|would)\s+you\b/i,
+  /\b(?:check|audit|inspect|explain)\s+(?:your|the)\s+(?:last|previous|prior)\s+(?:answer|response|turn|behavior)\b/i,
+  /\bwhy\s+(?:is|was|did)\b.{0,80}\b(?:fail|failed|wrong|happen|happened)\b/i,
 ];
 
 function errorRecord(error: unknown) {

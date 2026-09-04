@@ -242,6 +242,18 @@ describe('publication quality v2', () => {
     }).errors).toContain('RESP_UNSUPPORTED_PROPOSITION');
   });
 
+  it('rejects claimed self-assessment without a server inspection receipt', () => {
+    expect(verify('I checked the last response and it was wrong.', {
+      speechAct: 'challenge',
+      selfCorrectionV2: true,
+    }).errors).toContain('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION');
+    expect(verify('I checked the last response and it was wrong.', {
+      speechAct: 'challenge',
+      selfCorrectionV2: true,
+      inspectionReceiptId: 'inspection_1',
+    }).errors).not.toContain('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION');
+  });
+
   it('accepts a specific wait acknowledgment without activating a historical document', () => {
     expect(verify('Sounds good—upload the new file when you are ready, and I will perform a fresh extraction from that copy.', {
       requestedOperation: 'await_upload',

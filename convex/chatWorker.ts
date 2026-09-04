@@ -127,6 +127,12 @@ import {
     serializePublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
 import { buildPublicationRepairContent, decideRepair } from '../src/lib/nexx/response/repairPolicy';
+import {
+    correctionInspectionPrompt,
+    selfCorrectionTerminalMessage,
+    type PriorTurnInspectionReceipt,
+    type SelfCorrectionPlan,
+} from '../src/lib/nexx/response/selfCorrection';
 import type { TurnExecutionPlan } from '../src/lib/nexx/orchestration/types';
 import { derivePendingInteraction } from '../src/lib/nexx/orchestration/pendingInteraction';
 import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
@@ -646,6 +652,11 @@ type GenerationContext = {
         attempt: 1;
         reasonCodes: string[];
     };
+    selfCorrection?: {
+        auditId: Id<'conversationRepairAudits'>;
+        receipt: PriorTurnInspectionReceipt;
+        repairPlan: SelfCorrectionPlan;
+    };
     documentAmbiguity?: StoredDocumentAmbiguity | null;
     attachmentContexts?: AttachmentContext[];
     availableDocumentContexts?: AttachmentContext[];
@@ -883,6 +894,8 @@ async function commitVerifiedResponse(args: {
         requestedOperation: args.context.turnUnderstanding?.requestedOperation,
         citationVerificationPassed: args.citationVerificationPassed,
         usedDocumentIds: args.usedDocumentIds,
+        selfCorrectionV2: getExecutiveChatFeatureFlags().selfCorrectionV2,
+        inspectionReceiptId: args.context.selfCorrection?.receipt.receiptId,
     });
 
     if (!canonicalVerification.passed) {
@@ -946,6 +959,12 @@ async function commitVerifiedResponse(args: {
             publicationDecision: envelope.decision,
             publicationValidatorVersion: envelope.validatorVersion,
             publicationDiagnostics: verification.diagnostics,
+            selfCorrection: args.context.selfCorrection ? {
+                repairAuditId: args.context.selfCorrection.auditId.toString(),
+                inspectionReceiptId: args.context.selfCorrection.receipt.receiptId,
+                repairActions: args.context.selfCorrection.repairPlan.actions,
+                contradictionCodes: args.context.selfCorrection.repairPlan.contradictionCodes,
+            } : undefined,
         }),
         repairHistoryJson: args.repairHistory ? JSON.stringify(args.repairHistory) : undefined,
     });
@@ -1700,7 +1719,14 @@ function buildInput(
             : undefined,
     ].filter(Boolean).join('\n');
     const outsideGuidancePrompt = guidancePlaybookPrompt(context.turn.message);
-    const reassessmentPrompt = reassessmentTarget ? buildReassessmentPrompt(reassessmentTarget) : '';
+    const reassessmentPrompt = reassessmentTarget
+        ? [
+            buildReassessmentPrompt(reassessmentTarget),
+            ...(context.selfCorrection
+                ? [correctionInspectionPrompt(context.selfCorrection.receipt, context.selfCorrection.repairPlan)]
+                : []),
+          ].join('\n\n')
+        : '';
     const publicationRepairPrompt = context.publicationRepair
         ? [
             '<publication_repair>',
@@ -3476,6 +3502,7 @@ export const processChatGenerationJob = internalAction({
         const workerStartedAt = Date.now();
         const leaseOwner = crypto.randomUUID();
         let workerStage = 'leasing_job';
+        let selfCorrectionAuditId: Id<'conversationRepairAudits'> | undefined;
         const lease = await ctx.runMutation(internal.chatTurns.leaseGenerationJob, {
             jobId: args.jobId,
             leaseOwner,
@@ -3490,7 +3517,7 @@ export const processChatGenerationJob = internalAction({
 
         try {
             workerStage = 'loading_generation_context';
-            const context = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
+            let context: GenerationContext | null = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
                 turnId: lease.turnId,
             });
             if (!context) {
@@ -3506,6 +3533,44 @@ export const processChatGenerationJob = internalAction({
                     }),
                 });
                 return null;
+            }
+
+            const executiveChatFlags = getExecutiveChatFeatureFlags();
+            const reassessmentTarget = findReassessmentTarget(
+                context.turn.message,
+                context.recentMessages.map((message) => ({
+                    id: message._id.toString(),
+                    role: message.role,
+                    content: message.content,
+                    status: message.status,
+                    superseded: Boolean(message.supersededByMessageId || message.supersededByTurnId),
+                })),
+            );
+            if (executiveChatFlags.selfCorrectionV2 && reassessmentTarget) {
+                workerStage = 'inspecting_prior_response';
+                const diagnostic = await ctx.runMutation(internal.chatSelfCorrection.inspectPriorResponseAndPlan, {
+                    currentTurnId: context.turn._id,
+                    targetMessageId: reassessmentTarget.messageId as Id<'messages'>,
+                });
+                selfCorrectionAuditId = diagnostic.auditId;
+                context = {
+                    ...context,
+                    turn: diagnostic.executionPlan
+                        ? { ...context.turn, routeMode: diagnostic.executionPlan.routeMode }
+                        : context.turn,
+                    turnExecutionPlan: diagnostic.executionPlan ?? context.turnExecutionPlan,
+                    selfCorrection: {
+                        auditId: diagnostic.auditId,
+                        receipt: diagnostic.receipt,
+                        repairPlan: diagnostic.repairPlan,
+                    },
+                };
+                console.info('[ChatWorker] Prior response inspection completed', {
+                    jobId: args.jobId,
+                    repairActionCount: diagnostic.repairPlan.actions.length,
+                    contradictionCount: diagnostic.repairPlan.contradictionCodes.length,
+                    exhausted: diagnostic.repairPlan.exhausted,
+                });
             }
 
             const fullReviewAttachments: AttachmentContext[] = context.attachmentContexts ?? [];
@@ -3532,6 +3597,46 @@ export const processChatGenerationJob = internalAction({
                     pagesTotal: attachment.pagesTotal,
                 })),
             });
+
+            if (context.selfCorrection?.repairPlan.exhausted) {
+                workerStage = 'completing_self_correction_terminal';
+                const terminalContent = selfCorrectionTerminalMessage(context.selfCorrection.repairPlan);
+                const terminalResponse = plainTextAssistantResponse(terminalContent);
+                const terminalPublication = await commitVerifiedResponse({
+                    ctx,
+                    jobId: args.jobId,
+                    leaseOwner,
+                    context,
+                    response: terminalResponse,
+                    content: terminalContent,
+                    capabilitySnapshot: baselineCapabilitySnapshot,
+                    evidenceIds: [],
+                    citationVerificationPassed: true,
+                    usedDocumentIds: [],
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    decision: 'ask_clarification',
+                    metadata: {
+                        selfCorrectionTerminalReason: context.selfCorrection.repairPlan.terminalReason,
+                    },
+                });
+                await ctx.runMutation(internal.chatSelfCorrection.completeRepair, {
+                    auditId: context.selfCorrection.auditId,
+                    currentTurnId: context.turn._id,
+                    succeeded: false,
+                    correctionMessageId: terminalPublication?.completion?.assistantMessageId,
+                    terminalReason: context.selfCorrection.repairPlan.terminalReason,
+                });
+                if (!terminalPublication?.committed) {
+                    await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
+                        jobId: args.jobId,
+                        leaseOwner,
+                        recoveryCode: 'validation_exhausted',
+                        errorCode: 'self_correction_terminal_publication_failed',
+                        retryable: false,
+                    });
+                }
+                return null;
+            }
             if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
                 workerStage = 'completing_coverage_gate';
                 const gateResponse = degradedResponse(buildCoverageGateMessage(fullReviewAttachments));
@@ -3744,6 +3849,14 @@ export const processChatGenerationJob = internalAction({
 
             workerStage = 'committing_provider_response';
             if (result.degraded) {
+                if (context.selfCorrection) {
+                    await ctx.runMutation(internal.chatSelfCorrection.completeRepair, {
+                        auditId: context.selfCorrection.auditId,
+                        currentTurnId: context.turn._id,
+                        succeeded: false,
+                        terminalReason: result.errorCode ?? 'provider_generation_failed',
+                    });
+                }
                 await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                     jobId: args.jobId,
                     leaseOwner,
@@ -3914,9 +4027,31 @@ export const processChatGenerationJob = internalAction({
                     errorMessage: publication?.verification.errors.join(', '),
                     retryable: true,
                 });
+                if (context.selfCorrection) {
+                    await ctx.runMutation(internal.chatSelfCorrection.completeRepair, {
+                        auditId: context.selfCorrection.auditId,
+                        currentTurnId: context.turn._id,
+                        succeeded: false,
+                        terminalReason: 'publication_repair_exhausted',
+                    });
+                }
                 return null;
             }
             const completion = publication.completion;
+            if (context.selfCorrection) {
+                await ctx.runMutation(internal.chatSelfCorrection.completeRepair, {
+                    auditId: context.selfCorrection.auditId,
+                    currentTurnId: context.turn._id,
+                    succeeded: true,
+                    correctionMessageId: completion?.assistantMessageId,
+                    completedActions: context.selfCorrection.repairPlan.actions.filter((action) =>
+                        action === 'recompute_intent' ||
+                        action === 'refresh_capabilities' ||
+                        action === 'regenerate' ||
+                        action === 'ask_clarification'
+                    ),
+                });
+            }
             console.info('[ChatWorker] Job completed', {
                 jobId: args.jobId,
                 turnId: lease.turnId,
@@ -4121,6 +4256,18 @@ export const processChatGenerationJob = internalAction({
                 workerStage,
             });
             const normalized = normalizeProviderError(error);
+            if (selfCorrectionAuditId && lease.turnId) {
+                try {
+                    await ctx.runMutation(internal.chatSelfCorrection.completeRepair, {
+                        auditId: selfCorrectionAuditId,
+                        currentTurnId: lease.turnId,
+                        succeeded: false,
+                        terminalReason: `worker_failed:${workerStage}`,
+                    });
+                } catch (repairAuditError) {
+                    console.error('[ChatWorker] Failed to finalize self-correction audit', repairAuditError);
+                }
+            }
             await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                 jobId: args.jobId,
                 leaseOwner,

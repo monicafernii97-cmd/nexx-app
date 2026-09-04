@@ -21,6 +21,12 @@ import {
 import { hasCompleteDocumentRetrieval } from './lib/chatUploadReadiness';
 import { isReusableDocumentCandidate } from '../src/lib/nexx/documentDeduplication';
 import { documentProviderPolicy } from '../src/lib/nexx/documentProviderPolicy';
+import {
+  classifyCreationProvenance,
+  isDocumentEligibleForChat,
+  qaRunIdFromFilename,
+} from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 type StorageMetadata = {
   _id: Id<'_storage'>;
@@ -66,6 +72,28 @@ const retryableProcessingStatuses = new Set([
   'failed_processing',
   'stalled',
 ]);
+
+async function resolveUploadProvenance(
+  ctx: QueryCtx | MutationCtx,
+  user: Doc<'users'>,
+  filename: string,
+) {
+  const filenameRunId = qaRunIdFromFilename(filename);
+  const registeredRun = filenameRunId && user.clerkId
+    ? await ctx.db.query('chatUploadE2ERuns')
+      .withIndex('by_user_run', (q) => q.eq('clerkUserId', user.clerkId!).eq('runId', filenameRunId))
+      .first()
+    : null;
+  const provenance = classifyCreationProvenance({
+    email: user.email,
+    filename,
+    registeredQaRunId: registeredRun?.runId,
+  });
+  return {
+    ...provenance,
+    qaNamespace: provenance.dataProvenance === 'production' ? undefined : `qa:${user.clerkId}`,
+  };
+}
 
 async function getIdentityClerkId(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -227,6 +255,7 @@ export const startUploadSession = mutation({
       caseId: args.caseId,
     });
     if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
+    const provenance = await resolveUploadProvenance(ctx, user, args.filename);
 
     const clientUploadKey = args.clientUploadKey.trim();
     if (!clientUploadKey) throw new Error('clientUploadKey is required');
@@ -258,6 +287,14 @@ export const startUploadSession = mutation({
         || (existing.clientSha256 && existing.clientSha256 !== clientSha256)
       ) {
         throw new Error('Upload session key already belongs to a different file.');
+      }
+      if (!existing.dataProvenance) {
+        await ctx.db.patch(existing._id, {
+          dataProvenance: provenance.dataProvenance,
+          qaRunId: provenance.qaRunId,
+          qaNamespace: provenance.qaNamespace,
+          updatedAt: Date.now(),
+        });
       }
 
       if (!existing.storageId && existing.status !== 'cancelled') {
@@ -319,6 +356,9 @@ export const startUploadSession = mutation({
     const uploadUrlExpiresAt = now + CHAT_UPLOAD_CONFIG.uploadUrlTtlMs;
     const uploadSessionId = await ctx.db.insert('chatUploadSessions', {
       clerkUserId: user.clerkId,
+      dataProvenance: provenance.dataProvenance,
+      qaRunId: provenance.qaRunId,
+      qaNamespace: provenance.qaNamespace,
       caseId,
       conversationId: args.conversationId,
       clientUploadKey,
@@ -1066,13 +1106,17 @@ export const findReusableExtraction = internalQuery({
       .withIndex('by_clerk_storage_hash', (q) => q.eq('clerkUserId', session.clerkUserId).eq('storageSha256', session.storageSha256))
       .order('desc')
       .take(10);
-    const file = candidates.find((candidate) => isReusableDocumentCandidate({
+    const file = candidates.find((candidate) =>
+      (candidate.dataProvenance ?? 'production') === (session.dataProvenance ?? 'production') &&
+      candidate.qaRunId === session.qaRunId &&
+      isReusableDocumentCandidate({
       status: candidate.status,
       fullDocumentReviewStatus: candidate.fullDocumentReviewStatus,
       coverageStatus: candidate.coverageStatus,
       fullTextStorageId: candidate.fullTextStorageId?.toString(),
       activeMemoryGenerationId: candidate.activeMemoryGenerationId?.toString(),
-    }));
+      })
+    );
     if (!file?.fullTextStorageId || !file.activeMemoryGenerationId) return null;
     const pages = await ctx.db.query('documentPages')
       .withIndex('by_generation_page', (q) => q.eq('memoryGenerationId', file.activeMemoryGenerationId!))
@@ -1244,6 +1288,9 @@ export const upsertProcessedUploadedFile = internalMutation({
     if (session.uploadedFileId) {
       const existingUploadedFile = await ctx.db.get(session.uploadedFileId);
       if (!existingUploadedFile) throw new Error('Linked uploaded file is unavailable');
+      if (existingUploadedFile.status === 'quarantined') {
+        throw new Error('Linked uploaded file is quarantined');
+      }
       const previousFullTextStorageId = existingUploadedFile.fullTextStorageId;
       await ctx.db.patch(existingUploadedFile._id, {
         confidentialityLevel: documentProviderPolicy(session.intent, false).confidentialityLevel,
@@ -1286,6 +1333,10 @@ export const upsertProcessedUploadedFile = internalMutation({
 
     const uploadedFileId = await ctx.db.insert('uploadedFiles', {
       clerkUserId: session.clerkUserId,
+      dataProvenance: session.dataProvenance ?? 'production',
+      qaRunId: session.qaRunId,
+      qaNamespace: session.qaNamespace,
+      provenanceClassifiedAt: now,
       conversationId: session.conversationId,
       caseId: session.caseId,
       uploadSessionId: args.uploadSessionId,
@@ -1342,7 +1393,8 @@ export const validateAttachmentsForChat = query({
   },
   handler: async (ctx, args) => {
     const clerkUserId = await getIdentityClerkId(ctx);
-    await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+    const { user } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
+    const allowQa = isUploadE2ERobotEmail(user.email);
     if (args.attachments.length > 5) {
       throw new Error('Too many attachments for one chat turn.');
     }
@@ -1360,6 +1412,7 @@ export const validateAttachmentsForChat = query({
         uploadedFile.conversationId !== args.conversationId ||
         uploadedFile.uploadSessionId !== attachment.uploadSessionId ||
         uploadedFile.storageId !== attachment.storageId ||
+        !isDocumentEligibleForChat(uploadedFile, allowQa) ||
         (uploadedFile.status !== 'ready' && uploadedFile.status !== 'partial')
       ) {
         throw new Error('Attachment is not ready or does not belong to this conversation.');

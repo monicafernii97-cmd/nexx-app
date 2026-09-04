@@ -163,6 +163,9 @@ export const startRun = internalMutation({
     if (!file || !generation || file.activeMemoryGenerationId !== generation._id) {
       throw new Error('Cannot start understanding for a non-active document generation.');
     }
+    if (file.deletedAt || file.status === 'deleted' || file.status === 'quarantined') {
+      throw new Error('Cannot start understanding for a quarantined document.');
+    }
     if (!generation.coverageManifestId) throw new Error('Document has no coverage manifest.');
     const manifest = await ctx.db.get(generation.coverageManifestId);
     if (!manifest || manifest.status !== 'complete') throw new Error('Document coverage is not complete.');
@@ -192,12 +195,16 @@ export const startRun = internalMutation({
     const now = Date.now();
     const stableJobId = `dur_${stableCapabilityHash({
       uploadedFileId: file._id,
+      dataProvenance: file.dataProvenance ?? 'production',
+      qaRunId: file.qaRunId,
       memoryGenerationId: generation._id,
       coverageManifestId: manifest._id,
       version: understandingVersion,
     }).slice(0, 28)}`;
     const runId = await ctx.db.insert('documentUnderstandingRuns', {
       uploadedFileId: file._id,
+      dataProvenance: file.dataProvenance ?? 'production',
+      qaRunId: file.qaRunId,
       memoryGenerationId: generation._id,
       coverageManifestId: manifest._id,
       uploadSessionId: args.uploadSessionId,
@@ -386,6 +393,8 @@ export const beginWorkNode = internalMutation({
         nodeId: args.nodeId,
         runId: run._id,
         uploadedFileId: run.uploadedFileId,
+        dataProvenance: run.dataProvenance ?? 'production',
+        qaRunId: run.qaRunId,
         memoryGenerationId: run.memoryGenerationId,
         phase: args.phase,
         level: args.level,
@@ -625,6 +634,8 @@ export const persistNode = internalMutation({
     await ctx.db.insert('documentUnderstandingNodes', {
       runId: run._id,
       uploadedFileId: run.uploadedFileId,
+      dataProvenance: run.dataProvenance ?? 'production',
+      qaRunId: run.qaRunId,
       memoryGenerationId: run.memoryGenerationId,
       level: args.level,
       nodeIndex: args.nodeIndex,
@@ -691,6 +702,8 @@ export const finalizeRun = internalMutation({
     const recordId = await ctx.db.insert('documentUnderstandingRecords', {
       runId: run._id,
       uploadedFileId: run.uploadedFileId,
+      dataProvenance: run.dataProvenance ?? 'production',
+      qaRunId: run.qaRunId,
       memoryGenerationId: run.memoryGenerationId,
       coverageManifestId: run.coverageManifestId,
       version: run.version,
@@ -993,7 +1006,7 @@ export const getActiveRecord = internalQuery({
   args: { uploadedFileId: v.id('uploadedFiles') },
   handler: async (ctx, args) => {
     const file = await ctx.db.get(args.uploadedFileId);
-    if (!file?.activeUnderstandingRecordId || file.fullDocumentReviewStatus !== 'ready') return null;
+    if (!file?.activeUnderstandingRecordId || file.fullDocumentReviewStatus !== 'ready' || file.status === 'quarantined') return null;
     const record = await ctx.db.get(file.activeUnderstandingRecordId);
     if (!record || record.memoryGenerationId !== file.activeMemoryGenerationId || record.verificationStatus !== 'verified') return null;
     return record;
@@ -1006,6 +1019,10 @@ export const getOwnedRunStatus = query({
     const user = await getAuthenticatedUser(ctx);
     const run = await ctx.db.get(args.runId);
     if (!run || run.clerkUserId !== user.clerkId) throw new Error('Not authorized to inspect this review run.');
+    const file = await ctx.db.get(run.uploadedFileId);
+    if (!file || file.deletedAt || file.status === 'deleted' || file.status === 'quarantined') {
+      throw new Error('Not authorized to inspect this review run.');
+    }
     const nodes = await ctx.db.query('documentUnderstandingWorkNodes')
       .withIndex('by_run_status', (q) => q.eq('runId', run._id))
       .collect();
@@ -1038,7 +1055,7 @@ export const resumeOwnedRun = mutation({
       return { resumed: false, status: run.status, reason: 'run_not_failed' };
     }
     const file = await ctx.db.get(run.uploadedFileId);
-    if (!file || file.clerkUserId !== user.clerkId || file.activeMemoryGenerationId !== run.memoryGenerationId) {
+    if (!file || file.clerkUserId !== user.clerkId || file.activeMemoryGenerationId !== run.memoryGenerationId || file.status === 'quarantined') {
       throw new Error('The failed review no longer matches the active document version.');
     }
     const now = Date.now();
@@ -1080,7 +1097,7 @@ export const restartOwnedDocumentVersion = mutation({
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx);
     const file = await ctx.db.get(args.uploadedFileId);
-    if (!file || file.clerkUserId !== user.clerkId) throw new Error('Not authorized to restart this document review.');
+    if (!file || file.clerkUserId !== user.clerkId || file.status === 'quarantined') throw new Error('Not authorized to restart this document review.');
     if (!file.activeMemoryGenerationId) throw new Error('Document has no active memory generation.');
     const generation = await ctx.db.get(file.activeMemoryGenerationId);
     if (!generation?.coverageManifestId) throw new Error('Document has no complete coverage manifest.');
@@ -1097,6 +1114,8 @@ export const restartOwnedDocumentVersion = mutation({
     const now = Date.now();
     const stableJobId = `dur_${stableCapabilityHash({
       uploadedFileId: file._id,
+      dataProvenance: file.dataProvenance ?? 'production',
+      qaRunId: file.qaRunId,
       memoryGenerationId: generation._id,
       coverageManifestId: manifest._id,
       version: UNDERSTANDING_VERSION,
@@ -1104,6 +1123,8 @@ export const restartOwnedDocumentVersion = mutation({
     }).slice(0, 28)}`;
     const runId = await ctx.db.insert('documentUnderstandingRuns', {
       uploadedFileId: file._id,
+      dataProvenance: file.dataProvenance ?? 'production',
+      qaRunId: file.qaRunId,
       memoryGenerationId: generation._id,
       coverageManifestId: manifest._id,
       clerkUserId: file.clerkUserId,

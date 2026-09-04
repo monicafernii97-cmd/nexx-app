@@ -10,6 +10,8 @@ import {
   type SelfCorrectionPlan,
 } from '../src/lib/nexx/response/selfCorrection';
 import { getAuthenticatedUserAndConversation } from './lib/auth';
+import { isDocumentEligibleForChat } from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -86,6 +88,9 @@ export const inspectDocumentCapability = internalQuery({
       (uploadedFile.conversationId && uploadedFile.conversationId !== conversation._id)
     ) {
       throw new Error('self_correction_document_scope_mismatch');
+    }
+    if (!isDocumentEligibleForChat(uploadedFile, isUploadE2ERobotEmail(user.email))) {
+      throw new Error('self_correction_document_quarantined');
     }
     return {
       uploadedFileId: uploadedFile._id,

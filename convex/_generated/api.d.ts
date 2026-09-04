@@ -59,10 +59,12 @@ import type * as lib_chatUploadFallbackPolicy from "../lib/chatUploadFallbackPol
 import type * as lib_chatUploadReadiness from "../lib/chatUploadReadiness.js";
 import type * as lib_documentTelemetry from "../lib/documentTelemetry.js";
 import type * as lib_exportConfig from "../lib/exportConfig.js";
+import type * as lib_qaProvenance from "../lib/qaProvenance.js";
 import type * as lib_routeModeValidator from "../lib/routeModeValidator.js";
 import type * as messages from "../messages.js";
 import type * as nexProfiles from "../nexProfiles.js";
 import type * as quickGenerateArtifacts from "../quickGenerateArtifacts.js";
+import type * as productionStateRepair from "../productionStateRepair.js";
 import type * as releaseManifest from "../releaseManifest.js";
 import type * as resourcesCache from "../resourcesCache.js";
 import type * as retrievedSources from "../retrievedSources.js";
@@ -131,10 +133,12 @@ declare const fullApi: ApiFromModules<{
   "lib/chatUploadReadiness": typeof lib_chatUploadReadiness;
   "lib/documentTelemetry": typeof lib_documentTelemetry;
   "lib/exportConfig": typeof lib_exportConfig;
+  "lib/qaProvenance": typeof lib_qaProvenance;
   "lib/routeModeValidator": typeof lib_routeModeValidator;
   messages: typeof messages;
   nexProfiles: typeof nexProfiles;
   quickGenerateArtifacts: typeof quickGenerateArtifacts;
+  productionStateRepair: typeof productionStateRepair;
   releaseManifest: typeof releaseManifest;
   resourcesCache: typeof resourcesCache;
   retrievedSources: typeof retrievedSources;

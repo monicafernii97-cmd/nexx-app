@@ -3,6 +3,8 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { getAuthenticatedUser, getAuthenticatedUserAndConversation, validateCaseOwnership } from './lib/auth';
 import { routeModeValidator } from './lib/routeModeValidator';
+import { classifyCreationProvenance, isDocumentEligibleForChat } from './lib/qaProvenance';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 
 const UPLOAD_DRAFT_TTL_MS = 60 * 60 * 1000;
 
@@ -21,9 +23,12 @@ export const create = mutation({
     handler: async (ctx, args) => {
         const user = await getAuthenticatedUser(ctx);
         await validateCaseOwnership(ctx, args.caseId, user._id);
+        const provenance = classifyCreationProvenance({ email: user.email });
 
         return await ctx.db.insert('conversations', {
             userId: user._id,
+            dataProvenance: provenance.dataProvenance,
+            qaNamespace: provenance.dataProvenance === 'production' ? undefined : `qa:${user.clerkId}`,
             title: args.title,
             mode: args.mode,
             status: 'active',
@@ -147,6 +152,9 @@ export const list = query({
             .withIndex('by_clerk', (q) => q.eq('clerkId', identity.subject))
             .first();
         if (!user) return [];
+        const allowQa = isUploadE2ERobotEmail(user.email);
+        const visibleByProvenance = (conversation: { dataProvenance?: 'production' | 'qa' | 'synthetic' }) =>
+            allowQa || conversation.dataProvenance === undefined || conversation.dataProvenance === 'production';
 
         // Case-scoped query when caseId is provided
         if (args.caseId) {
@@ -157,9 +165,10 @@ export const list = query({
                 )
                 .order('desc')
                 .collect();
-            const visibleResults = args.status
+            const visibleResults = (args.status
                 ? results
-                : results.filter((c) => c.status === 'active' || c.status === 'archived');
+                : results.filter((c) => c.status === 'active' || c.status === 'archived'))
+                .filter(visibleByProvenance);
             // Filter by status client-side when using case index
             if (args.status) {
                 return visibleResults.filter((c) => c.status === args.status);
@@ -168,13 +177,13 @@ export const list = query({
         }
 
         if (args.status) {
-            return await ctx.db
+            return (await ctx.db
                 .query('conversations')
                 .withIndex('by_user_status', (q) =>
                     q.eq('userId', user._id).eq('status', args.status!)
                 )
                 .order('desc')
-                .collect();
+                .collect()).filter(visibleByProvenance);
         }
 
         const results = await ctx.db
@@ -182,7 +191,9 @@ export const list = query({
             .withIndex('by_user', (q) => q.eq('userId', user._id))
             .order('desc')
             .collect();
-        return results.filter((c) => c.status === 'active' || c.status === 'archived');
+        return results.filter((c) =>
+            (c.status === 'active' || c.status === 'archived') && visibleByProvenance(c)
+        );
     },
 });
 
@@ -203,9 +214,12 @@ export const createDraftForUpload = mutation({
         if (args.caseId) {
             await validateCaseOwnership(ctx, args.caseId, user._id);
         }
+        const provenance = classifyCreationProvenance({ email: user.email });
 
         return await ctx.db.insert('conversations', {
             userId: user._id,
+            dataProvenance: provenance.dataProvenance,
+            qaNamespace: provenance.dataProvenance === 'production' ? undefined : `qa:${user.clerkId}`,
             title: args.title,
             mode: args.mode,
             status: 'draft_uploading',
@@ -314,7 +328,7 @@ export const get = query({
 export const getChatRoutingContext = query({
     args: { id: v.id('conversations') },
     handler: async (ctx, args) => {
-        const { conversation } = await getAuthenticatedUserAndConversation(ctx, args.id);
+        const { conversation, user } = await getAuthenticatedUserAndConversation(ctx, args.id);
         const [conversationDocumentState, conversationSummary] = await Promise.all([
             ctx.db
                 .query('conversationDocumentState')
@@ -326,10 +340,18 @@ export const getChatRoutingContext = query({
                 .first(),
         ]);
 
+        const activeUploadedFile = conversationDocumentState?.activeUploadedFileId
+            ? await ctx.db.get(conversationDocumentState.activeUploadedFileId)
+            : null;
+        const activeUploadedFileId = activeUploadedFile &&
+            isDocumentEligibleForChat(activeUploadedFile, isUploadE2ERobotEmail(user.email))
+            ? activeUploadedFile._id
+            : null;
+
         return {
             title: conversation.title,
             routeMode: conversation.routeMode,
-            activeUploadedFileId: conversationDocumentState?.activeUploadedFileId ?? null,
+            activeUploadedFileId,
             conversationSummary: conversationSummary?.summary ?? null,
         };
     },

@@ -289,7 +289,7 @@ export const createGeneration = internalMutation({
   },
   handler: async (ctx, args) => {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     if (args.pagesExpected !== undefined) {
       assertPositiveInteger('pagesExpected', args.pagesExpected);
     }
@@ -309,6 +309,8 @@ export const createGeneration = internalMutation({
       conversationId: uploadedFile.conversationId,
       caseId: uploadedFile.caseId,
       uploadedFileId: args.uploadedFileId,
+      dataProvenance: uploadedFile.dataProvenance ?? 'production',
+      qaRunId: uploadedFile.qaRunId,
       generationNumber,
       status: 'building',
       sourceFileHash: args.sourceFileHash ?? sourceHashForFile(uploadedFile),
@@ -577,6 +579,7 @@ export const createCoverageManifest = internalMutation({
     if (!uploadedFile || !generation || generation.uploadedFileId !== args.uploadedFileId) {
       throw new Error('Document memory generation not found for coverage manifest');
     }
+    if (uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     if (generation.status !== 'building') {
       throw new Error(`Cannot create coverage manifest for ${generation.status} generation`);
     }
@@ -626,7 +629,10 @@ export const insertCoverageUnitBatch = internalMutation({
       throw new Error(`Coverage batch must contain between 1 and ${COVERAGE_BATCH_LIMIT} units`);
     }
     const manifest = await ctx.db.get(args.coverageManifestId);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (
+      !uploadedFile ||
+      uploadedFile.status === 'quarantined' ||
       !manifest ||
       manifest.uploadedFileId !== args.uploadedFileId ||
       manifest.memoryGenerationId !== args.memoryGenerationId ||
@@ -704,7 +710,10 @@ export const finalizeCoverageManifest = internalMutation({
   },
   handler: async (ctx, args) => {
     const manifest = await ctx.db.get(args.coverageManifestId);
+    const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (
+      !uploadedFile ||
+      uploadedFile.status === 'quarantined' ||
       !manifest ||
       manifest.uploadedFileId !== args.uploadedFileId ||
       manifest.memoryGenerationId !== args.memoryGenerationId
@@ -738,9 +747,8 @@ export const finalizeCoverageManifest = internalMutation({
       ])),
       updatedAt: now,
     });
-    const uploadedFile = await ctx.db.get(args.uploadedFileId);
     const generation = await ctx.db.get(args.memoryGenerationId);
-    if (uploadedFile && generation && uploadedFile.latestGenerationNumber === generation.generationNumber) {
+    if (generation && uploadedFile.latestGenerationNumber === generation.generationNumber) {
       await ctx.db.patch(args.uploadedFileId, {
         activeCoverageManifestId: args.coverageManifestId,
         coverageStatus: status,
@@ -767,7 +775,7 @@ export const validateAndActivateGeneration = internalMutation({
   },
   handler: async (ctx, args) => {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     const generation = await ctx.db.get(args.memoryGenerationId);
     if (!generation || generation.uploadedFileId !== args.uploadedFileId) {
       throw new Error('Document memory generation not found for uploaded file');
@@ -1056,7 +1064,7 @@ export const backfillLegacyGeneration = internalMutation({
   },
   handler: async (ctx, args) => {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
-    if (!uploadedFile) throw new Error('Uploaded file not found');
+    if (!uploadedFile || uploadedFile.status === 'quarantined') throw new Error('Uploaded file not writable');
     const existingActive = await ctx.db
       .query('documentMemoryGenerations')
       .withIndex('by_file_status', (q) =>
@@ -1117,6 +1125,8 @@ export const backfillLegacyGeneration = internalMutation({
       conversationId: uploadedFile.conversationId,
       caseId: uploadedFile.caseId,
       uploadedFileId: args.uploadedFileId,
+      dataProvenance: uploadedFile.dataProvenance ?? 'production',
+      qaRunId: uploadedFile.qaRunId,
       generationNumber,
       status: 'building',
       sourceFileHash: sourceHashForFile(uploadedFile),

@@ -83,6 +83,12 @@ const providerUsageStatusValidator = v.union(
     v.literal('failed')
 );
 
+const dataProvenanceValidator = v.union(
+    v.literal('production'),
+    v.literal('qa'),
+    v.literal('synthetic')
+);
+
 export default defineSchema({
     // ═══ Users ═══
     users: defineTable({
@@ -202,6 +208,8 @@ export default defineSchema({
     // ═══ Conversations ═══
     conversations: defineTable({
         userId: v.id('users'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaNamespace: v.optional(v.string()),
         title: v.string(),
         mode: v.union(
             v.literal('therapeutic'),
@@ -397,6 +405,9 @@ export default defineSchema({
 
     chatUploadSessions: defineTable({
         clerkUserId: v.string(),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
+        qaNamespace: v.optional(v.string()),
         caseId: v.optional(v.id('cases')),
         conversationId: v.optional(v.id('conversations')),
         clientUploadKey: v.string(),
@@ -646,6 +657,8 @@ export default defineSchema({
         conversationId: v.id('conversations'),
         uploadedFileId: v.id('uploadedFiles'),
         uploadSessionId: v.id('chatUploadSessions'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         filename: v.string(),
         mimeType: v.string(),
         byteSize: v.number(),
@@ -909,6 +922,108 @@ export default defineSchema({
         .index('by_target_message', ['targetMessageId'])
         .index('by_conversation_created', ['conversationId', 'createdAt'])
         .index('by_response_fingerprint', ['conversationId', 'responseFingerprint']),
+
+    productionStateRepairRuns: defineTable({
+        repairRunId: v.string(),
+        codeVersion: v.string(),
+        scopeConversationId: v.optional(v.id('conversations')),
+        scopeCaseId: v.optional(v.id('cases')),
+        status: v.union(
+            v.literal('auditing'),
+            v.literal('awaiting_approval'),
+            v.literal('authorized'),
+            v.literal('snapshotted'),
+            v.literal('applying'),
+            v.literal('verifying'),
+            v.literal('verified'),
+            v.literal('restoring'),
+            v.literal('restored'),
+            v.literal('failed')
+        ),
+        auditCursor: v.optional(v.string()),
+        auditComplete: v.boolean(),
+        scannedCount: v.number(),
+        candidateCount: v.number(),
+        unclassifiedCount: v.number(),
+        approvedTargetUploadedFileIds: v.array(v.id('uploadedFiles')),
+        operatorId: v.optional(v.string()),
+        approvalId: v.optional(v.string()),
+        approvedAt: v.optional(v.number()),
+        approvalReason: v.optional(v.string()),
+        reportJson: v.optional(v.string()),
+        errorSafe: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        completedAt: v.optional(v.number()),
+    })
+        .index('by_repair_run', ['repairRunId'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
+    productionStateRepairItems: defineTable({
+        repairRunId: v.string(),
+        uploadedFileId: v.id('uploadedFiles'),
+        conversationId: v.optional(v.id('conversations')),
+        caseId: v.optional(v.id('cases')),
+        classification: v.union(
+            v.literal('confirmed_qa'),
+            v.literal('confirmed_synthetic'),
+            v.literal('unclassified')
+        ),
+        confidence: v.union(v.literal('high'), v.literal('medium'), v.literal('low')),
+        discoveryReasons: v.array(v.string()),
+        referenceCategories: v.array(v.string()),
+        referenceSummaryJson: v.string(),
+        selectedForRepair: v.boolean(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_run_file', ['repairRunId', 'uploadedFileId'])
+        .index('by_run_selected', ['repairRunId', 'selectedForRepair']),
+
+    productionStateRepairSnapshots: defineTable({
+        repairRunId: v.string(),
+        sequence: v.number(),
+        targetTable: v.union(
+            v.literal('uploadedFiles'),
+            v.literal('conversations'),
+            v.literal('conversationDocumentState'),
+            v.literal('conversationControlStates'),
+            v.literal('conversationTasks'),
+            v.literal('turnExecutionPlans'),
+            v.literal('conversationLegalIssueState')
+        ),
+        targetId: v.string(),
+        beforeJson: v.string(),
+        intendedAfterJson: v.string(),
+        beforeHash: v.string(),
+        intendedAfterHash: v.string(),
+        discoveryReasons: v.array(v.string()),
+        confidence: v.union(v.literal('high'), v.literal('medium'), v.literal('low')),
+        state: v.union(
+            v.literal('pending'),
+            v.literal('applied'),
+            v.literal('restored'),
+            v.literal('conflict')
+        ),
+        conflictSafe: v.optional(v.string()),
+        appliedAt: v.optional(v.number()),
+        restoredAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_run_sequence', ['repairRunId', 'sequence'])
+        .index('by_run_target', ['repairRunId', 'targetTable', 'targetId'])
+        .index('by_run_state', ['repairRunId', 'state']),
+
+    productionStateRepairEvents: defineTable({
+        repairRunId: v.string(),
+        eventType: v.string(),
+        operatorId: v.optional(v.string()),
+        approvalId: v.optional(v.string()),
+        detailJson: v.string(),
+        createdAt: v.number(),
+    })
+        .index('by_run_created', ['repairRunId', 'createdAt']),
 
     releaseManifests: defineTable({
         runtime: v.union(v.literal('web'), v.literal('convex')),
@@ -1233,6 +1348,8 @@ export default defineSchema({
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         coverageManifestId: v.optional(v.id('documentCoverageManifests')),
         generationNumber: v.number(),
         status: documentMemoryGenerationStatusValidator,
@@ -1341,6 +1458,8 @@ export default defineSchema({
 
     documentUnderstandingRuns: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         memoryGenerationId: v.id('documentMemoryGenerations'),
         coverageManifestId: v.id('documentCoverageManifests'),
         uploadSessionId: v.optional(v.id('chatUploadSessions')),
@@ -1386,6 +1505,8 @@ export default defineSchema({
     documentUnderstandingNodes: defineTable({
         runId: v.id('documentUnderstandingRuns'),
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         memoryGenerationId: v.id('documentMemoryGenerations'),
         level: v.number(),
         nodeIndex: v.number(),
@@ -1404,6 +1525,8 @@ export default defineSchema({
         nodeId: v.string(),
         runId: v.id('documentUnderstandingRuns'),
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         memoryGenerationId: v.id('documentMemoryGenerations'),
         phase: v.union(v.literal('map'), v.literal('reduce'), v.literal('finalize')),
         level: v.number(),
@@ -1466,6 +1589,8 @@ export default defineSchema({
     documentUnderstandingRecords: defineTable({
         runId: v.id('documentUnderstandingRuns'),
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         memoryGenerationId: v.id('documentMemoryGenerations'),
         coverageManifestId: v.id('documentCoverageManifests'),
         version: v.string(),
@@ -1683,6 +1808,8 @@ export default defineSchema({
 
     documentChunks: defineTable({
         uploadedFileId: v.id('uploadedFiles'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
         memoryGenerationId: v.optional(v.id('documentMemoryGenerations')),
         orgId: v.optional(v.string()),
         accountId: v.optional(v.string()),
@@ -2236,6 +2363,12 @@ export default defineSchema({
         conversationId: v.optional(v.id('conversations')),
         caseId: v.optional(v.id('cases')),
         uploadSessionId: v.optional(v.id('chatUploadSessions')),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaRunId: v.optional(v.string()),
+        qaNamespace: v.optional(v.string()),
+        provenanceClassifiedAt: v.optional(v.number()),
+        quarantinedAt: v.optional(v.number()),
+        quarantineReason: v.optional(v.string()),
         filename: v.string(),
         displayFileName: v.optional(v.string()),
         mimeType: v.string(),

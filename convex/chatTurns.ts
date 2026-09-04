@@ -67,6 +67,7 @@ import { decideDocumentActivation } from '../src/lib/nexx/orchestration/document
 import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 import {
     PUBLICATION_VALIDATOR_VERSION,
+    PUBLICATION_VALIDATOR_V2_VERSION,
     validatePersistedEnvelope,
     type PersistedPublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
@@ -3100,6 +3101,7 @@ export const commitValidatedAssistant = internalMutation({
         repairHistoryJson: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const now = Date.now();
         const job = await ctx.db.get(args.jobId);
         if (!job || job.leaseOwner !== args.leaseOwner) return null;
@@ -3133,8 +3135,11 @@ export const commitValidatedAssistant = internalMutation({
             focusRevision: control.focusRevision,
             capabilitySnapshotHash: args.capabilitySnapshotHash,
             evidenceSetHash: args.evidenceSetHash,
+            expectedValidatorVersion: executiveChatFlags.publicationGateV2
+                ? PUBLICATION_VALIDATOR_V2_VERSION
+                : PUBLICATION_VALIDATOR_VERSION,
         });
-        if (!validation.passed || envelope.validatorVersion !== PUBLICATION_VALIDATOR_VERSION) {
+        if (!validation.passed) {
             await ctx.db.insert('responsePublicationAudits', {
                 envelopeId: typeof envelope.envelopeId === 'string' ? envelope.envelopeId : `rejected_${turn._id}`,
                 turnId: turn._id,

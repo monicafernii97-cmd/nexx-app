@@ -725,7 +725,8 @@ export default defineSchema({
             v.literal('confirm'),
             v.literal('continue'),
             v.literal('clarify'),
-            v.literal('supply_detail')
+            v.literal('supply_detail'),
+            v.literal('await_upload')
         )),
         pendingOptionsJson: v.optional(v.string()),
         pendingSourceTurnId: v.optional(v.id('chatTurns')),
@@ -832,6 +833,7 @@ export default defineSchema({
         capabilityRequirements: v.array(v.string()),
         fallbackOrder: v.array(v.string()),
         questionContractJson: v.string(),
+        documentActivationJson: v.optional(v.string()),
         status: v.union(
             v.literal('planned'), v.literal('executing'), v.literal('superseded'),
             v.literal('completed'), v.literal('failed_recoverable')

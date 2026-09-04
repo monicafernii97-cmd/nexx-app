@@ -303,6 +303,7 @@ export async function POST(req: NextRequest) {
     conversationSummary: conversation.conversationSummary ?? undefined,
     activeMode: activeRouteMode,
     hasActiveDocumentContext,
+    foregroundIntentV2: executiveChatFlags.documentActivationV2,
   });
   const analysisMode = sanitizedAttachments.find((attachment) => attachment.analysisMode)?.analysisMode;
   console.info('[Chat] Accepting chat turn', {

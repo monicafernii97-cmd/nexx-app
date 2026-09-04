@@ -27,7 +27,7 @@ export type ConversationTaskKind =
   | 'relational'
   | 'general';
 
-export type PendingAct = 'select' | 'confirm' | 'continue' | 'clarify' | 'supply_detail';
+export type PendingAct = 'select' | 'confirm' | 'continue' | 'clarify' | 'supply_detail' | 'await_upload';
 
 export type PendingOption = {
   optionId: string;
@@ -112,6 +112,7 @@ export type TurnUnderstandingInput = {
   }>;
   conversationSummary?: string;
   activeDocumentDescriptors?: Array<{ uploadedFileId: string; filename: string; aliases?: string[] }>;
+  foregroundIntentV2?: boolean;
 };
 
 export type FocusTransition =

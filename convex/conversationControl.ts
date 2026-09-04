@@ -6,6 +6,9 @@ import type { RouteMode } from '../src/lib/types';
 import { understandTurn } from '../src/lib/nexx/orchestration/turnUnderstanding';
 import { decideFocusTransition } from '../src/lib/nexx/orchestration/focusTransition';
 import { buildExecutionPlan } from '../src/lib/nexx/orchestration/executionPlan';
+import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
+import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
+import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 import type {
   AssistantOffer,
   ConversationControlSnapshot,
@@ -138,6 +141,7 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
   conversationSummary?: string;
   now: number;
 }) {
+  const executiveChatFlags = getExecutiveChatFeatureFlags();
   const loaded = await loadConversationControlContext(ctx, {
     conversationId: args.conversation._id,
     userId: args.userId,
@@ -164,6 +168,7 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     recentAssistantTurns: args.recentMessages.filter((message) => message.role === 'assistant'),
     conversationSummary: args.conversationSummary,
     activeDocumentDescriptors: activeDocumentIds.map((uploadedFileId) => ({ uploadedFileId, filename: uploadedFileId })),
+    foregroundIntentV2: executiveChatFlags.documentActivationV2,
   });
   const transition = decideFocusTransition({
     message: args.message,
@@ -241,6 +246,29 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     createdAt: args.now,
   });
 
+  const hasPendingDocumentAction = Boolean(
+    startingControl.pendingOptions.some((option) => option.documentIds.length > 0) ||
+    startingControl.lastAssistantOffer?.documentIds.length
+  );
+  const documentActivation = executiveChatFlags.documentActivationV2
+    ? decideDocumentActivation({
+        message: args.message,
+        speechAct: understanding.speechAct,
+        requestedOperation: understanding.requestedOperation,
+        detection: detectDocumentReference(args.message),
+        pendingAct: startingControl.pendingAct,
+        hasCurrentAttachments: args.attachmentDocumentIds.length > 0,
+        hasActiveDocumentContext: activeDocumentIds.length > 0,
+        hasPendingDocumentAction,
+      })
+    : {
+        active: activeDocumentIds.length > 0,
+        preserveFocus: true,
+        source: activeDocumentIds.length > 0 ? 'pending_action' as const : 'none' as const,
+        referenceStrength: activeDocumentIds.length > 0 ? 'carried' as const : 'none' as const,
+        useCurrentAttachmentsOnly: false,
+        reasonCodes: ['legacy_document_activation_v1'],
+      };
   const plan = buildExecutionPlan({
     message: args.message,
     understanding,
@@ -249,10 +277,14 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     focusRevision,
     routeMode: args.routeMode,
     activeDocumentIds,
+    attachmentDocumentIds: args.attachmentDocumentIds.map(String),
+    documentActivation,
   });
   const consumesPendingInteraction = transition.kind === 'refine' &&
     ['select', 'confirm', 'cancel'].includes(understanding.speechAct);
-  const expiresPendingInteraction = transition.kind === 'replace' || consumesPendingInteraction;
+  const awaitedUploadArrived = startingControl.pendingAct === 'await_upload' && args.attachmentDocumentIds.length > 0;
+  const startsAwaitingUpload = executiveChatFlags.documentActivationV2 && understanding.requestedOperation === 'await_upload';
+  const expiresPendingInteraction = transition.kind === 'replace' || consumesPendingInteraction || awaitedUploadArrived;
   const selectedDocumentIds = plan.selectedDocumentIds.map((id) => id as Id<'uploadedFiles'>);
   const executionPlanId = await ctx.db.insert('turnExecutionPlans', {
     planId: plan.planId,
@@ -270,6 +302,7 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     capabilityRequirements: plan.capabilityRequirements,
     fallbackOrder: plan.fallbackOrder,
     questionContractJson: JSON.stringify({ kind: plan.questionKind }),
+    documentActivationJson: JSON.stringify(documentActivation),
     status: 'planned',
     plannerVersion: understanding.resolverVersion,
     createdAt: args.now,
@@ -285,13 +318,20 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     activeDocumentIds: activeDocumentIds.map((id) => id as Id<'uploadedFiles'>),
     activeEvidenceGenerationIds: startingControl.activeEvidenceGenerationIds.map((id) => id as Id<'documentMemoryGenerations'>),
     parentTaskId,
-    pendingAct: transition.kind === 'clarify'
+    pendingAct: startsAwaitingUpload
+      ? 'await_upload' as const
+      : transition.kind === 'clarify'
       ? 'clarify' as const
       : expiresPendingInteraction
         ? undefined
         : startingControl.pendingAct,
-    pendingOptionsJson: JSON.stringify(expiresPendingInteraction ? [] : startingControl.pendingOptions),
-    lastAssistantOfferJson: expiresPendingInteraction
+    pendingOptionsJson: JSON.stringify(startsAwaitingUpload || expiresPendingInteraction ? [] : startingControl.pendingOptions),
+    pendingSourceTurnId: startsAwaitingUpload
+      ? args.turnId
+      : expiresPendingInteraction
+        ? undefined
+        : loaded.row?.pendingSourceTurnId,
+    lastAssistantOfferJson: startsAwaitingUpload || expiresPendingInteraction
       ? undefined
       : startingControl.lastAssistantOffer
         ? JSON.stringify(startingControl.lastAssistantOffer)
@@ -355,6 +395,12 @@ export const getDecisionTimeline = query({
         reasonCodes: understanding?.reasonCodes ?? [],
         resolverVersion: understanding?.resolverVersion,
         selectedDocumentCount: plan?.selectedDocumentIds.length ?? 0,
+        documentActivation: parseJsonObject<{
+          active: boolean;
+          source: string;
+          referenceStrength: string;
+          reasonCodes: string[];
+        }>(plan?.documentActivationJson),
         evidenceRequirementCount: plan?.evidenceRequirements.length ?? 0,
         publicationDecision: audit?.decision,
         publicationRejectionCodes: audit?.rejectionCodes ?? [],
@@ -493,7 +539,7 @@ export const applyValidatedPendingState = internalMutation({
     turnId: v.id('chatTurns'),
     pendingAct: v.optional(v.union(
       v.literal('select'), v.literal('confirm'), v.literal('continue'),
-      v.literal('clarify'), v.literal('supply_detail')
+      v.literal('clarify'), v.literal('supply_detail'), v.literal('await_upload')
     )),
     pendingOptionsJson: v.optional(v.string()),
     assistantOfferJson: v.optional(v.string()),

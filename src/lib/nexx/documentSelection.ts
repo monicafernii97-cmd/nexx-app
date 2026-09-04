@@ -132,7 +132,17 @@ export function selectStoredDocumentCandidates(args: {
   detection: DocumentReferenceDetection;
   candidates: StoredDocumentCandidateInput[];
   maxDocuments: number;
+  requireMeaningfulReference?: boolean;
 }) {
+  if (args.requireMeaningfulReference && !args.detection.referencesDocument) {
+    return {
+      selected: [] as StoredDocumentSelection[],
+      ranked: [] as StoredDocumentSelection[],
+      abstained: true as const,
+      abstentionReason: 'no_meaningful_document_reference' as const,
+    };
+  }
+
   const normalizedMessage = normalizeDocumentAlias(args.message);
   const seenContentHashes = new Set<string>();
   const uniqueCandidates = args.candidates.filter((candidate) => {
@@ -198,6 +208,8 @@ export function selectStoredDocumentCandidates(args: {
   return {
     selected: ranked.slice(0, args.maxDocuments),
     ranked,
+    abstained: args.maxDocuments <= 0,
+    abstentionReason: args.maxDocuments <= 0 ? 'selection_disabled' as const : undefined,
   };
 }
 

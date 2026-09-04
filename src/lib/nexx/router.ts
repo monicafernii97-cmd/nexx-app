@@ -12,6 +12,7 @@ import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentR
 import { classifyLegalIntent } from './legalIntent';
 import { classifyPackedCaseIntake } from './legal-engine/packedCaseIntake';
 import { hasConversationalContinuationSignal } from './legal-engine/legalSignals';
+import { isAwaitingUploadTurn } from './orchestration/documentActivation';
 
 // ---------------------------------------------------------------------------
 // Keyword/pattern maps for Phase 1 heuristic classification
@@ -331,7 +332,8 @@ function isBareVaguePronounFollowUp(
 export function classifyMessage(
   message: string,
   conversationSummary?: string,
-  activeMode?: RouteMode
+  activeMode?: RouteMode,
+  options?: { foregroundIntentV2?: boolean },
 ): RouterResult {
   const text = message.toLowerCase();
   const documentReference = detectDocumentReference(message);
@@ -347,6 +349,12 @@ export function classifyMessage(
   // Safety-first: always check escalation first
   if (hasSafetyEscalationSignal(message)) {
     return buildResult('safety_escalation', undefined, legalIntent);
+  }
+
+  // A promised future upload is an input-waiting turn, not permission to
+  // analyze a historical document that happens to remain in memory.
+  if (options?.foregroundIntentV2 && isAwaitingUploadTurn(message)) {
+    return buildResult('adaptive_chat', undefined, 'general_summary');
   }
 
   // Storage/availability questions are conversational metadata checks. They
@@ -564,9 +572,11 @@ export function preserveOrUpgradeDocumentRoute(
   classified: RouterResult,
   message: string,
   activeMode?: RouteMode,
-  conversationSummary?: string
+  conversationSummary?: string,
+  options?: { foregroundIntentV2?: boolean },
 ): RouterResult {
   if (classified.mode === 'safety_escalation') return classified;
+  if (options?.foregroundIntentV2 && isAwaitingUploadTurn(message)) return classified;
   if (isDocumentAvailabilityQuestion(message)) return classified;
 
   const legalIntent = classifyLegalIntent(message);
@@ -625,11 +635,13 @@ export function resolveTurnRoute(args: {
   conversationSummary?: string;
   activeMode?: RouteMode;
   hasActiveDocumentContext?: boolean;
+  foregroundIntentV2?: boolean;
 }) {
   const classified = classifyMessage(
     args.message,
     args.conversationSummary,
-    args.activeMode
+    args.activeMode,
+    { foregroundIntentV2: args.foregroundIntentV2 },
   );
 
   return args.hasActiveDocumentContext && classified.mode !== 'safety_escalation'
@@ -638,6 +650,7 @@ export function resolveTurnRoute(args: {
         args.message,
         args.activeMode,
         args.conversationSummary,
+        { foregroundIntentV2: args.foregroundIntentV2 },
       )
     : classified;
 }

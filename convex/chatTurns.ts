@@ -63,6 +63,8 @@ import { normalizeReviewFlagMessage, requiresZdrForClassification, sanitizeAudit
 import { routeModeValidator } from './lib/routeModeValidator';
 import { loadConversationControlContext, persistTurnOrchestration } from './conversationControl';
 import { understandTurn } from '../src/lib/nexx/orchestration/turnUnderstanding';
+import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
+import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 import {
     PUBLICATION_VALIDATOR_VERSION,
     validatePersistedEnvelope,
@@ -1057,6 +1059,7 @@ export const acceptChatTurn = mutation({
         attachments: v.optional(v.array(attachmentRefValidator)),
     },
     handler: async (ctx, args) => {
+        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const { user, conversation } = await getAuthenticatedUserAndConversation(ctx, args.conversationId);
         if (!user.clerkId) throw new Error('Authenticated user is missing clerkId');
         const now = Date.now();
@@ -1255,7 +1258,23 @@ export const acceptChatTurn = mutation({
                 .filter((message) => message.role === 'assistant')
                 .map((message) => ({ id: message._id.toString(), content: message.content })),
             conversationSummary: conversationSummary?.summary,
+            foregroundIntentV2: executiveChatFlags.documentActivationV2,
         });
+        const preliminaryDocumentActivation = executiveChatFlags.documentActivationV2
+            ? decideDocumentActivation({
+                message: effectiveMessage,
+                speechAct: preliminaryUnderstanding.speechAct,
+                requestedOperation: preliminaryUnderstanding.requestedOperation,
+                detection: detectDocumentReference(effectiveMessage),
+                pendingAct: preliminaryControl?.pendingAct,
+                hasCurrentAttachments: validatedAttachments.length > 0,
+                hasActiveDocumentContext,
+                hasPendingDocumentAction: Boolean(
+                    preliminaryControl?.pendingOptions.some((option) => option.documentIds.length > 0) ||
+                    preliminaryControl?.lastAssistantOffer?.documentIds.length
+                ),
+              })
+            : null;
         const activeTaskIsDocument = preliminaryControl?.activeTaskKind === 'document_review' ||
             preliminaryControl?.activeTaskKind === 'document_question';
         const activeMode = activeTaskIsDocument
@@ -1266,8 +1285,10 @@ export const acceptChatTurn = mutation({
             conversationSummary: conversationSummary?.summary,
             activeMode,
             hasActiveDocumentContext,
+            foregroundIntentV2: executiveChatFlags.documentActivationV2,
         });
         const preservesDocumentTask = activeTaskIsDocument &&
+            (!executiveChatFlags.documentActivationV2 || preliminaryDocumentActivation?.active) &&
             preliminaryUnderstanding.continuity !== 'new_task' &&
             preliminaryUnderstanding.speechAct !== 'switch_topic';
         const routeMode = args.routeMode === 'safety_escalation'
@@ -1598,6 +1619,7 @@ export const leaseGenerationJob = internalMutation({
 export const getGenerationContext = internalQuery({
     args: { turnId: v.id('chatTurns') },
     handler: async (ctx, args) => {
+        const executiveChatFlags = getExecutiveChatFeatureFlags();
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return null;
 
@@ -1667,31 +1689,43 @@ export const getGenerationContext = internalQuery({
         });
 
         const routeMode = turn.routeMode ?? conversation.routeMode as RouteMode | undefined;
-        const contextualFollowUpMessage = buildContextualDocumentFollowUpMessage(
-            turn.message,
-            recentMessages.filter((message) =>
-                message.status !== 'deleted' &&
-                message.status !== 'degraded' &&
-                !message.supersededByMessageId &&
-                !message.supersededByTurnId
-            ),
-            routeMode,
-            4_000,
-            summarizeActiveLegalIssue(activeLegalIssueState ? {
-                issueKey: activeLegalIssueState.issueKey,
-                label: activeLegalIssueState.label,
-                routeMode: activeLegalIssueState.routeMode,
-                userQuestion: activeLegalIssueState.userQuestion,
-                controllingConclusion: activeLegalIssueState.controllingConclusion,
-                issueTerms: activeLegalIssueState.issueTerms,
-                sourceAnchors: activeLegalIssueState.sourceAnchors.map((anchor) => ({
-                    uploadedFileId: anchor.uploadedFileId.toString(),
-                    pageStart: anchor.pageStart,
-                    pageEnd: anchor.pageEnd,
-                })),
-            } : null)
-        );
-        const documentReference = detectDocumentReference(contextualFollowUpMessage);
+        const currentDocumentReference = detectDocumentReference(turn.message);
+        const carriesDocumentAction = executiveChatFlags.documentActivationV2 &&
+            !currentDocumentReference.referencesDocument &&
+            Boolean(turnExecutionPlan?.selectedDocumentIds.length) &&
+            ['select', 'confirm', 'continue', 'correct', 'challenge', 'reassess']
+                .includes(turnUnderstanding?.speechAct ?? '');
+        const contextualFollowUpMessage = !executiveChatFlags.documentActivationV2 || carriesDocumentAction
+            ? buildContextualDocumentFollowUpMessage(
+                turn.message,
+                recentMessages.filter((message) =>
+                    message.status !== 'deleted' &&
+                    message.status !== 'degraded' &&
+                    !message.supersededByMessageId &&
+                    !message.supersededByTurnId
+                ),
+                routeMode,
+                4_000,
+                summarizeActiveLegalIssue(activeLegalIssueState ? {
+                    issueKey: activeLegalIssueState.issueKey,
+                    label: activeLegalIssueState.label,
+                    routeMode: activeLegalIssueState.routeMode,
+                    userQuestion: activeLegalIssueState.userQuestion,
+                    controllingConclusion: activeLegalIssueState.controllingConclusion,
+                    issueTerms: activeLegalIssueState.issueTerms,
+                    sourceAnchors: activeLegalIssueState.sourceAnchors.map((anchor) => ({
+                        uploadedFileId: anchor.uploadedFileId.toString(),
+                        pageStart: anchor.pageStart,
+                        pageEnd: anchor.pageEnd,
+                    })),
+                } : null)
+            )
+            : turn.message;
+        const documentReference = executiveChatFlags.documentActivationV2
+            ? carriesDocumentAction
+                ? detectDocumentReference(contextualFollowUpMessage)
+                : currentDocumentReference
+            : detectDocumentReference(contextualFollowUpMessage);
         const clerkUserId = user.clerkId;
         const activeCaseId = conversation.caseId;
         const grantedUploadedFiles = clerkUserId
@@ -1857,7 +1891,10 @@ export const getGenerationContext = internalQuery({
             memorySourceByUploadedFileId.set(uploadedFileId, source);
             accessibleMemoryFiles.push(uploadedFile);
         }
+        const plannedDocumentIds = new Set((turnExecutionPlan?.selectedDocumentIds ?? []).map(String));
         const rankableMemoryFiles = accessibleMemoryFiles.filter((uploadedFile) => {
+            if (executiveChatFlags.documentActivationV2 && !documentReference.referencesDocument) return false;
+            if (executiveChatFlags.documentActivationV2 && carriesDocumentAction && !plannedDocumentIds.has(uploadedFile._id.toString())) return false;
             const source = memorySourceByUploadedFileId.get(uploadedFile._id.toString());
             return source
                 ? Boolean(
@@ -1897,6 +1934,7 @@ export const getGenerationContext = internalQuery({
             detection: documentReference,
             maxDocuments: 5,
             candidates: storedDocumentCandidateInputs,
+            requireMeaningfulReference: executiveChatFlags.documentActivationV2,
         });
         const documentAmbiguity = attachmentContexts.length === 0
             ? detectStoredDocumentAmbiguity({
@@ -3069,14 +3107,16 @@ export const commitValidatedAssistant = internalMutation({
         if (!turn || !turn.executionPlanId || !turn.taskId || turn.focusRevision === undefined) {
             throw new Error('publication_orchestration_context_missing');
         }
-        const [plan, control] = await Promise.all([
+        const [plan, control, understanding] = await Promise.all([
             ctx.db.get(turn.executionPlanId),
             ctx.db.query('conversationControlStates')
                 .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
                 .first(),
+            turn.understandingId ? ctx.db.get(turn.understandingId) : Promise.resolve(null),
         ]);
         if (!plan || plan.turnId !== turn._id || plan.userId !== turn.userId) throw new Error('publication_plan_scope_mismatch');
         if (!control || control.userId !== turn.userId) throw new Error('publication_control_scope_mismatch');
+        if (understanding && understanding.userId !== turn.userId) throw new Error('publication_understanding_scope_mismatch');
         if (turn.publicationEnvelopeId) throw new Error('publication_envelope_already_used');
 
         let envelope: PersistedPublicationEnvelope;
@@ -3169,7 +3209,10 @@ export const commitValidatedAssistant = internalMutation({
             metadataJson: JSON.stringify(publicationMetadata),
         });
 
-        if (envelope.pendingOptionsJson || envelope.assistantOfferJson || envelope.responseAct === 'clarify') {
+        if (
+            understanding?.requestedOperation !== 'await_upload' &&
+            (envelope.pendingOptionsJson || envelope.assistantOfferJson || envelope.responseAct === 'clarify')
+        ) {
             let optionCount = 0;
             if (envelope.pendingOptionsJson) {
                 try {

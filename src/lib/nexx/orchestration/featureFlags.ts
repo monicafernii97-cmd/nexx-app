@@ -5,6 +5,7 @@ export type ExecutiveChatFeatureFlags = {
   publicationGate: boolean;
   repairPolicy: boolean;
   semanticArbiter: boolean;
+  documentActivationV2: boolean;
 };
 
 function enabled(value: string | undefined, fallback: boolean) {
@@ -26,6 +27,7 @@ export function getExecutiveChatFeatureFlags(
     publicationGate: enabled(env.EXEC_CHAT_PUBLICATION_GATE, true),
     repairPolicy: enabled(env.EXEC_CHAT_REPAIR_POLICY, true),
     semanticArbiter: enabled(env.EXEC_CHAT_SEMANTIC_ARBITER, false),
+    documentActivationV2: enabled(env.EXEC_CHAT_DOCUMENT_ACTIVATION_V2, false),
   };
 }
 

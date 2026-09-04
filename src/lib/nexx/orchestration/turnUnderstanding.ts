@@ -1,4 +1,5 @@
 import { hasExplicitNewIssueSignal } from '../legal-engine/legalSignals';
+import { isAwaitingUploadTurn } from './documentActivation';
 import { ORCHESTRATION_POLICY_VERSION, clampConfidence } from './policy';
 import { resolveReferents } from './referentResolver';
 import type { SpeechAct, TurnUnderstanding, TurnUnderstandingInput } from './types';
@@ -18,7 +19,8 @@ function normalize(value: string) {
   return value.normalize('NFKC').replace(/\s+/g, ' ').trim();
 }
 
-function inferRequestedOperation(message: string) {
+function inferRequestedOperation(message: string, foregroundIntentV2 = false) {
+  if (foregroundIntentV2 && isAwaitingUploadTurn(message)) return 'await_upload';
   if (CAPABILITY.test(message)) return 'document_capability';
   const match = message.match(/\b(analy[sz]e|review|summari[sz]e|quote|search|compare|explain|read|draft|check)\b/i);
   return match?.[1].toLowerCase().replace('analyse', 'analyze').replace('summarise', 'summarize');
@@ -100,7 +102,7 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     schemaVersion: 1,
     speechAct,
     continuity,
-    requestedOperation: inferRequestedOperation(message),
+    requestedOperation: inferRequestedOperation(message, input.foregroundIntentV2),
     referents: resolved.referents,
     candidateTasks: resolved.taskCandidates,
     confidence,

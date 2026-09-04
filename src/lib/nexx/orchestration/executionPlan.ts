@@ -1,4 +1,5 @@
 import type { RouteMode } from '../../types';
+import type { DocumentActivationDecision } from './documentActivation';
 import type { FocusTransition, QuestionKind, TurnExecutionPlan, TurnUnderstanding } from './types';
 
 function fingerprint(value: string) {
@@ -30,20 +31,31 @@ export function buildExecutionPlan(args: {
   focusRevision: number;
   routeMode: RouteMode;
   activeDocumentIds: string[];
+  attachmentDocumentIds?: string[];
+  documentActivation?: DocumentActivationDecision;
 }): TurnExecutionPlan {
   const responseAct = args.transition.kind === 'clarify' || args.understanding.ambiguityMaterial
     ? 'clarify'
     : args.understanding.speechAct === 'correct' || args.understanding.speechAct === 'challenge'
       ? 'correct'
+    : args.understanding.requestedOperation === 'await_upload'
+      ? 'status'
       : args.understanding.speechAct === 'confirm'
         ? 'confirm'
         : 'answer';
-  const selectedDocumentIds = Array.from(new Set([
-    ...args.activeDocumentIds,
-    ...args.understanding.referents
-      .filter((referent) => referent.resolvedType === 'document' && referent.resolvedId)
-      .map((referent) => referent.resolvedId as string),
-  ]));
+  const resolvedDocumentIds = args.understanding.referents
+    .filter((referent) => referent.resolvedType === 'document' && referent.resolvedId)
+    .map((referent) => referent.resolvedId as string);
+  const documentActivation = args.documentActivation ?? {
+    active: true,
+    useCurrentAttachmentsOnly: false,
+  };
+  const activatedDocumentIds = documentActivation.useCurrentAttachmentsOnly
+    ? args.attachmentDocumentIds ?? []
+    : args.activeDocumentIds;
+  const selectedDocumentIds = documentActivation.active
+    ? Array.from(new Set([...activatedDocumentIds, ...resolvedDocumentIds]))
+    : [];
   const requiresDocuments = selectedDocumentIds.length > 0;
   const kind = questionKind(args.message, args.understanding);
   const requiresDocumentText = requiresDocuments && kind !== 'capability';

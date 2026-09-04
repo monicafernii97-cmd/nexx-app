@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { classifyLegalIntent } from '../legalIntent';
-import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute } from '../router';
+import { classifyFollowUpIntent, classifyMessage, preserveOrUpgradeDocumentRoute, resolveTurnRoute } from '../router';
 
 describe('classifyMessage document follow-ups', () => {
+  it('does not pin a greeting to an active document route', () => {
+    const result = resolveTurnRoute({
+      message: 'hey',
+      activeMode: 'document_analysis',
+      hasActiveDocumentContext: true,
+      foregroundIntentV2: true,
+    });
+
+    expect(result.mode).toBe('adaptive_chat');
+    expect(result.requiresDocumentRetrieval).toBeUndefined();
+  });
+
   it('keeps exact-page lookups against a generic document out of court-order interpretation', () => {
     const result = classifyMessage(
       'What exact verification token is written on pages 1, 50, and 100 of the document? Quote each token with its page number.'

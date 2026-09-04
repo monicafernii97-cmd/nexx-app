@@ -24,7 +24,8 @@ export type ClaimVerificationError =
   | 'RESP_INTENT_NOT_FULFILLED'
   | 'RESP_GENERIC_MULTI_SENTENCE'
   | 'RESP_FALLBACK_NOT_CONTEXTUAL'
-  | 'RESP_WRONG_DOCUMENT_SCOPE';
+  | 'RESP_WRONG_DOCUMENT_SCOPE'
+  | 'RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION';
 
 export type ClaimVerificationResult = {
   passed: boolean;
@@ -58,6 +59,7 @@ const DOCUMENT_CONTEXT_MENTION = /\b(?:order|document|file|pdf|attachment|upload
 const INPUT_WAIT_ACKNOWLEDGMENT = /\b(?:upload|re[- ]?upload|attach|send|provide)\b|\b(?:when|once) (?:it|you|the (?:file|document|order))\b/i;
 const HISTORICAL_DOCUMENT_WORK = /\b(?:review|analy[sz]e|extract|read|process|check|use)\b.{0,60}\b(?:the\s+)?(?:existing|previous|prior|old|historical|current|available|uploaded|saved)?\s*(?:order|document|file|pdf)\b/i;
 const ACTION_COMPLETION_CLAIM = /\b(?:i|we)(?:'ve| have)? (?:now )?(?:reviewed|analy[sz]ed|extracted|read|processed|completed|finished|checked)\b|\b(?:the\s+)?(?:review|analysis|extraction|processing|check)\s+(?:is|was|has been)\s+(?:complete|completed|finished|done)\b/i;
+const SELF_ASSESSMENT_CLAIM = /\b(?:i|we)\s+(?:checked|rechecked|reassessed|inspected|reviewed|looked\s+again)\b/i;
 
 export function verifyResponseClaims(args: {
   content: string;
@@ -76,6 +78,8 @@ export function verifyResponseClaims(args: {
   requestedOperation?: string;
   citationVerificationPassed?: boolean;
   usedDocumentIds?: string[];
+  selfCorrectionV2?: boolean;
+  inspectionReceiptId?: string;
 }) : ClaimVerificationResult {
   const content = args.content.trim();
   const errors: ClaimVerificationError[] = [];
@@ -136,6 +140,14 @@ export function verifyResponseClaims(args: {
       errors.push('RESP_FALSE_ACTION_COMPLETION', 'RESP_FUTURE_ACTION_EXECUTED_EARLY');
     }
   }
+  if (
+    args.selfCorrectionV2 &&
+    ['challenge', 'correct', 'reassess'].includes(args.speechAct ?? '') &&
+    SELF_ASSESSMENT_CLAIM.test(content) &&
+    !args.inspectionReceiptId
+  ) {
+    errors.push('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION');
+  }
 
   const normalizedSupported = args.supportedPropositionSource
     ? (args.supportedPropositions ?? []).map((item) => item.toLowerCase().replace(/\s+/g, ' ').trim())
@@ -174,7 +186,8 @@ export function verifyResponseClaims(args: {
         !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD'),
       contradictions: !has('RESP_UNSUPPORTED_PROPOSITION') &&
         !has('RESP_FALSE_ACTION_COMPLETION') &&
-        !has('RESP_FUTURE_ACTION_EXECUTED_EARLY'),
+        !has('RESP_FUTURE_ACTION_EXECUTED_EARLY') &&
+        !has('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION'),
       safety: true,
       internalPayload: !has('RESP_INTERNAL_PAYLOAD'),
     },

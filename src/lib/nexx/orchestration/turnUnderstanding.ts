@@ -6,7 +6,7 @@ import type { SpeechAct, TurnUnderstanding, TurnUnderstandingInput } from './typ
 
 const CANCEL = /^(?:stop|cancel|never\s*mind|nevermind|forget\s+it|don't|do\s+not)$/i;
 const EXPLICIT_SWITCH = /\b(?:new|different|another|separate)\s+(?:topic|question|issue)|\b(?:switch|change)\s+(?:topics?|subjects?)\b/i;
-const CHALLENGE = /\b(?:you(?:'re|\s+are)\s+wrong|that(?:'s|\s+is)\s+wrong|incorrect|not\s+right|look\s+again|recheck|are\s+you\s+sure)\b/i;
+const CHALLENGE = /\b(?:you(?:'re|\s+are)\s+wrong|that(?:'s|\s+is)\s+wrong|incorrect|not\s+right|look\s+again|recheck|are\s+you\s+sure|why\s+(?:did|do|are|were|would)\s+you|(?:check|audit|inspect|explain)\s+(?:your|the)\s+(?:last|previous|prior)\s+(?:answer|response|turn|behavior)|why\s+(?:is|was|did)\b.{0,80}\b(?:fail|failed|wrong|happen|happened))\b/i;
 const CORRECTION = /^(?:no[, ]+|wait[, ]+|actually\b|not\s+that\b|i\s+meant\b|correction\b)/i;
 const CONFIRM = /^(?:yes|yeah|yep|correct|right|exactly|okay|ok|sure|please|please\s+do|please\s+do\s+so|do\s+it|that\s+works|sounds\s+good)[.! ]*$/i;
 const CONTINUE = /^(?:continue|go\s+on|keep\s+going|more|proceed|carry\s+on|then\s+what)[.! ]*$/i;

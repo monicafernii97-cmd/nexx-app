@@ -873,6 +873,43 @@ export default defineSchema({
         .index('by_turn', ['turnId'])
         .index('by_conversation', ['conversationId']),
 
+    conversationRepairAudits: defineTable({
+        repairId: v.string(),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        caseId: v.optional(v.id('cases')),
+        currentTurnId: v.id('chatTurns'),
+        targetTurnId: v.id('chatTurns'),
+        targetMessageId: v.id('messages'),
+        trigger: v.string(),
+        status: v.union(
+            v.literal('planned'),
+            v.literal('applied'),
+            v.literal('succeeded'),
+            v.literal('exhausted')
+        ),
+        responseFingerprint: v.string(),
+        inspectionReceiptJson: v.string(),
+        contradictionCodes: v.array(v.string()),
+        plannedActions: v.array(v.string()),
+        appliedActions: v.array(v.string()),
+        beforeStateHash: v.optional(v.string()),
+        afterStateHash: v.optional(v.string()),
+        terminalReason: v.optional(v.string()),
+        escalationRequired: v.optional(v.boolean()),
+        escalatedAt: v.optional(v.number()),
+        correctionMessageId: v.optional(v.id('messages')),
+        attempt: v.number(),
+        maxAttempts: v.number(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_repair', ['repairId'])
+        .index('by_current_turn', ['currentTurnId'])
+        .index('by_target_message', ['targetMessageId'])
+        .index('by_conversation_created', ['conversationId', 'createdAt'])
+        .index('by_response_fingerprint', ['conversationId', 'responseFingerprint']),
+
     releaseManifests: defineTable({
         runtime: v.union(v.literal('web'), v.literal('convex')),
         environment: v.union(v.literal('preview'), v.literal('production')),

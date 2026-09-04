@@ -17,6 +17,7 @@ import type * as cases from "../cases.js";
 import type * as chatPublication from "../chatPublication.js";
 import type * as chatQualityCanary from "../chatQualityCanary.js";
 import type * as chatRateLimits from "../chatRateLimits.js";
+import type * as chatSelfCorrection from "../chatSelfCorrection.js";
 import type * as chatTurns from "../chatTurns.js";
 import type * as chatUploadCanary from "../chatUploadCanary.js";
 import type * as chatUploadE2E from "../chatUploadE2E.js";
@@ -88,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   chatPublication: typeof chatPublication;
   chatQualityCanary: typeof chatQualityCanary;
   chatRateLimits: typeof chatRateLimits;
+  chatSelfCorrection: typeof chatSelfCorrection;
   chatTurns: typeof chatTurns;
   chatUploadCanary: typeof chatUploadCanary;
   chatUploadE2E: typeof chatUploadE2E;

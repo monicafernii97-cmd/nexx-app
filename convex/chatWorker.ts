@@ -911,6 +911,7 @@ async function commitVerifiedResponse(args: {
         speechAct: args.context.turnUnderstanding?.speechAct,
         requestedOperation: args.context.turnUnderstanding?.requestedOperation,
         documentContextAllowed: plan.selectedDocumentIds.length > 0 ||
+            (args.context.attachmentContexts?.length ?? 0) > 0 ||
             args.context.turnUnderstanding?.requestedOperation === 'await_upload' ||
             detectDocumentReference(args.context.turn.message).referencesDocument,
         citationVerificationPassed: args.citationVerificationPassed,

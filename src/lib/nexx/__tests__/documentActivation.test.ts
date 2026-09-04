@@ -99,7 +99,18 @@ describe('foreground document activation', () => {
       active: true,
       source: 'current_attachment',
       useCurrentAttachmentsOnly: true,
-      reasonCodes: expect.arrayContaining(['awaited_upload_arrived']),
+      reasonCodes: expect.arrayContaining(['current_turn_attachment']),
+    });
+  });
+
+  it('treats a current attachment as explicit authority even when the prompt uses an unmatched description', () => {
+    expect(decision('Confirm that you received this synthetic test document.', {
+      hasCurrentAttachments: true,
+    })).toMatchObject({
+      active: true,
+      source: 'current_attachment',
+      referenceStrength: 'explicit',
+      useCurrentAttachmentsOnly: true,
     });
   });
 

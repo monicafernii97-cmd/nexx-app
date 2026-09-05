@@ -1123,6 +1123,9 @@ export default defineSchema({
         approvedAt: v.optional(v.number()),
         appliedAt: v.optional(v.number()),
         verifiedAt: v.optional(v.number()),
+        resumeCount: v.optional(v.number()),
+        lastResumedAt: v.optional(v.number()),
+        lastResumeFailureClass: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })

@@ -54,3 +54,15 @@ npm run manage:durable-review-repair -- verify <operation-id>
 Verification remains incomplete until all of these are true: the replacement is ready and `dur_v2`; the file points to that run and its verified record; the record covers every canonical chunk; and the source-unit receipt equals the exact expected count. For the reported signed order, the only acceptable receipt is 46/46 pages.
 
 Do not call the exhaustive-review feature operational from a queued, mapping, reducing, failed, or merely extracted state.
+
+## Resume a preserved-node dead letter
+
+If the approved `dur_v2` replacement reaches `dead_letter`, first inspect its exact failure class and retained progress. Do not create another replacement run. The same operation may resume its exact replacement up to three times while preserving verified nodes, but only when the file, active generation, source manifest, expected unit count, active run pointer, version, operator, approver, and ticket are unchanged.
+
+Set `EXEC_CHAT_OPERATOR` to the recorded operator and `DURABLE_REVIEW_CONFIRMATION` to `AUTHORIZE_DURABLE_REVIEW_RESUME`, then run:
+
+```text
+npm run manage:durable-review-repair -- resume <operation-id>
+```
+
+Resume rechecks 46/46 source coverage, resets only the exhausted node's retry cycle, records the prior failure class and resume count, and continues from the saved chunk index. A singleton strict retry receives a larger output budget with lower reasoning overhead and an exact-quote brevity contract. If three operator resumes are exhausted, stop and adjudicate the source chunk or model contract instead of looping.

@@ -17,6 +17,7 @@ import { stableCapabilityHash } from '../src/lib/nexx/capabilities/documentCapab
 import {
   DURABLE_REVIEW_NODE_MAX_ATTEMPTS,
   classifyDurableReviewFailure,
+  durableReviewGenerationProfile,
   durableReviewNodeId,
   durableReviewRetryDecision,
   strictStructuredOutputReminder,
@@ -37,8 +38,6 @@ const UNDERSTANDING_VERSION = DURABLE_REVIEW_VERSION;
 const UNDERSTANDING_MODEL = DURABLE_REVIEW_MODEL;
 const MAP_CHUNKS = DURABLE_REVIEW_MAP_BATCH_SIZE;
 const REDUCE_NODES = DURABLE_REVIEW_REDUCE_BATCH_SIZE;
-const MAX_OUTPUT_TOKENS = 12_000;
-const STRICT_RETRY_OUTPUT_TOKENS = 6_000;
 const NODE_LEASE_MS = 120_000;
 const PROCESS_RUN_REFERENCE = makeFunctionReference<'action', { runId: Id<'documentUnderstandingRuns'> }, unknown>(
   'documentUnderstanding:processRun',
@@ -114,16 +113,16 @@ function pageCitation(pageStart?: number, pageEnd?: number) {
   return pageEnd && pageEnd !== pageStart ? `[pp. ${pageStart}-${pageEnd}]` : `[p. ${pageStart}]`;
 }
 
-async function generateNode(prompt: string, options?: { strictRetry?: boolean }) {
+async function generateNode(prompt: string, options: { strictRetry: boolean; batchSize: number }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.');
   const client = new OpenAI({ apiKey, maxRetries: 0, timeout: 110_000 });
-  const maxOutputTokens = options?.strictRetry ? STRICT_RETRY_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS;
+  const profile = durableReviewGenerationProfile(options);
   const response = await client.responses.create({
     model: UNDERSTANDING_MODEL,
-    reasoning: { effort: 'high' },
-    max_output_tokens: maxOutputTokens,
-    input: options?.strictRetry ? `${prompt}\n\n${strictStructuredOutputReminder()}` : prompt,
+    reasoning: { effort: profile.reasoningEffort },
+    max_output_tokens: profile.maxOutputTokens,
+    input: options.strictRetry ? `${prompt}\n\n${strictStructuredOutputReminder()}` : prompt,
     text: { format: DUR_SCHEMA },
   });
   if (response.status === 'incomplete') {
@@ -149,7 +148,7 @@ async function generateNode(prompt: string, options?: { strictRetry?: boolean })
     payload,
     outputJson: response.output_text,
     providerRequestId: response.id,
-    maxOutputTokens,
+    maxOutputTokens: profile.maxOutputTokens,
   };
 }
 
@@ -432,7 +431,7 @@ export const beginWorkNode = internalMutation({
       validationState: 'pending',
       validationErrors: [],
       model: run.model,
-      maxOutputTokens: strictRetry ? STRICT_RETRY_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS,
+      maxOutputTokens: durableReviewGenerationProfile({ strictRetry, batchSize: args.batchSize }).maxOutputTokens,
       startedAt: now,
     });
     await ctx.db.patch(run._id, {
@@ -792,7 +791,10 @@ async function processLegacyWork(ctx: ActionCtx, work: UnderstandingWork) {
     const last = work.chunks[work.chunks.length - 1];
     const source = work.chunks.map((chunk) =>
       `SOURCE_CHUNK_${chunk.chunkIndex} | ${pageCitation(chunk.pageStart, chunk.pageEnd)}\n${chunk.text}`).join('\n\n');
-    const generated = await generateNode(buildDocumentUnderstandingMapPrompt(source));
+    const generated = await generateNode(buildDocumentUnderstandingMapPrompt(source), {
+      strictRetry: false,
+      batchSize: work.chunks.length,
+    });
     await ctx.runMutation(internal.documentUnderstanding.persistNode, {
       runId: work.run._id, expectedStatus: 'mapping', level: 0,
       nodeIndex: work.outputNodeIndex,
@@ -807,7 +809,10 @@ async function processLegacyWork(ctx: ActionCtx, work: UnderstandingWork) {
     if (work.nodes.length === 0) throw new Error('Reduce phase found no nodes.');
     const first = work.nodes[0];
     const last = work.nodes[work.nodes.length - 1];
-    const generated = await generateNode(buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson)));
+    const generated = await generateNode(buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson)), {
+      strictRetry: false,
+      batchSize: work.nodes.length,
+    });
     const consumed = first.nodeIndex + work.nodes.length;
     await ctx.runMutation(internal.documentUnderstanding.persistNode, {
       runId: work.run._id, expectedStatus: 'reducing', level: work.run.currentLevel + 1,
@@ -852,7 +857,7 @@ export const processRun = internalAction({
         });
         if (!lease.leased) return { phase: 'mapping', disposition: lease.reason };
         try {
-          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry });
+          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry, batchSize: work.chunks.length });
           const verification = verifyDocumentUnderstandingNode({
             payload: generated.payload,
             chunks: work.chunks,
@@ -904,7 +909,7 @@ export const processRun = internalAction({
         if (!lease.leased) return { phase: 'reducing', disposition: lease.reason };
         const consumed = first.nodeIndex + work.nodes.length;
         try {
-          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry });
+          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry, batchSize: work.nodes.length });
           const allChunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
           const chunks = allChunks.filter((chunk) =>
             chunk.chunkIndex >= first.sourceChunkStart && chunk.chunkIndex <= last.sourceChunkEnd

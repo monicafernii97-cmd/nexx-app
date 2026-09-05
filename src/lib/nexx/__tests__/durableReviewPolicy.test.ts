@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifyDurableReviewFailure,
+  durableReviewGenerationProfile,
   durableReviewNodeId,
   durableReviewRetryDecision,
 } from '../durableReviewPolicy';
@@ -28,5 +29,16 @@ describe('durable exhaustive-review retry policy', () => {
     const input = { stableJobId: 'review_file_generation', phase: 'map' as const, level: 0, sourceStart: 0, sourceEnd: 5, inputHash: 'abcdef1234567890abcdef' };
     expect(durableReviewNodeId(input)).toBe(durableReviewNodeId({ ...input }));
     expect(durableReviewNodeId(input)).not.toBe(durableReviewNodeId({ ...input, sourceEnd: 2 }));
+  });
+
+  it('preserves output budget while reducing reasoning on strict singleton retries', () => {
+    expect(durableReviewGenerationProfile({ strictRetry: false, batchSize: 6 })).toEqual({
+      reasoningEffort: 'medium',
+      maxOutputTokens: 16_000,
+    });
+    expect(durableReviewGenerationProfile({ strictRetry: true, batchSize: 1 })).toEqual({
+      reasoningEffort: 'low',
+      maxOutputTokens: 20_000,
+    });
   });
 });

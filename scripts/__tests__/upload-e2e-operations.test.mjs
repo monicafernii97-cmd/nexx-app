@@ -63,6 +63,55 @@ test("uses sanitized cleanup attachment metadata for resilience reports", () => 
   assert.equal(envelope.syntheticArtifactsRemaining, "none_observed");
 });
 
+test("keeps successful cleanup separate from a failed browser assertion", () => {
+  const envelope = buildOperationsEnvelope({
+    env: { ...baseEnv, E2E_LANE: "release", E2E_JOB_STATUS: "failure" },
+    summary: {
+      status: "failed",
+      results: [
+        {
+          title: "executive chat preserves focus",
+          status: "failed",
+          retry: 1,
+          error: "Assistant response ended in degraded status.",
+          attachments: [
+            { name: "upload-metrics", contentType: "application/json" },
+            { name: "cleanup-result", contentType: "application/json" },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(envelope.operatingState, "DEGRADED");
+  assert.equal(envelope.failureCode, "BROWSER_ASSERTION_FAILURE");
+  assert.equal(envelope.cleanupStatus, "passed");
+  assert.equal(envelope.syntheticArtifactsRemaining, "none_observed");
+});
+
+test("keeps an explicit cleanup failure authoritative", () => {
+  const envelope = buildOperationsEnvelope({
+    env: { ...baseEnv, E2E_LANE: "release", E2E_JOB_STATUS: "failure" },
+    summary: {
+      status: "failed",
+      results: [
+        {
+          title: "executive chat preserves focus",
+          status: "failed",
+          error: "Synthetic upload cleanup failed.",
+          attachments: [
+            { name: "cleanup-failure", contentType: "application/json" },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(envelope.failureCode, "CLEANUP_FAILURE");
+  assert.equal(envelope.cleanupStatus, "failed");
+  assert.equal(envelope.syntheticArtifactsRemaining, "possible");
+});
+
 test("classifies a security failure as critical and redacts identity data", () => {
   const envelope = buildOperationsEnvelope({
     env: { ...baseEnv, E2E_JOB_STATUS: "failure" },

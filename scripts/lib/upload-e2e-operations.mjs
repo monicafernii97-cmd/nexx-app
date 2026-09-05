@@ -44,43 +44,61 @@ export function summarizeResults(summary) {
   const passed = results.filter(
     (result) => normalizedStatus(result?.status) === "passed",
   );
-  const cleanupResults = results
-    .map((result) => {
-      const attachmentNames = Array.isArray(result?.attachments)
-        ? result.attachments.map((attachment) => String(attachment?.name ?? ""))
-        : [];
-      return {
-        result,
-        attachmentNames,
-        cleanupTitled: /cleanup|synthetic artifacts?|remove all synthetic/i.test(
-          String(result?.title ?? ""),
-        ),
-      };
-    })
-    .filter(
-      ({ attachmentNames, cleanupTitled }) =>
-        cleanupTitled ||
-        attachmentNames.some((name) =>
-          /^cleanup-(?:result|failure)$/i.test(name),
-        ),
-    );
-  const cleanupFailed = cleanupResults.some(
-    ({ result, attachmentNames, cleanupTitled }) =>
-      attachmentNames.some((name) => /^cleanup-failure$/i.test(name)) ||
-      (cleanupTitled &&
-        !attachmentNames.some((name) => /^cleanup-result$/i.test(name)) &&
-        ["failed", "timedout", "interrupted"].includes(
-          normalizedStatus(result?.status),
-        )),
+  const cleanupEvidence = results.flatMap((result) => {
+    const attachmentNames = Array.isArray(result?.attachments)
+      ? result.attachments.map((attachment) => ({
+          name: String(attachment?.name ?? ""),
+          runId: /^e2e-(?:pr|release|daily|weekly|resilience)-[a-z0-9-]{8,96}$/.test(
+            String(attachment?.runId ?? "").toLowerCase(),
+          )
+            ? String(attachment.runId).toLowerCase()
+            : null,
+        }))
+      : [];
+    const attachments = attachmentNames.flatMap((attachment) => {
+      if (/^cleanup-failure$/i.test(attachment.name))
+        return [{ status: "failed", runId: attachment.runId }];
+      if (/^cleanup-result$/i.test(attachment.name))
+        return [{ status: "passed", runId: attachment.runId }];
+      return [];
+    });
+    if (attachments.length > 0) return attachments;
+    if (
+      /cleanup|synthetic artifacts?|remove all synthetic/i.test(
+        String(result?.title ?? ""),
+      )
+    ) {
+      return [
+        {
+          status: ["failed", "timedout", "interrupted"].includes(
+            normalizedStatus(result?.status),
+          )
+            ? "failed"
+            : normalizedStatus(result?.status) === "passed"
+              ? "passed"
+              : "unknown",
+          runId: null,
+        },
+      ];
+    }
+    return [];
+  });
+  const cleanupFailed = cleanupEvidence.some(
+    (evidence) => evidence.status === "failed",
   );
   const cleanupPassed =
-    cleanupResults.length > 0 &&
-    !cleanupFailed &&
-    cleanupResults.every(
-      ({ result, attachmentNames, cleanupTitled }) =>
-        attachmentNames.some((name) => /^cleanup-result$/i.test(name)) ||
-        (cleanupTitled && normalizedStatus(result?.status) === "passed"),
-    );
+    cleanupEvidence.length > 0 &&
+    cleanupEvidence.every((evidence) => evidence.status === "passed");
+  const cleanupRuns = [
+    ...new Map(
+      cleanupEvidence
+        .filter((evidence) => evidence.runId)
+        .map((evidence) => [
+          evidence.runId,
+          { runId: evidence.runId, status: evidence.status },
+        ]),
+    ).values(),
+  ];
 
   return {
     counts,
@@ -93,6 +111,7 @@ export function summarizeResults(summary) {
       : cleanupPassed
         ? "passed"
         : "unknown",
+    cleanupRuns,
   };
 }
 
@@ -149,8 +168,13 @@ export function buildOperationsEnvelope({ env = {}, summary = null } = {}) {
     targetHost: safeHost(env.E2E_BASE_URL),
     counts: resultSummary.counts,
     cleanupStatus: resultSummary.cleanupStatus,
+    cleanupRuns: resultSummary.cleanupRuns,
     syntheticArtifactsRemaining:
-      resultSummary.cleanupStatus === "failed" ? "possible" : "none_observed",
+      resultSummary.cleanupStatus === "failed"
+        ? "possible"
+        : resultSummary.cleanupStatus === "passed"
+          ? "none_observed"
+          : "unknown",
     customerImpact: passed ? "none_observed" : "possible",
     confidence: hasSummary ? "high" : "low",
     lastSuccessfulPhase: resultSummary.lastSuccessfulPhase,

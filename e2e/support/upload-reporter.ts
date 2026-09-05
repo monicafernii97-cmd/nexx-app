@@ -16,8 +16,15 @@ type SanitizedTestResult = {
   retry: number;
   durationMs: number;
   error?: string;
-  attachments: Array<{ name: string; contentType: string }>;
+  attachments: Array<{
+    name: string;
+    contentType: string;
+    runId?: string;
+  }>;
 };
+
+const SYNTHETIC_RUN_ID_PATTERN =
+  /^e2e-(?:pr|release|daily|weekly|resilience)-[a-z0-9-]{8,96}$/;
 
 const SECRET_PATTERNS = [
   /Bearer\s+[A-Za-z0-9._~-]+/gi,
@@ -32,6 +39,30 @@ export function redactE2EText(value: string) {
     (current, pattern) => current.replace(pattern, "[REDACTED]"),
     value,
   ).slice(0, 4_000);
+}
+
+function sanitizedAttachment(
+  attachment: TestResult["attachments"][number],
+): SanitizedTestResult["attachments"][number] {
+  const sanitized: SanitizedTestResult["attachments"][number] = {
+    name: attachment.name,
+    contentType: attachment.contentType,
+  };
+  if (!/^cleanup-(?:result|failure)$/i.test(attachment.name)) return sanitized;
+
+  try {
+    const raw = attachment.body
+      ? attachment.body.toString("utf8")
+      : attachment.path
+        ? fs.readFileSync(attachment.path, "utf8")
+        : null;
+    if (!raw) return sanitized;
+    const runId = String(JSON.parse(raw)?.runId ?? "").toLowerCase();
+    if (SYNTHETIC_RUN_ID_PATTERN.test(runId)) sanitized.runId = runId;
+  } catch {
+    // Cleanup evidence remains useful even when optional run-id metadata is absent.
+  }
+  return sanitized;
 }
 
 export default class UploadE2EReporter implements Reporter {
@@ -53,10 +84,7 @@ export default class UploadE2EReporter implements Reporter {
       error: result.error?.message
         ? redactE2EText(result.error.message)
         : undefined,
-      attachments: result.attachments.map(({ name, contentType }) => ({
-        name,
-        contentType,
-      })),
+      attachments: result.attachments.map(sanitizedAttachment),
     });
   }
 

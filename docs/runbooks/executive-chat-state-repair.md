@@ -14,6 +14,20 @@ Production repair is a separate, approval-gated operation. A chat request, fixtu
 8. Verify that synthetic references are absent from selection, memory, tasks, plans, retrieval, citations, and active control while genuine attachment history remains.
 9. Repeat verification and rerun the repair idempotently; the second run must produce zero changes.
 
+## Linked derived-state repair
+
+Quarantining an upload does not prove that every future-facing reference was removed. After the quarantine run is verified, create a separate linked derived-state repair run. The linked run must:
+
+1. Name the verified parent repair, the exact affected conversation, one canonical production document, and every genuine duplicate to collapse.
+2. Prove duplicates with a stored exact document fingerprint. A filename, page count, or visual similarity is not sufficient.
+3. Audit all conversations in the same owner/case graph for the parent run's quarantined IDs. If another conversation still contains a reference, stop and scope an additional repair instead of reporting success.
+4. Require the independent confirmation phrase `AUTHORIZE_DERIVED_STATE_REPAIR` and the same operator/approval ledger used by other production repairs.
+5. Snapshot only derived records. Preserve upload rows, message attachments, source text, court-document content, and the parent repair snapshots.
+6. Replace the active set with the canonical document, remove quarantined and exact-duplicate IDs from tasks/plans/anchors, and clear pending options or assistant offers that contain a removed ID.
+7. Apply, verify, and run a second idempotence pass before enabling a live test.
+
+Runtime conversation loading also filters quarantined, deleted, QA-only, out-of-owner, out-of-case, and exact-duplicate document IDs before planning. This is a containment layer, not a substitute for the auditable repair.
+
 The system may quarantine confirmed QA/synthetic records and rebuild derived references. It may not delete source evidence, rewrite a user message, modify court-document content, or classify an unknown production document as synthetic.
 
 ## Restore

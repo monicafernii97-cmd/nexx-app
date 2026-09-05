@@ -9,6 +9,9 @@ import { buildExecutionPlan } from '../src/lib/nexx/orchestration/executionPlan'
 import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
 import { decideDocumentActivation } from '../src/lib/nexx/orchestration/documentActivation';
 import { getExecutiveChatFeatureFlags, type ExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
+import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
+import { isDocumentEligibleForChat } from './lib/qaProvenance';
+import { canonicalizeDocumentCandidates } from '../src/lib/nexx/qaStateRepair';
 import type {
   AssistantOffer,
   ConversationControlSnapshot,
@@ -74,6 +77,67 @@ function taskSnapshot(row: Doc<'conversationTasks'>): ConversationTaskSnapshot {
   };
 }
 
+async function loadEligibleCanonicalDocumentState(ctx: ReadCtx, args: {
+  conversationId: Id<'conversations'>;
+  userId: Id<'users'>;
+  controlRow?: Doc<'conversationControlStates'> | null;
+  taskRows: Doc<'conversationTasks'>[];
+}) {
+  const [user, conversation] = await Promise.all([
+    ctx.db.get(args.userId),
+    ctx.db.get(args.conversationId),
+  ]);
+  if (!user || !conversation || conversation.userId !== args.userId) {
+    throw new Error('conversation_control_scope_mismatch');
+  }
+  const pendingDocumentIds = [
+    ...parseJsonArray<PendingOption>(args.controlRow?.pendingOptionsJson).flatMap((option) => option.documentIds),
+    ...(parseJsonObject<AssistantOffer>(args.controlRow?.lastAssistantOfferJson)?.documentIds ?? []),
+  ];
+  const orderedIds = Array.from(new Set([
+    ...(args.controlRow?.activeDocumentIds ?? []).map(String),
+    ...args.taskRows.flatMap((task) => task.documentIds.map(String)),
+    ...pendingDocumentIds,
+  ]));
+  const clerkId = user.clerkId;
+  const activeGrants = clerkId
+    ? await ctx.db.query('fileAccessGrants')
+        .withIndex('by_subject', (q) => q.eq('subjectType', 'user').eq('subjectId', clerkId))
+        .collect()
+    : [];
+  const now = Date.now();
+  const grantedIds = new Set(activeGrants.filter((grant) =>
+    grant.permissions.chat &&
+    grant.revokedAt === undefined &&
+    (grant.expiresAt === undefined || grant.expiresAt > now) &&
+    (!grant.caseId || grant.caseId === conversation.caseId)
+  ).map((grant) => grant.uploadedFileId.toString()));
+  const files = await Promise.all(orderedIds.map((id) => ctx.db.get(id as Id<'uploadedFiles'>)));
+  const selection = canonicalizeDocumentCandidates(files.map((file, index) => ({
+    uploadedFileId: orderedIds[index],
+    eligible: Boolean(
+      file &&
+      isDocumentEligibleForChat(file, isUploadE2ERobotEmail(user.email ?? '')) &&
+      (file.clerkUserId === user.clerkId || grantedIds.has(file._id.toString())) &&
+      (!conversation.caseId || !file.caseId || file.caseId === conversation.caseId)
+    ),
+    storageSha256: file?.storageSha256,
+    fullTextSha256: file?.fullTextSha256,
+    sha256Hash: file?.sha256Hash,
+  })));
+  const selected = new Set(selection.selectedDocumentIds);
+  const canonicalByDuplicate = new Map(selection.rejected
+    .filter((item) => item.reason === 'exact_duplicate' && item.canonicalUploadedFileId)
+    .map((item) => [item.uploadedFileId, item.canonicalUploadedFileId!]));
+  const resolveDocumentIds = (ids: string[]) => Array.from(new Set(ids.flatMap((id) => {
+    if (selected.has(id)) return [id];
+    const canonical = canonicalByDuplicate.get(id);
+    return canonical && selected.has(canonical) ? [canonical] : [];
+  })));
+
+  return { resolveDocumentIds };
+}
+
 export async function loadConversationControlContext(ctx: ReadCtx, args: {
   conversationId: Id<'conversations'>;
   userId: Id<'users'>;
@@ -88,10 +152,38 @@ export async function loadConversationControlContext(ctx: ReadCtx, args: {
   ]);
   if (controlRow && controlRow.userId !== args.userId) throw new Error('conversation_control_scope_mismatch');
   if (taskRows.some((task) => task.userId !== args.userId)) throw new Error('conversation_task_scope_mismatch');
+  const eligibility = await loadEligibleCanonicalDocumentState(ctx, {
+    conversationId: args.conversationId,
+    userId: args.userId,
+    controlRow,
+    taskRows,
+  });
+  const rawControl = controlSnapshot(controlRow);
+  const controlState = rawControl
+    ? {
+        ...rawControl,
+        activeDocumentIds: eligibility.resolveDocumentIds(rawControl.activeDocumentIds),
+        pendingOptions: rawControl.pendingOptions.flatMap((option) => {
+          const documentIds = eligibility.resolveDocumentIds(option.documentIds);
+          return option.documentIds.length > 0 && documentIds.length === 0 ? [] : [{ ...option, documentIds }];
+        }),
+        lastAssistantOffer: rawControl.lastAssistantOffer
+          ? (() => {
+              const documentIds = eligibility.resolveDocumentIds(rawControl.lastAssistantOffer!.documentIds);
+              return rawControl.lastAssistantOffer!.documentIds.length > 0 && documentIds.length === 0
+                ? undefined
+                : { ...rawControl.lastAssistantOffer!, documentIds };
+            })()
+          : undefined,
+      }
+    : undefined;
   return {
     row: controlRow,
-    controlState: controlSnapshot(controlRow),
-    tasks: taskRows.map(taskSnapshot),
+    controlState,
+    tasks: taskRows.map((task) => ({
+      ...taskSnapshot(task),
+      documentIds: eligibility.resolveDocumentIds(task.documentIds.map(String)),
+    })),
   };
 }
 

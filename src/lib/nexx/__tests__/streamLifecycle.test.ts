@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ProviderStreamLifecycleError,
   classifyProviderStreamTerminal,
+  decideProviderStreamRetry,
+  providerAttemptTimeoutMs,
   streamTerminalError,
 } from '../provider/streamLifecycle';
 
@@ -61,5 +63,42 @@ describe('provider stream lifecycle', () => {
       retryable: true,
       incompleteReason: 'max_output_tokens',
     });
+  });
+
+  it('reserves worker time for recovery instead of spending it all on attempt one', () => {
+    expect(providerAttemptTimeoutMs({ attemptNumber: 1, remainingBudgetMs: 90_000 })).toBe(35_000);
+    expect(providerAttemptTimeoutMs({ attemptNumber: 2, remainingBudgetMs: 18_000 })).toBe(18_000);
+  });
+
+  it('continues by saved response id and otherwise switches to compact evidence', () => {
+    expect(decideProviderStreamRetry({
+      attemptNumber: 1,
+      retryable: true,
+      responseId: 'resp_saved',
+      remainingBudgetMs: 40_000,
+    })).toBe('continue');
+    expect(decideProviderStreamRetry({
+      attemptNumber: 1,
+      retryable: true,
+      remainingBudgetMs: 40_000,
+    })).toBe('compact');
+    expect(decideProviderStreamRetry({
+      attemptNumber: 3,
+      retryable: true,
+      responseId: 'resp_saved',
+      remainingBudgetMs: 40_000,
+    })).toBe('stop');
+  });
+
+  it('retries provider-declared transient stream failures', () => {
+    const error = streamTerminalError(classifyProviderStreamTerminal({
+      responseId: 'resp_transient',
+      text: '',
+      elapsedMs: 100,
+      terminalEvent: 'failed',
+      providerCode: 'server_error',
+      providerMessageSafe: 'temporarily unavailable',
+    }));
+    expect(error).toMatchObject({ code: 'provider_stream_failed', retryable: true });
   });
 });

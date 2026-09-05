@@ -19,6 +19,8 @@
 - Durable work: Which verified node was last saved, what failed, and can the job resume without discarding verified work?
 - Release: Do web/backend manifests and the persisted turn rollout snapshot match the incident artifact?
 
+For an interrupted provider stream, inspect `chatGenerationAttempts` in attempt-number order. Confirm the first attempt was bounded, whether a provider response ID was captured, whether recovery used `continue` or `compact`, and whether the final attempt recorded a terminal event. An iterator ending without `response.completed`, `response.incomplete`, or `response.failed` is `provider_stream_interrupted`; it is not an unknown terminal failure. Never discard a saved response ID or rerun the original full evidence packet repeatedly.
+
 ## Communication and recovery
 
 Tell the user specifically what is known, what is being rechecked, and what action is safe next. Do not use an invented analysis, claim to have inspected evidence without a receipt, or hide a recoverable error behind a generic fallback.

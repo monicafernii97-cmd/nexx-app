@@ -37,6 +37,36 @@ export type ProviderStreamSnapshot = {
   deadlineExceeded?: boolean;
 };
 
+export const PROVIDER_GENERATION_BUDGET_MS = 95_000;
+export const PROVIDER_FIRST_ATTEMPT_TIMEOUT_MS = 35_000;
+export const PROVIDER_RECOVERY_ATTEMPT_TIMEOUT_MS = 25_000;
+export const PROVIDER_MINIMUM_ATTEMPT_BUDGET_MS = 8_000;
+export const PROVIDER_MAX_GENERATION_ATTEMPTS = 3;
+
+export function providerAttemptTimeoutMs(args: {
+  attemptNumber: number;
+  remainingBudgetMs: number;
+}) {
+  const ceiling = args.attemptNumber === 1
+    ? PROVIDER_FIRST_ATTEMPT_TIMEOUT_MS
+    : PROVIDER_RECOVERY_ATTEMPT_TIMEOUT_MS;
+  return Math.max(0, Math.min(ceiling, Math.floor(args.remainingBudgetMs)));
+}
+
+export function decideProviderStreamRetry(args: {
+  attemptNumber: number;
+  retryable: boolean;
+  responseId?: string;
+  remainingBudgetMs: number;
+}): ProviderStreamStrategy | 'stop' {
+  if (
+    !args.retryable ||
+    args.attemptNumber >= PROVIDER_MAX_GENERATION_ATTEMPTS ||
+    args.remainingBudgetMs < PROVIDER_MINIMUM_ATTEMPT_BUDGET_MS
+  ) return 'stop';
+  return args.responseId ? 'continue' : 'compact';
+}
+
 /**
  * Convert stream state into one exhaustive terminal result. An iterator that
  * stops without a provider terminal event is explicitly interrupted; callers
@@ -83,6 +113,7 @@ export class ProviderStreamLifecycleError extends Error {
   readonly code: ProviderStreamFailureCode;
   readonly retryable: boolean;
   readonly responseId?: string;
+  readonly providerCode?: string;
   readonly lastEventType?: string;
   readonly elapsedMs?: number;
   readonly incompleteReason?: string;
@@ -92,6 +123,7 @@ export class ProviderStreamLifecycleError extends Error {
     message: string;
     retryable?: boolean;
     responseId?: string;
+    providerCode?: string;
     lastEventType?: string;
     elapsedMs?: number;
     incompleteReason?: string;
@@ -101,6 +133,7 @@ export class ProviderStreamLifecycleError extends Error {
     this.code = args.code;
     this.retryable = args.retryable ?? args.code !== 'provider_stream_failed';
     this.responseId = args.responseId;
+    this.providerCode = args.providerCode;
     this.lastEventType = args.lastEventType;
     this.elapsedMs = args.elapsedMs;
     this.incompleteReason = args.incompleteReason;
@@ -139,7 +172,8 @@ export function streamTerminalError(terminal: ProviderStreamTerminal) {
   return new ProviderStreamLifecycleError({
     code: 'provider_stream_failed',
     message: terminal.messageSafe,
-    retryable: false,
+    retryable: /rate|timeout|server|overload|unavailable|temporar/i.test(terminal.providerCode ?? terminal.messageSafe),
     responseId: terminal.responseId,
+    providerCode: terminal.providerCode,
   });
 }

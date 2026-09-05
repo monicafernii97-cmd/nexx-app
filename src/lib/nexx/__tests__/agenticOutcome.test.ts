@@ -41,6 +41,11 @@ describe('agentic outcome and recovery policy', () => {
       code: 'provider_stream_timeout',
       message: 'Absolute deadline reached.',
     })).toMatchObject({ code: 'provider_stream_timeout', retryable: true, category: 'temporary' });
+    expect(normalizeProviderFailure({
+      code: 'provider_stream_failed',
+      message: 'temporarily unavailable',
+      retryable: true,
+    })).toMatchObject({ code: 'provider_stream_failed', retryable: true, category: 'temporary' });
   });
 
   it('locks correction metadata to the actual challenged message', () => {

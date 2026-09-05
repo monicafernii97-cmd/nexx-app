@@ -1684,6 +1684,101 @@ export const leaseGenerationJob = internalMutation({
     },
 });
 
+const generationAttemptStrategyValidator = v.union(
+    v.literal('full'),
+    v.literal('continue'),
+    v.literal('compact'),
+    v.literal('deterministic_scoped'),
+);
+
+/** Allocate one durable provider-attempt number under the active job lease. */
+export const beginGenerationAttempt = internalMutation({
+    args: {
+        jobId: v.id('chatGenerationJobs'),
+        leaseOwner: v.string(),
+        strategy: generationAttemptStrategyValidator,
+        model: v.string(),
+        inputTokenEstimate: v.number(),
+        maxOutputTokens: v.number(),
+        sourceDocumentCount: v.number(),
+        sourcePacketCount: v.number(),
+        sourceCharacterCount: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const job = await ctx.db.get(args.jobId);
+        if (!job || job.leaseOwner !== args.leaseOwner || job.status !== 'running') {
+            throw new Error('generation_attempt_lease_lost');
+        }
+        const attempts = await ctx.db.query('chatGenerationAttempts')
+            .withIndex('by_job_attempt', (q) => q.eq('jobId', args.jobId))
+            .collect();
+        const attemptNumber = attempts.reduce((max, attempt) => Math.max(max, attempt.attemptNumber), 0) + 1;
+        const now = Date.now();
+        const attemptId = await ctx.db.insert('chatGenerationAttempts', {
+            jobId: args.jobId,
+            turnId: job.turnId,
+            conversationId: job.conversationId,
+            userId: job.userId,
+            attemptNumber,
+            strategy: args.strategy,
+            status: 'started',
+            model: args.model,
+            inputTokenEstimate: Math.max(0, Math.floor(args.inputTokenEstimate)),
+            maxOutputTokens: Math.max(1, Math.floor(args.maxOutputTokens)),
+            sourceDocumentCount: Math.max(0, Math.floor(args.sourceDocumentCount)),
+            sourcePacketCount: Math.max(0, Math.floor(args.sourcePacketCount)),
+            sourceCharacterCount: Math.max(0, Math.floor(args.sourceCharacterCount)),
+            partialOutputCharacters: 0,
+            startedAt: now,
+            createdAt: now,
+            updatedAt: now,
+        });
+        return { attemptId, attemptNumber };
+    },
+});
+
+/** Close a durable provider attempt with its terminal stream evidence. */
+export const finishGenerationAttempt = internalMutation({
+    args: {
+        jobId: v.id('chatGenerationJobs'),
+        leaseOwner: v.string(),
+        attemptId: v.id('chatGenerationAttempts'),
+        status: v.union(v.literal('completed'), v.literal('retry_scheduled'), v.literal('failed')),
+        providerResponseId: v.optional(v.string()),
+        firstEventAt: v.optional(v.number()),
+        lastEventAt: v.optional(v.number()),
+        lastEventType: v.optional(v.string()),
+        partialOutputCharacters: v.number(),
+        failureCode: v.optional(v.string()),
+        failureStage: v.optional(v.string()),
+        incompleteReason: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const [job, attempt] = await Promise.all([
+            ctx.db.get(args.jobId),
+            ctx.db.get(args.attemptId),
+        ]);
+        if (!job || job.leaseOwner !== args.leaseOwner || !attempt || attempt.jobId !== args.jobId) {
+            throw new Error('generation_attempt_lease_lost');
+        }
+        const now = Date.now();
+        await ctx.db.patch(args.attemptId, {
+            status: args.status,
+            providerResponseId: args.providerResponseId,
+            firstEventAt: args.firstEventAt,
+            lastEventAt: args.lastEventAt,
+            lastEventType: args.lastEventType,
+            partialOutputCharacters: Math.max(0, Math.floor(args.partialOutputCharacters)),
+            failureCode: args.failureCode,
+            failureStage: args.failureStage,
+            incompleteReason: args.incompleteReason,
+            completedAt: now,
+            updatedAt: now,
+        });
+        return true;
+    },
+});
+
 /** Load the prompt context needed by the worker for a specific turn. */
 export const getGenerationContext = internalQuery({
     args: { turnId: v.id('chatTurns') },

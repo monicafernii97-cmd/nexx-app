@@ -71,6 +71,16 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   if (providerCode === 'provider_output_incomplete') {
     return { code: 'provider_output_incomplete', message: 'The response stopped before all output was returned.', rawMessage, retryable: true, category: 'temporary' };
   }
+  if (providerCode === 'provider_stream_failed') {
+    const retryable = record.retryable === true;
+    return {
+      code: 'provider_stream_failed',
+      message: retryable ? 'The response stream failed temporarily.' : 'The response stream could not be completed.',
+      rawMessage,
+      retryable,
+      category: retryable ? 'temporary' : 'unknown',
+    };
+  }
 
   if (status === 429 || lower.includes('rate limit') || providerCode?.includes('rate_limit')) {
     return { code: 'provider_rate_limit', message: 'The model service was temporarily busy.', rawMessage, retryable: true, category: 'temporary' };

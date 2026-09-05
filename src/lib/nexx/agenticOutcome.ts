@@ -62,6 +62,16 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
     .find((value): value is string => typeof value === 'string')
     ?.toLowerCase();
 
+  if (providerCode === 'provider_stream_interrupted' || lower.includes('stream ended before a terminal event')) {
+    return { code: 'provider_stream_interrupted', message: 'The response stream was interrupted before completion.', rawMessage, retryable: true, category: 'temporary' };
+  }
+  if (providerCode === 'provider_stream_timeout' || providerCode === 'provider_stream_inactive') {
+    return { code: providerCode, message: 'The response took too long to finish.', rawMessage, retryable: true, category: 'temporary' };
+  }
+  if (providerCode === 'provider_output_incomplete') {
+    return { code: 'provider_output_incomplete', message: 'The response stopped before all output was returned.', rawMessage, retryable: true, category: 'temporary' };
+  }
+
   if (status === 429 || lower.includes('rate limit') || providerCode?.includes('rate_limit')) {
     return { code: 'provider_rate_limit', message: 'The model service was temporarily busy.', rawMessage, retryable: true, category: 'temporary' };
   }

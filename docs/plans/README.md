@@ -7,6 +7,7 @@
 
 - [Production Reconciliation — 2026-09-01](./14_production_reconciliation_2026-09-01.md) — verifies current `origin/main`, the successful production web release, and live Convex application definitions are aligned.
 - [Executive Chat Hardening — Full Implementation Specification](./15_executive_chat_hardening_full_spec.md) — authoritative P0 specification for durable task focus, referent resolution, capability truth, response verification, recovery, adversarial sequence testing, and release controls.
+- [Executive Chat Production Incident Remediation](./16_executive_chat_production_incident_remediation_spec.md) — P0 follow-up specification for the live owner-canary failure: cross-conversation state repair, interrupted-stream recovery, audited fallbacks, document prompt budgets, and verified 46-page review recovery.
 
 ---
 

@@ -7,7 +7,7 @@ const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? process.env.CONVEX_URL;
 if (!secret) throw new Error('durable_review_secret_missing');
 if (!convexUrl) throw new Error('durable_review_convex_url_missing');
 if (!operation || !operationId) {
-  throw new Error('usage: manage-durable-review-repair <inspect|authorize|apply|verify|status> <operation-id>');
+  throw new Error('usage: manage-durable-review-repair <inspect|authorize|apply|resume|verify|status> <operation-id>');
 }
 
 const client = new ConvexHttpClient(convexUrl);
@@ -40,6 +40,15 @@ if (operation === 'inspect') {
     throw new Error('apply requires EXEC_CHAT_OPERATOR and DURABLE_REVIEW_CONFIRMATION=AUTHORIZE_DURABLE_REVIEW_RESTART');
   }
   result = await client.mutation(anyApi.durableReviewOperations.apply, {
+    secret, operationId, operatorId, confirmation,
+  });
+} else if (operation === 'resume') {
+  const operatorId = process.env.EXEC_CHAT_OPERATOR?.trim();
+  const confirmation = process.env.DURABLE_REVIEW_CONFIRMATION?.trim();
+  if (!operatorId || confirmation !== 'AUTHORIZE_DURABLE_REVIEW_RESUME') {
+    throw new Error('resume requires EXEC_CHAT_OPERATOR and DURABLE_REVIEW_CONFIRMATION=AUTHORIZE_DURABLE_REVIEW_RESUME');
+  }
+  result = await client.mutation(anyApi.durableReviewOperations.resume, {
     secret, operationId, operatorId, confirmation,
   });
 } else if (operation === 'verify') {

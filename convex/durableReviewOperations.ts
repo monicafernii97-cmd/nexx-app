@@ -7,6 +7,8 @@ import {
   DURABLE_REVIEW_MAP_BATCH_SIZE,
   DURABLE_REVIEW_MODEL,
   DURABLE_REVIEW_REDUCE_BATCH_SIZE,
+  DURABLE_REVIEW_OPERATION_MAX_RESUMES,
+  DURABLE_REVIEW_RESUME_CONFIRMATION,
   DURABLE_REVIEW_RESTART_CONFIRMATION,
   DURABLE_REVIEW_VERSION,
   validateDurableReviewRestartApproval,
@@ -256,6 +258,101 @@ export const apply = mutation({
   },
 });
 
+/** Resume the same approved replacement while preserving every verified node. */
+export const resume = mutation({
+  args: {
+    secret: v.string(),
+    operationId: v.string(),
+    operatorId: v.string(),
+    confirmation: v.literal(DURABLE_REVIEW_RESUME_CONFIRMATION),
+  },
+  handler: async (ctx, args) => {
+    requireOperationsSecret(args.secret);
+    const operation = await ctx.db.query('durableReviewRepairOperations')
+      .withIndex('by_operation', (q) => q.eq('operationId', args.operationId))
+      .unique();
+    if (!operation?.replacementRunId) throw new Error('durable_review_replacement_missing');
+    if (operation.operatorId !== args.operatorId) throw new Error('durable_review_operator_mismatch');
+    if (operation.status !== 'applied' || !operation.approverId || !operation.approvalId) {
+      throw new Error(`durable_review_operation_not_resumable:${operation.status}`);
+    }
+    const [run, file] = await Promise.all([
+      ctx.db.get(operation.replacementRunId),
+      ctx.db.get(operation.uploadedFileId),
+    ]);
+    if (!run || !file || !['dead_letter', 'failed', 'partial'].includes(run.status)) {
+      return { resumed: false as const, status: run?.status ?? 'missing', reason: 'replacement_not_failed' };
+    }
+    if (
+      run.version !== DURABLE_REVIEW_VERSION ||
+      run.uploadedFileId !== operation.uploadedFileId ||
+      run.memoryGenerationId !== operation.memoryGenerationId ||
+      file.activeUnderstandingRunId !== run._id ||
+      file.activeMemoryGenerationId !== operation.memoryGenerationId ||
+      file.status === 'quarantined' || file.status === 'deleted' || file.deletedAt
+    ) throw new Error('durable_review_resume_scope_changed');
+    await loadVerifiedCoverage(ctx, {
+      uploadedFileId: operation.uploadedFileId,
+      memoryGenerationId: operation.memoryGenerationId,
+      coverageManifestId: operation.coverageManifestId,
+      expectedUnits: operation.expectedUnits,
+    });
+    const operationResumeCount = operation.resumeCount ?? 0;
+    if (operationResumeCount >= DURABLE_REVIEW_OPERATION_MAX_RESUMES) {
+      throw new Error('durable_review_operation_resume_budget_exhausted');
+    }
+    const now = Date.now();
+    if (run.deadLetterNodeId) {
+      const node = await ctx.db.query('documentUnderstandingWorkNodes')
+        .withIndex('by_node_id', (q) => q.eq('nodeId', run.deadLetterNodeId!))
+        .first();
+      if (!node || node.runId !== run._id) throw new Error('durable_review_dead_letter_node_missing');
+      await ctx.db.patch(node._id, {
+        status: 'retryable_failed',
+        cycleAttemptCount: 0,
+        strictRetry: false,
+        leaseId: undefined,
+        leaseExpiresAt: undefined,
+        validationState: 'pending',
+        validationErrors: [],
+        failureClass: undefined,
+        lastErrorMessage: undefined,
+        finishedAt: undefined,
+        updatedAt: now,
+      });
+    }
+    const resumedStatus = run.nextChunkIndex < run.totalChunks ? 'mapping' as const : 'reducing' as const;
+    await ctx.db.patch(run._id, {
+      status: resumedStatus,
+      resumeCount: (run.resumeCount ?? 0) + 1,
+      lastResumedAt: now,
+      deadLetterNodeId: undefined,
+      deadLetterFailureClass: undefined,
+      errorCode: undefined,
+      errorMessage: undefined,
+      finishedAt: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.patch(file._id, { fullDocumentReviewStatus: 'building', updatedAt: now });
+    await ctx.db.patch(operation._id, {
+      resumeCount: operationResumeCount + 1,
+      lastResumedAt: now,
+      lastResumeFailureClass: run.deadLetterFailureClass,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, PROCESS_RUN_REFERENCE, { runId: run._id });
+    return {
+      resumed: true as const,
+      status: resumedStatus,
+      replacementRunId: run._id,
+      nextChunkIndex: run.nextChunkIndex,
+      totalChunks: run.totalChunks,
+      priorFailureClass: run.deadLetterFailureClass,
+      resumeCount: operationResumeCount + 1,
+    };
+  },
+});
+
 export const verify = mutation({
   args: { secret: v.string(), operationId: v.string() },
   handler: async (ctx, args) => {
@@ -307,6 +404,10 @@ export const verify = mutation({
       verifiedUnits: coverage.verification.unitsRead,
       totalChunks: operation.totalChunks,
       coveredChunks: record?.coveredChunks ?? 0,
+      nextChunkIndex: run?.nextChunkIndex ?? 0,
+      currentLevel: run?.currentLevel ?? 0,
+      nextNodeIndex: run?.nextNodeIndex ?? 0,
+      resumeCount: operation.resumeCount ?? 0,
       checks,
       errorCode: run?.errorCode,
       errorMessage: run?.errorMessage,

@@ -4,6 +4,8 @@ export const DURABLE_REVIEW_MAP_BATCH_SIZE = 6;
 export const DURABLE_REVIEW_REDUCE_BATCH_SIZE = 6;
 
 export const DURABLE_REVIEW_RESTART_CONFIRMATION = 'AUTHORIZE_DURABLE_REVIEW_RESTART';
+export const DURABLE_REVIEW_RESUME_CONFIRMATION = 'AUTHORIZE_DURABLE_REVIEW_RESUME';
+export const DURABLE_REVIEW_OPERATION_MAX_RESUMES = 3;
 
 export function validateDurableReviewRestartApproval(args: {
   operatorId: string;

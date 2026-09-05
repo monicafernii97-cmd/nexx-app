@@ -16,6 +16,16 @@ export type DurableReviewRetryDecision =
   | { kind: 'split_batch'; nextBatchSize: number }
   | { kind: 'dead_letter'; reason: DurableReviewFailureClass };
 
+export function durableReviewGenerationProfile(args: { strictRetry: boolean; batchSize: number }) {
+  if (args.strictRetry) {
+    return {
+      reasoningEffort: 'low' as const,
+      maxOutputTokens: args.batchSize === 1 ? 20_000 : 16_000,
+    };
+  }
+  return { reasoningEffort: 'medium' as const, maxOutputTokens: 16_000 };
+}
+
 export function classifyDurableReviewFailure(error: unknown): DurableReviewFailureClass {
   const message = (error instanceof Error ? error.message : String(error ?? '')).toLowerCase();
   if (/unexpected end|unterminated|truncat|incomplete output|max(?:imum)? output tokens/.test(message)) {
@@ -73,6 +83,7 @@ export function strictStructuredOutputReminder() {
   return [
     'CORRECTION RETRY: Return exactly one JSON object matching the supplied strict schema.',
     'Do not add markdown fences, commentary, prefixes, suffixes, or incomplete fields.',
-    'Keep each finding concise while preserving its exact source IDs and supporting quote.',
+    'Keep each detail to one concise sentence. Copy an exact supporting quote of 8 to 30 words from one cited source chunk.',
+    'Before returning, verify every quote is character-for-character present in its cited source after ordinary whitespace normalization.',
   ].join(' ');
 }

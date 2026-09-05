@@ -81,6 +81,14 @@ import {
 } from '../src/lib/nexx/providerInput';
 import { detectDocumentReference, isDocumentAvailabilityQuestion, type DocumentReferenceDetection, type DocumentType } from '../src/lib/nexx/documentReferenceDetection';
 import {
+    documentEvidenceBudgetForTurn,
+    fallbackDocumentContextForPrompt,
+} from '../src/lib/nexx/documentEvidenceBudget';
+import {
+    reviewDepthChoiceMessage,
+    shouldOfferReviewDepthChoices,
+} from '../src/lib/nexx/reviewDepthChoice';
+import {
     plainTextAssistantResponse,
     reasoningEffortForRoute,
     usesPlainTextResponse,
@@ -1516,6 +1524,7 @@ function buildAttachmentContextPrompt(
 
     const isFullDocumentReview = analysisMode === 'full_document_review';
     const preferRetrievedChunks = !isFullDocumentReview && shouldPreferRetrievedChunks(detection);
+    const evidenceBudget = documentEvidenceBudgetForTurn({ analysisMode, detection });
     const shouldFillLegalInterpretation =
         routeMode === 'order_interpretation' ||
         routeMode === 'possession_access_schedule' ||
@@ -1535,7 +1544,12 @@ function buildAttachmentContextPrompt(
 
         const retrievedChunkPrompt = buildRetrievedChunkPrompt(attachment.documentChunks ?? [], sourcePackets);
         const requestedPagePrompt = buildRequestedPagePrompt(attachment, sourcePackets);
-        const shouldIncludeFullContext = !preferRetrievedChunks || !retrievedChunkPrompt;
+        const fallbackContext = fallbackDocumentContextForPrompt({
+            analysisMode,
+            retrievedChunkCount: attachment.documentChunks?.length ?? 0,
+            text: attachment.chatContextText,
+            maxCharacters: evidenceBudget.maxFallbackContextCharactersPerFile,
+        });
 
         if (!attachment.chatContextText?.trim() && !retrievedChunkPrompt) {
             return [
@@ -1554,10 +1568,10 @@ function buildAttachmentContextPrompt(
             '</WARNINGS>',
             requestedPagePrompt || undefined,
             retrievedChunkPrompt || undefined,
-            shouldIncludeFullContext && attachment.chatContextText?.trim()
+            fallbackContext
                 ? [
                     '<EXTRACTED_DOCUMENT_CONTEXT>',
-                    sanitizeDocumentContextText(attachment.chatContextText),
+                    sanitizeDocumentContextText(fallbackContext),
                     '</EXTRACTED_DOCUMENT_CONTEXT>',
                 ].join('\n')
                 : undefined,
@@ -3817,6 +3831,44 @@ export const processChatGenerationJob = internalAction({
                         recoveryCode: 'validation_exhausted',
                         errorCode: 'self_correction_terminal_publication_failed',
                         retryable: false,
+                    });
+                }
+                return null;
+            }
+            if (shouldOfferReviewDepthChoices({
+                message: context.turn.message,
+                analysisMode: context.turn.analysisMode,
+                hasCurrentAttachment: fullReviewAttachments.length > 0,
+            })) {
+                workerStage = 'publishing_review_depth_choices';
+                const content = reviewDepthChoiceMessage();
+                const response = plainTextAssistantResponse(content);
+                const choicePublication = await commitVerifiedResponse({
+                    ctx,
+                    jobId: args.jobId,
+                    leaseOwner,
+                    context,
+                    response,
+                    content,
+                    capabilitySnapshot: baselineCapabilitySnapshot,
+                    evidenceIds: uniqueDocumentChunkIds(fullReviewAttachments).map(String),
+                    citationVerificationPassed: true,
+                    usedDocumentIds: [],
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    decision: 'ask_clarification',
+                    metadata: {
+                        deterministicInteraction: 'review_depth_choice',
+                        analysisMode: context.turn.analysisMode,
+                    },
+                });
+                if (!choicePublication?.committed) {
+                    await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
+                        jobId: args.jobId,
+                        leaseOwner,
+                        recoveryCode: 'validation_exhausted',
+                        errorCode: 'review_depth_choice_publication_failed',
+                        errorMessage: choicePublication?.verification.errors.join(', '),
+                        retryable: true,
                     });
                 }
                 return null;

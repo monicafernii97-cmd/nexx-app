@@ -74,6 +74,11 @@ import {
 } from '../src/lib/nexx/response/publicationContract';
 import { stableCapabilityHash } from '../src/lib/nexx/capabilities/documentCapabilityLedger';
 import { isDocumentEligibleForChat } from './lib/qaProvenance';
+import {
+    assessRecoveryPublication,
+    buildContextualRecoveryContent,
+    type RecoveryPublicationCode,
+} from '../src/lib/nexx/response/recoveryPublication';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -276,8 +281,6 @@ async function insertOpenReviewFlagOnce(
     });
 }
 
-const DEGRADED_MESSAGE =
-    'Your message is saved. I could not finish the answer right now. Try this response again; I will reuse the work already completed.';
 const EMPTY_ARTIFACTS_JSON = JSON.stringify({
     draftReady: null,
     timelineReady: null,
@@ -972,6 +975,12 @@ async function saveDegradedAssistantForTurn(
     errorCode: string,
     errorMessage: string
 ) {
+    const publication = await buildAndAuditRecoveryPublication(ctx, {
+        turn,
+        recoveryCode: 'worker_interrupted',
+        errorCode,
+        retryable: true,
+    });
     const metadata = {
         degraded: true,
         errorCode,
@@ -985,13 +994,19 @@ async function saveDegradedAssistantForTurn(
             nextBestAction: { kind: 'retry', label: 'Try again', prompt: 'Retry this response using saved state.' },
             correction: null,
         },
+        publication: {
+            envelopeId: publication.envelopeId,
+            decision: 'publish_recovery',
+            validatorVersion: 'recovery-publication-v1',
+            verified: true,
+        },
     };
     let assistantMessageId = turn.assistantMessageId;
     let shouldIncrementMessageCount = false;
 
     if (assistantMessageId) {
         await ctx.db.patch(assistantMessageId, {
-            content: DEGRADED_MESSAGE,
+            content: publication.content,
             status: 'degraded',
             artifactsJson: EMPTY_ARTIFACTS_JSON,
             metadata,
@@ -1001,7 +1016,7 @@ async function saveDegradedAssistantForTurn(
         assistantMessageId = turn.assistantDraftMessageId;
         shouldIncrementMessageCount = true;
         await ctx.db.patch(turn.assistantDraftMessageId, {
-            content: DEGRADED_MESSAGE,
+            content: publication.content,
             status: 'degraded',
             artifactsJson: EMPTY_ARTIFACTS_JSON,
             requestId: assistantRequestId(turn.requestId),
@@ -1015,7 +1030,7 @@ async function saveDegradedAssistantForTurn(
             userId: turn.userId,
             turnId: turn._id,
             role: 'assistant',
-            content: DEGRADED_MESSAGE,
+            content: publication.content,
             status: 'degraded',
             turnNumber: turn.turnNumber,
             roleOrder: 1,
@@ -3439,12 +3454,87 @@ export const commitValidatedAssistant = internalMutation({
     },
 });
 
-const RECOVERY_COPY = {
-    context_unavailable: 'I could not safely load the saved conversation context for this turn. Your conversation is still saved; please retry this response.',
-    provider_unavailable: 'I could not finish this response. Your uploaded files and conversation are still saved, so you can retry without uploading them again.',
-    worker_interrupted: 'The response was interrupted before it could be verified. Your saved work is intact; please retry the response.',
-    validation_exhausted: 'I could not verify this answer safely. Your conversation and documents remain available; please narrow the question or retry.',
-} as const;
+async function buildAndAuditRecoveryPublication(ctx: MutationCtx, args: {
+    turn: Doc<'chatTurns'>;
+    recoveryCode: RecoveryPublicationCode;
+    errorCode: string;
+    retryable: boolean;
+}) {
+    const [understanding, plan, control, attempts] = await Promise.all([
+        ctx.db.query('turnUnderstandings').withIndex('by_turn', (q) => q.eq('turnId', args.turn._id)).first(),
+        ctx.db.query('turnExecutionPlans').withIndex('by_turn', (q) => q.eq('turnId', args.turn._id)).first(),
+        ctx.db.query('conversationControlStates').withIndex('by_conversation', (q) => q.eq('conversationId', args.turn.conversationId)).first(),
+        ctx.db.query('chatGenerationAttempts').withIndex('by_turn', (q) => q.eq('turnId', args.turn._id)).collect(),
+    ]);
+    const documentReference = detectDocumentReference(args.turn.message);
+    const selectedDocumentCount = plan?.selectedDocumentIds.length ?? 0;
+    const continuationCarriesDocument = selectedDocumentCount > 0 && [
+        'answer', 'select', 'confirm', 'continue', 'correct', 'challenge', 'reassess',
+    ].includes(understanding?.speechAct ?? '');
+    const context = {
+        latestUserMessage: args.turn.message,
+        speechAct: understanding?.speechAct,
+        requestedOperation: understanding?.requestedOperation,
+        documentContextActive: Boolean(
+            args.turn.analysisMode ||
+            documentReference.referencesDocument ||
+            continuationCarriesDocument
+        ),
+    };
+    const content = buildContextualRecoveryContent({ recoveryCode: args.recoveryCode, context });
+    const assessment = assessRecoveryPublication({ content, context });
+    const now = Date.now();
+    const envelopeId = `recovery_${args.turn._id}_${args.errorCode}`;
+    const common = {
+        envelopeId,
+        turnId: args.turn._id,
+        conversationId: args.turn.conversationId,
+        userId: args.turn.userId,
+        planId: plan?.planId ?? `recovery:${args.turn._id}`,
+        taskId: plan?.taskId ?? args.turn.taskId ?? `recovery:${args.turn._id}`,
+        focusRevision: control?.focusRevision ?? plan?.focusRevision ?? 0,
+        responseClass: 'recovery' as const,
+        failureCode: args.errorCode,
+        attemptCount: attempts.length,
+        checksJson: JSON.stringify(assessment),
+        rejectionCodes: assessment.rejectionCodes,
+        capabilitySnapshotHash: stableCapabilityHash('recovery:no-capability-claim'),
+        evidenceSetHash: stableCapabilityHash('recovery:no-evidence-claim'),
+        canonicalPlanHash: stableCapabilityHash({ responseClass: 'recovery', contextKind: assessment.contextKind }),
+        contentHash: stableCapabilityHash(content),
+        validatorVersion: 'recovery-publication-v1',
+        rolloutConfigVersion: args.turn.rolloutConfigVersion,
+        rolloutMode: persistedRolloutMode(args.turn, 'publication_v2') as 'off' | 'shadow' | 'enforce' | undefined,
+        recoveryReceiptJson: JSON.stringify({
+            recoveryCode: args.recoveryCode,
+            retryable: args.retryable,
+            contextKind: assessment.contextKind,
+            attemptCount: attempts.length,
+        }),
+        createdAt: now,
+    };
+    const existingAudit = await ctx.db.query('responsePublicationAudits')
+        .withIndex('by_envelope', (q) => q.eq('envelopeId', envelopeId))
+        .unique();
+    if (existingAudit) {
+        if (existingAudit.contentHash !== common.contentHash || existingAudit.failureCode !== args.errorCode) {
+            throw new Error('recovery_publication_idempotency_conflict');
+        }
+        if (existingAudit.decision === 'rejected') {
+            throw new Error(`recovery_publication_rejected:${existingAudit.rejectionCodes.join(',')}`);
+        }
+        return { content, envelopeId, publicationAuditId: existingAudit._id, assessment };
+    }
+    if (!assessment.passed) {
+        await ctx.db.insert('responsePublicationAudits', { ...common, decision: 'rejected' });
+        throw new Error(`recovery_publication_rejected:${assessment.rejectionCodes.join(',')}`);
+    }
+    const publicationAuditId = await ctx.db.insert('responsePublicationAudits', {
+        ...common,
+        decision: 'publish_recovery',
+    });
+    return { content, envelopeId, publicationAuditId, assessment };
+}
 
 export const commitSystemRecoveryNotice = internalMutation({
     args: {
@@ -3461,16 +3551,37 @@ export const commitSystemRecoveryNotice = internalMutation({
         retryable: v.boolean(),
         metadataJson: v.optional(v.string()),
     },
-    handler: async (ctx, args) => completeAssistantCore(ctx, {
-        jobId: args.jobId,
-        leaseOwner: args.leaseOwner,
-        content: RECOVERY_COPY[args.recoveryCode],
-        degraded: true,
-        errorCode: args.errorCode ?? args.recoveryCode,
-        errorMessage: args.errorMessage,
-        errorRetryable: args.retryable,
-        metadataJson: args.metadataJson,
-    }),
+    handler: async (ctx, args) => {
+        const job = await ctx.db.get(args.jobId);
+        if (!job || job.leaseOwner !== args.leaseOwner) return null;
+        const turn = await ctx.db.get(job.turnId);
+        if (!turn) return null;
+        const errorCode = args.errorCode ?? args.recoveryCode;
+        const publication = await buildAndAuditRecoveryPublication(ctx, {
+            turn,
+            recoveryCode: args.recoveryCode,
+            errorCode,
+            retryable: args.retryable,
+        });
+        return completeAssistantCore(ctx, {
+            jobId: args.jobId,
+            leaseOwner: args.leaseOwner,
+            content: publication.content,
+            degraded: true,
+            errorCode,
+            errorMessage: args.errorMessage,
+            errorRetryable: args.retryable,
+            metadataJson: JSON.stringify({
+                ...metadataFromJson(args.metadataJson),
+                publication: {
+                    envelopeId: publication.envelopeId,
+                    decision: 'publish_recovery',
+                    validatorVersion: 'recovery-publication-v1',
+                    verified: true,
+                },
+            }),
+        });
+    },
 });
 
 /** Requeue or degrade expired jobs so conversations never stay stuck active. */

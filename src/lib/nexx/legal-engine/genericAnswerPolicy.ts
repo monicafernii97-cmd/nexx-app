@@ -105,7 +105,7 @@ export function isGenericCanonicalLegalAnswer(
   value: string,
   options?: { sentenceLevel?: boolean },
 ) {
-  if (options?.sentenceLevel) return assessGenericAnswer(value).isGeneric;
+  if (options?.sentenceLevel !== false) return assessGenericAnswer(value).isGeneric;
   const normalized = value.replace(/\s+/g, ' ').trim();
   return LEGACY_GENERIC_CANONICAL_PATTERNS.some((pattern) => pattern.test(normalized));
 }

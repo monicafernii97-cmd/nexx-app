@@ -113,6 +113,16 @@ describe('publication quality v2', () => {
     expect(isGenericCanonicalLegalAnswer(content)).toBe(false);
   });
 
+  it('does not let a second generic sentence hide the first generic sentence', () => {
+    const content = 'Here are the key provisions in the order. I can help you with that.';
+    expect(assessGenericAnswer(content)).toMatchObject({
+      isGeneric: true,
+      genericSentenceCount: 2,
+      substantiveSentenceCount: 0,
+    });
+    expect(isGenericCanonicalLegalAnswer(content)).toBe(true);
+  });
+
   it('rejects document analysis on a social turn', () => {
     expect(verify('According to the order, the possession clause controls.', {
       speechAct: 'social',

@@ -63,6 +63,101 @@ test("uses sanitized cleanup attachment metadata for resilience reports", () => 
   assert.equal(envelope.syntheticArtifactsRemaining, "none_observed");
 });
 
+test("keeps journey failure separate from successful cleanup", () => {
+  const runId = "e2e-pr-20260904150555-abcdefgh";
+  const envelope = buildOperationsEnvelope({
+    env: { ...baseEnv, E2E_LANE: "pr", E2E_JOB_STATUS: "failure" },
+    summary: {
+      status: "failed",
+      results: [
+        {
+          title: "signed-in upload returns a usable answer",
+          status: "failed",
+          retry: 0,
+          error: "Assistant response ended in degraded status.",
+          attachments: [
+            { name: "cleanup-result", contentType: "application/json", runId },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(envelope.failureCode, "BROWSER_ASSERTION_FAILURE");
+  assert.equal(envelope.cleanupStatus, "passed");
+  assert.equal(envelope.syntheticArtifactsRemaining, "none_observed");
+  assert.deepEqual(envelope.cleanupRuns, [{ runId, status: "passed" }]);
+});
+
+test("gives explicit cleanup failure precedence across retries", () => {
+  const failedRunId = "e2e-pr-20260904135144-abcdefgh";
+  const passedRunId = "e2e-pr-20260904135944-ijklmnop";
+  const envelope = buildOperationsEnvelope({
+    env: { ...baseEnv, E2E_LANE: "pr", E2E_JOB_STATUS: "failure" },
+    summary: {
+      status: "failed",
+      results: [
+        {
+          title: "signed-in upload returns a usable answer",
+          status: "failed",
+          retry: 0,
+          error: "Synthetic upload support endpoint returned 500.",
+          attachments: [
+            {
+              name: "cleanup-failure",
+              contentType: "application/json",
+              runId: failedRunId,
+            },
+          ],
+        },
+        {
+          title: "signed-in upload returns a usable answer",
+          status: "failed",
+          retry: 1,
+          error: "Assistant response ended in degraded status.",
+          attachments: [
+            {
+              name: "cleanup-result",
+              contentType: "application/json",
+              runId: passedRunId,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(envelope.failureCode, "CLEANUP_FAILURE");
+  assert.equal(envelope.cleanupStatus, "failed");
+  assert.equal(envelope.syntheticArtifactsRemaining, "possible");
+  assert.deepEqual(envelope.cleanupRuns, [
+    { runId: failedRunId, status: "failed" },
+    { runId: passedRunId, status: "passed" },
+  ]);
+});
+
+test("reports unknown cleanup when a failed journey has no cleanup evidence", () => {
+  const envelope = buildOperationsEnvelope({
+    env: { ...baseEnv, E2E_LANE: "pr", E2E_JOB_STATUS: "failure" },
+    summary: {
+      status: "failed",
+      results: [
+        {
+          title: "signed-in upload setup",
+          status: "failed",
+          retry: 0,
+          error: "Upload trigger remained disabled.",
+          attachments: [],
+        },
+      ],
+    },
+  });
+
+  assert.equal(envelope.cleanupStatus, "unknown");
+  assert.equal(envelope.syntheticArtifactsRemaining, "unknown");
+  assert.deepEqual(envelope.cleanupRuns, []);
+});
+
 test("classifies a security failure as critical and redacts identity data", () => {
   const envelope = buildOperationsEnvelope({
     env: { ...baseEnv, E2E_JOB_STATUS: "failure" },

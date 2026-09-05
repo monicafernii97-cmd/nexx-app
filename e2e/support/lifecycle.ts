@@ -31,7 +31,7 @@ export async function finishSyntheticRun(
   try {
     await cleanupSyntheticRun(page, runId);
     await testInfo.attach("cleanup-result", {
-      body: Buffer.from(JSON.stringify({ status: "passed" })),
+      body: Buffer.from(JSON.stringify({ status: "passed", runId })),
       contentType: "application/json",
     });
   } catch (error) {

@@ -1094,6 +1094,42 @@ export default defineSchema({
     })
         .index('by_run_created', ['repairRunId', 'createdAt']),
 
+    durableReviewRepairOperations: defineTable({
+        operationId: v.string(),
+        sourceRunId: v.id('documentUnderstandingRuns'),
+        replacementRunId: v.optional(v.id('documentUnderstandingRuns')),
+        uploadedFileId: v.id('uploadedFiles'),
+        memoryGenerationId: v.id('documentMemoryGenerations'),
+        coverageManifestId: v.id('documentCoverageManifests'),
+        expectedUnits: v.number(),
+        verifiedUnits: v.number(),
+        totalChunks: v.number(),
+        sourceRunStatus: v.union(v.literal('failed'), v.literal('dead_letter')),
+        replacementVersion: v.string(),
+        status: v.union(
+            v.literal('awaiting_approval'),
+            v.literal('authorized'),
+            v.literal('applied'),
+            v.literal('verified'),
+            v.literal('failed')
+        ),
+        operatorId: v.string(),
+        approverId: v.optional(v.string()),
+        approvalId: v.optional(v.string()),
+        approvalReason: v.optional(v.string()),
+        beforeJson: v.string(),
+        verificationJson: v.optional(v.string()),
+        errorSafe: v.optional(v.string()),
+        approvedAt: v.optional(v.number()),
+        appliedAt: v.optional(v.number()),
+        verifiedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_operation', ['operationId'])
+        .index('by_source_run', ['sourceRunId'])
+        .index('by_status_updated', ['status', 'updatedAt']),
+
     releaseManifests: defineTable({
         runtime: v.union(v.literal('web'), v.literal('convex')),
         environment: v.union(v.literal('preview'), v.literal('production')),

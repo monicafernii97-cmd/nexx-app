@@ -25,7 +25,8 @@
     "e2e:report:daily": "node scripts/report-upload-e2e-status.mjs --lane daily --format markdown",
     "verify:executive-chat-release": "node scripts/verify-executive-chat-release.mjs",
     "report:executive-chat-health": "node scripts/report-executive-chat-health.mjs",
-    "manage:executive-chat-rollout": "node scripts/manage-executive-chat-rollout.mjs"
+    "manage:executive-chat-rollout": "node scripts/manage-executive-chat-rollout.mjs",
+    "manage:durable-review-repair": "node scripts/manage-durable-review-repair.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",

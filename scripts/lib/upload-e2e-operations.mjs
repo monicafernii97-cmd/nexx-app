@@ -44,26 +44,42 @@ export function summarizeResults(summary) {
   const passed = results.filter(
     (result) => normalizedStatus(result?.status) === "passed",
   );
-  const cleanupResults = results.filter((result) => {
-    const attachmentNames = Array.isArray(result?.attachments)
-      ? result.attachments.map((attachment) => String(attachment?.name ?? ""))
-      : [];
-    return (
-      /cleanup|synthetic artifacts?|remove all synthetic/i.test(
-        String(result?.title ?? ""),
-      ) || attachmentNames.some((name) => /^cleanup-(?:result|failure)$/i.test(name))
+  const cleanupResults = results
+    .map((result) => {
+      const attachmentNames = Array.isArray(result?.attachments)
+        ? result.attachments.map((attachment) => String(attachment?.name ?? ""))
+        : [];
+      return {
+        result,
+        attachmentNames,
+        cleanupTitled: /cleanup|synthetic artifacts?|remove all synthetic/i.test(
+          String(result?.title ?? ""),
+        ),
+      };
+    })
+    .filter(
+      ({ attachmentNames, cleanupTitled }) =>
+        cleanupTitled ||
+        attachmentNames.some((name) =>
+          /^cleanup-(?:result|failure)$/i.test(name),
+        ),
     );
-  });
-  const cleanupFailed = cleanupResults.some((result) =>
-    ["failed", "timedout", "interrupted"].includes(
-      normalizedStatus(result?.status),
-    ) ||
-    result.attachments?.some((attachment) => attachment?.name === "cleanup-failure"),
+  const cleanupFailed = cleanupResults.some(
+    ({ result, attachmentNames, cleanupTitled }) =>
+      attachmentNames.some((name) => /^cleanup-failure$/i.test(name)) ||
+      (cleanupTitled &&
+        !attachmentNames.some((name) => /^cleanup-result$/i.test(name)) &&
+        ["failed", "timedout", "interrupted"].includes(
+          normalizedStatus(result?.status),
+        )),
   );
   const cleanupPassed =
     cleanupResults.length > 0 &&
+    !cleanupFailed &&
     cleanupResults.every(
-      (result) => normalizedStatus(result?.status) === "passed",
+      ({ result, attachmentNames, cleanupTitled }) =>
+        attachmentNames.some((name) => /^cleanup-result$/i.test(name)) ||
+        (cleanupTitled && normalizedStatus(result?.status) === "passed"),
     );
 
   return {

@@ -698,6 +698,17 @@ export const finalizeRun = internalMutation({
       if (existingRecord.finalizationHash && existingRecord.finalizationHash !== finalizationHash) {
         throw new Error('Document understanding finalization conflict.');
       }
+      if (run.status === 'ready' && (
+        run.errorCode || run.errorMessage || run.deadLetterNodeId || run.deadLetterFailureClass
+      )) {
+        await ctx.db.patch(run._id, {
+          errorCode: undefined,
+          errorMessage: undefined,
+          deadLetterNodeId: undefined,
+          deadLetterFailureClass: undefined,
+          updatedAt: Date.now(),
+        });
+      }
       return run.status === 'ready';
     }
     if (run.status !== 'reducing') return false;
@@ -731,7 +742,15 @@ export const finalizeRun = internalMutation({
       coveredChunks: args.sourceChunkIndexes.length,
       createdAt: now,
     });
-    await ctx.db.patch(run._id, { status: 'ready', updatedAt: now, finishedAt: now });
+    await ctx.db.patch(run._id, {
+      status: 'ready',
+      errorCode: undefined,
+      errorMessage: undefined,
+      deadLetterNodeId: undefined,
+      deadLetterFailureClass: undefined,
+      updatedAt: now,
+      finishedAt: now,
+    });
     await ctx.db.patch(run.uploadedFileId, {
       activeUnderstandingRecordId: recordId,
       fullDocumentReviewStatus: 'ready',

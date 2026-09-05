@@ -53,6 +53,8 @@ npm run manage:durable-review-repair -- verify <operation-id>
 
 Verification remains incomplete until all of these are true: the replacement is ready and `dur_v2`; the file points to that run and its verified record; the record covers every canonical chunk; and the source-unit receipt equals the exact expected count. For the reported signed order, the only acceptable receipt is 46/46 pages.
 
+A verified ready run has no active `errorCode`, `errorMessage`, or dead-letter pointer. Verification clears stale terminal error fields left by a recovered attempt; the immutable work-node attempts and repair-operation audit retain the failure and resume history.
+
 For `dur_v2` runs, reduction is a deterministic merge of already verified map-node payloads. It preserves every distinct source-backed finding, collapses only exact duplicates, unions uncertainties, and re-runs provenance verification over the covered chunks. Reduction must not call a model or ask one to re-emit the growing review payload; this prevents output truncation from turning a fully mapped document into a failed exhaustive review.
 
 Do not call the exhaustive-review feature operational from a queued, mapping, reducing, failed, or merely extracted state.

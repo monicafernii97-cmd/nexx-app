@@ -19,6 +19,32 @@ export type UnderstandingSourceChunk = {
   pageEnd?: number;
 };
 
+/**
+ * Exhaustive reduction must not depend on a model re-emitting an ever-growing
+ * payload. Preserve every distinct verified finding and collapse only exact
+ * duplicates; the rendered overview is descriptive, not an evidence store.
+ */
+export function mergeDocumentUnderstandingPayloads(payloads: DocumentUnderstandingPayload[]): DocumentUnderstandingPayload {
+  const findings: DocumentUnderstandingFinding[] = [];
+  const findingKeys = new Set<string>();
+  for (const payload of payloads) {
+    for (const finding of payload.findings) {
+      const key = JSON.stringify(finding);
+      if (findingKeys.has(key)) continue;
+      findingKeys.add(key);
+      findings.push(finding);
+    }
+  }
+  const uncertainties = payloads
+    .flatMap((payload) => payload.uncertainties)
+    .filter((value, index, values) => values.indexOf(value) === index);
+  return {
+    overview: `Consolidated ${findings.length} distinct source-verified finding${findings.length === 1 ? '' : 's'} from ${payloads.length} contiguous analysis node${payloads.length === 1 ? '' : 's'}.`,
+    findings,
+    uncertainties,
+  };
+}
+
 export function buildDocumentUnderstandingMapPrompt(source: string) {
   return [
     'You are exhaustively reading one contiguous part of a legal document.',

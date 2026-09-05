@@ -7,6 +7,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import {
   buildDocumentUnderstandingMapPrompt,
   buildDocumentUnderstandingReducePrompt,
+  mergeDocumentUnderstandingPayloads,
   renderVerifiedDocumentReview,
   verifyDocumentUnderstanding,
   verifyDocumentUnderstandingNode,
@@ -295,6 +296,7 @@ export const beginWorkNode = internalMutation({
     sourceEnd: v.number(),
     batchSize: v.number(),
     inputHash: v.string(),
+    deterministic: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
@@ -376,7 +378,9 @@ export const beginWorkNode = internalMutation({
       await ctx.db.patch(run.uploadedFileId, { fullDocumentReviewStatus: 'failed', updatedAt: now });
       return { leased: false as const, reason: 'dead_letter_after_expired_lease' };
     }
-    const strictRetry = cycleAttempt >= 3;
+    const deterministic = Boolean(args.deterministic);
+    const strictRetry = !deterministic && cycleAttempt >= 3;
+    const executionModel = deterministic ? 'deterministic-merge-v1' : run.model;
     const leaseId = crypto.randomUUID();
     const workNodePatch = {
       status: 'running' as const,
@@ -384,6 +388,7 @@ export const beginWorkNode = internalMutation({
       cycleAttemptCount: cycleAttempt,
       maxAttempts: DURABLE_REVIEW_NODE_MAX_ATTEMPTS,
       strictRetry,
+      model: executionModel,
       leaseId,
       leaseExpiresAt: now + NODE_LEASE_MS,
       validationState: 'pending' as const,
@@ -409,14 +414,15 @@ export const beginWorkNode = internalMutation({
         sourceEnd: args.sourceEnd,
         batchSize: args.batchSize,
         inputHash: args.inputHash,
-        model: run.model,
         createdAt: now,
         ...workNodePatch,
       });
       workNode = await ctx.db.get(workNodeId);
     }
     if (!workNode) throw new Error('Failed to create durable review work node.');
-    const mode = cycleAttempt === 1
+    const mode = deterministic
+      ? 'deterministic_reduce' as const
+      : cycleAttempt === 1
       ? (run.resumeCount ? 'operator_resume' as const : 'initial' as const)
       : cycleAttempt === 2 ? 'same_input_retry' as const : 'strict_retry' as const;
     const attemptId = await ctx.db.insert('documentUnderstandingNodeAttempts', {
@@ -430,8 +436,8 @@ export const beginWorkNode = internalMutation({
       status: 'running',
       validationState: 'pending',
       validationErrors: [],
-      model: run.model,
-      maxOutputTokens: durableReviewGenerationProfile({ strictRetry, batchSize: args.batchSize }).maxOutputTokens,
+      model: executionModel,
+      maxOutputTokens: deterministic ? 0 : durableReviewGenerationProfile({ strictRetry, batchSize: args.batchSize }).maxOutputTokens,
       startedAt: now,
     });
     await ctx.db.patch(run._id, {
@@ -893,8 +899,16 @@ export const processRun = internalAction({
         if (work.nodes.length === 0) throw new Error('Reduce phase found no nodes.');
         const first = work.nodes[0];
         const last = work.nodes[work.nodes.length - 1];
-        const prompt = buildDocumentUnderstandingReducePrompt(work.nodes.map((node) => node.payloadJson));
-        const inputHash = stableCapabilityHash(prompt);
+        const mergedPayload = mergeDocumentUnderstandingPayloads(work.nodes.map((node) => parsePayload(node.payloadJson)));
+        const inputHash = stableCapabilityHash({
+          mode: 'deterministic_reduce_v1',
+          nodes: work.nodes.map((node) => ({
+            id: node._id,
+            sourceChunkStart: node.sourceChunkStart,
+            sourceChunkEnd: node.sourceChunkEnd,
+            payloadHash: stableCapabilityHash(node.payloadJson),
+          })),
+        });
         const nodeId = durableReviewNodeId({
           stableJobId: work.run.stableJobId ?? `dur_legacy_${work.run._id}`,
           phase: 'reduce', level: work.run.currentLevel + 1,
@@ -904,18 +918,17 @@ export const processRun = internalAction({
           runId: work.run._id, expectedStatus: 'reducing', nodeId, phase: 'reduce',
           level: work.run.currentLevel + 1, nodeIndex: work.outputNodeIndex,
           sourceStart: first.nodeIndex, sourceEnd: last.nodeIndex,
-          batchSize: work.nodes.length, inputHash,
+          batchSize: work.nodes.length, inputHash, deterministic: true,
         });
         if (!lease.leased) return { phase: 'reducing', disposition: lease.reason };
         const consumed = first.nodeIndex + work.nodes.length;
         try {
-          const generated = await generateNode(prompt, { strictRetry: lease.strictRetry, batchSize: work.nodes.length });
           const allChunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
           const chunks = allChunks.filter((chunk) =>
             chunk.chunkIndex >= first.sourceChunkStart && chunk.chunkIndex <= last.sourceChunkEnd
           );
           const verification = verifyDocumentUnderstandingNode({
-            payload: generated.payload,
+            payload: mergedPayload,
             chunks,
             provenance: {
               sourceChunkStart: first.sourceChunkStart,
@@ -931,7 +944,7 @@ export const processRun = internalAction({
             sourceChunkEnd: last.sourceChunkEnd,
             sourceChunkCount: work.nodes.reduce((sum, node) => sum + node.sourceChunkCount, 0),
             pageStart: first.pageStart, pageEnd: last.pageEnd,
-            payloadJson: JSON.stringify(generated.payload), providerRequestId: generated.providerRequestId,
+            payloadJson: JSON.stringify(mergedPayload),
             nextNodeIndex: consumed, finishLevel: consumed >= work.levelCount,
           });
           return { phase: 'reducing', level: work.run.currentLevel, attempt: lease.attempt };

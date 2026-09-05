@@ -28,6 +28,8 @@ Quarantining an upload does not prove that every future-facing reference was rem
 
 Use the read-only `productionStateRepair:inspectDerivedStateGraph` operation before creating a linked repair. It returns the exact affected conversation IDs, titles, reference categories, and quarantined IDs so an outside-scope finding can be adjudicated without weakening the apply-time guard. A failed `startDerivedStateAudit` call rolls back completely and does not create a repair run.
 
+When the graph inspection finds an orphaned reference in a different conversation, create one `startQuarantinedReferenceCleanup` run per exact conversation before the canonical rebuild. Each cleanup run must be linked to the verified parent quarantine, independently authorized with `AUTHORIZE_DERIVED_STATE_REPAIR`, snapshotted, applied, verified, and rerun idempotently. Cleanup-only runs remove quarantined document and evidence-generation references, clear affected pending interactions, abandon empty document tasks, mark empty in-flight plans recoverable, and make empty legal anchors dormant. They cannot name, select, or assign a replacement document. After all cleanup-only runs verify, rerun the graph inspection; only then may `startDerivedStateAudit` promote a genuine canonical document in its intended conversation.
+
 Runtime conversation loading also filters quarantined, deleted, QA-only, out-of-owner, out-of-case, and exact-duplicate document IDs before planning. This is a containment layer, not a substitute for the auditable repair.
 
 The system may quarantine confirmed QA/synthetic records and rebuild derived references. It may not delete source evidence, rewrite a user message, modify court-document content, or classify an unknown production document as synthetic.

@@ -4,6 +4,7 @@ import {
   canonicalizeDocumentCandidates,
   classifyRepairCandidate,
   containsAnyTarget,
+  documentIdsForDerivedRepair,
   findDerivedDocumentReferences,
   stableRepairHash,
   withoutTargets,
@@ -86,6 +87,21 @@ describe('QA state repair primitives', () => {
       quarantinedUploadedFileIds: new Set(['synthetic-a']),
       duplicateUploadedFileIds: new Set(['duplicate-a']),
     })).toEqual(['canonical', 'other']);
+  });
+
+  it('removes quarantined references without assigning a document during cleanup-only repair', () => {
+    expect(documentIdsForDerivedRepair({
+      existingIds: ['genuine-other', 'synthetic-a', 'genuine-other'],
+      removedUploadedFileIds: new Set(['synthetic-a']),
+    })).toEqual(['genuine-other']);
+  });
+
+  it('promotes a canonical document only when the repair explicitly supplies one', () => {
+    expect(documentIdsForDerivedRepair({
+      existingIds: ['duplicate-a', 'synthetic-a', 'canonical'],
+      canonicalUploadedFileId: 'canonical',
+      removedUploadedFileIds: new Set(['duplicate-a', 'synthetic-a']),
+    })).toEqual(['canonical']);
   });
 
   it('finds quarantined references outside the upload row original conversation', () => {

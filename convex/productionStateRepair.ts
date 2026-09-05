@@ -4,10 +4,10 @@ import type { Doc, Id } from './_generated/dataModel';
 import { isUploadE2ERobotEmail } from './lib/chatRateLimitPolicy';
 import { isProductionEligibleDocument, qaRunIdFromFilename } from './lib/qaProvenance';
 import {
-  canonicalDocumentIdsForRepair,
   canonicalizeDocumentCandidates,
   classifyRepairCandidate,
   containsAnyTarget,
+  documentIdsForDerivedRepair,
   findDerivedDocumentReferences,
   stableRepairHash,
   withoutTargets,
@@ -427,6 +427,11 @@ export const inspectDerivedStateGraph = internalQuery({
         ctx.db.query('turnExecutionPlans').withIndex('by_conversation_status', (q) => q.eq('conversationId', conversation._id)).collect(),
         ctx.db.query('conversationLegalIssueState').withIndex('by_conversation_status', (q) => q.eq('conversationId', conversation._id)).collect(),
       ]);
+      const generationIds = [...new Set([
+        ...(controlState?.activeEvidenceGenerationIds ?? []).map(String),
+        ...tasks.flatMap((task) => task.evidenceGenerationIds.map(String)),
+      ])];
+      const generations = await Promise.all(generationIds.map((id) => ctx.db.get(id as Id<'documentMemoryGenerations'>)));
       const records = [
         ...(documentState ? [{
           conversationId: conversation._id.toString(),
@@ -448,6 +453,11 @@ export const inspectDerivedStateGraph = internalQuery({
           ].filter(Boolean).join('\n'),
         }] : []),
         ...tasks.map((task) => ({ conversationId: conversation._id.toString(), category: 'conversation_task', documentIds: task.documentIds.map(String) })),
+        ...generations.filter((generation) => Boolean(generation)).map((generation) => ({
+          conversationId: conversation._id.toString(),
+          category: 'evidence_generation',
+          documentIds: [generation!.uploadedFileId.toString()],
+        })),
         ...plans.map((plan) => ({ conversationId: conversation._id.toString(), category: 'turn_execution_plan', documentIds: plan.selectedDocumentIds.map(String) })),
         ...issues.map((issue) => ({
           conversationId: conversation._id.toString(),
@@ -687,6 +697,163 @@ export const startDerivedStateAudit = internalMutation({
   },
 });
 
+/**
+ * Create a separately authorized, cleanup-only run for one conversation that
+ * still points at targets from a verified quarantine. This operation never
+ * assigns a replacement document and never mutates upload rows.
+ */
+export const startQuarantinedReferenceCleanup = internalMutation({
+  args: {
+    repairRunId: v.string(),
+    parentRepairRunId: v.string(),
+    scopeConversationId: v.id('conversations'),
+    clearPendingInteraction: v.boolean(),
+    codeVersion: v.string(),
+    operatorId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query('productionStateRepairRuns')
+      .withIndex('by_repair_run', (q) => q.eq('repairRunId', args.repairRunId))
+      .unique();
+    if (existing) {
+      if (
+        existing.parentRepairRunId !== args.parentRepairRunId ||
+        existing.scopeConversationId !== args.scopeConversationId ||
+        existing.canonicalUploadedFileId !== undefined ||
+        (existing.duplicateUploadedFileIds ?? []).length !== 0 ||
+        existing.clearPendingInteraction !== args.clearPendingInteraction ||
+        existing.codeVersion !== args.codeVersion ||
+        existing.operatorId !== args.operatorId
+      ) throw new Error('Cleanup repair run ID already exists with different immutable inputs');
+      return { created: false as const, run: existing };
+    }
+    if (!args.operatorId.trim() || !args.codeVersion.trim()) {
+      throw new Error('Operator identity and code version are required');
+    }
+
+    const [parent, conversation] = await Promise.all([
+      getRun(ctx, args.parentRepairRunId),
+      ctx.db.get(args.scopeConversationId),
+    ]);
+    if (parent.status !== 'verified') throw new Error('Parent quarantine repair must be verified');
+    if (!conversation) throw new Error('Cleanup conversation scope is missing');
+    if (parent.scopeCaseId && conversation.caseId !== parent.scopeCaseId) {
+      throw new Error('Cleanup conversation is outside the verified parent case scope');
+    }
+    const parentItems = await ctx.db.query('productionStateRepairItems')
+      .withIndex('by_run_selected', (q) => q.eq('repairRunId', args.parentRepairRunId).eq('selectedForRepair', true))
+      .collect();
+    if (parentItems.length === 0 || parentItems.length !== parent.approvedTargetUploadedFileIds.length) {
+      throw new Error('Parent repair target ledger is incomplete');
+    }
+    const targetIds = new Set(parent.approvedTargetUploadedFileIds.map(String));
+    const [documentState, controlState, tasks, plans, issues] = await Promise.all([
+      ctx.db.query('conversationDocumentState').withIndex('by_conversation', (q) => q.eq('conversationId', args.scopeConversationId)).first(),
+      ctx.db.query('conversationControlStates').withIndex('by_conversation', (q) => q.eq('conversationId', args.scopeConversationId)).first(),
+      ctx.db.query('conversationTasks').withIndex('by_conversation_status', (q) => q.eq('conversationId', args.scopeConversationId)).collect(),
+      ctx.db.query('turnExecutionPlans').withIndex('by_conversation_status', (q) => q.eq('conversationId', args.scopeConversationId)).collect(),
+      ctx.db.query('conversationLegalIssueState').withIndex('by_conversation_status', (q) => q.eq('conversationId', args.scopeConversationId)).collect(),
+    ]);
+    const generationIds = [...new Set([
+      ...(controlState?.activeEvidenceGenerationIds ?? []).map(String),
+      ...tasks.flatMap((task) => task.evidenceGenerationIds.map(String)),
+    ])];
+    const generations = await Promise.all(generationIds.map((id) => ctx.db.get(id as Id<'documentMemoryGenerations'>)));
+    const records = [
+      ...(documentState ? [{
+        conversationId: args.scopeConversationId.toString(),
+        category: 'conversation_document_state',
+        documentIds: [
+          ...(documentState.activeUploadedFileId ? [documentState.activeUploadedFileId.toString()] : []),
+          ...documentState.lastReferencedUploadedFileIds.map(String),
+          ...documentState.pinnedUploadedFileIds.map(String),
+        ],
+      }] : []),
+      ...(controlState ? [{
+        conversationId: args.scopeConversationId.toString(),
+        category: 'conversation_control',
+        documentIds: controlState.activeDocumentIds.map(String),
+        serializedState: [controlState.pendingOptionsJson, controlState.lastAssistantOfferJson, controlState.lastResolvedReferentsJson]
+          .filter(Boolean).join('\n'),
+      }] : []),
+      ...tasks.map((task) => ({ conversationId: args.scopeConversationId.toString(), category: 'conversation_task', documentIds: task.documentIds.map(String) })),
+      ...generations.filter((generation) => Boolean(generation)).map((generation) => ({
+        conversationId: args.scopeConversationId.toString(),
+        category: 'evidence_generation',
+        documentIds: [generation!.uploadedFileId.toString()],
+      })),
+      ...plans.map((plan) => ({ conversationId: args.scopeConversationId.toString(), category: 'turn_execution_plan', documentIds: plan.selectedDocumentIds.map(String) })),
+      ...issues.map((issue) => ({
+        conversationId: args.scopeConversationId.toString(),
+        category: 'legal_issue_anchor',
+        documentIds: issue.sourceAnchors.map((anchor) => anchor.uploadedFileId.toString()),
+      })),
+    ];
+    const matches = findDerivedDocumentReferences(records, targetIds);
+    if (matches.length === 0) throw new Error('Cleanup scope contains no references to the verified quarantine targets');
+
+    const now = Date.now();
+    await ctx.db.insert('productionStateRepairRuns', {
+      repairRunId: args.repairRunId,
+      parentRepairRunId: args.parentRepairRunId,
+      codeVersion: args.codeVersion,
+      scopeConversationId: args.scopeConversationId,
+      scopeCaseId: conversation.caseId,
+      duplicateUploadedFileIds: [],
+      clearPendingInteraction: args.clearPendingInteraction,
+      status: 'awaiting_approval',
+      auditComplete: true,
+      scannedCount: parentItems.length,
+      candidateCount: parentItems.length,
+      unclassifiedCount: 0,
+      approvedTargetUploadedFileIds: [],
+      operatorId: args.operatorId,
+      reportJson: JSON.stringify({
+        mode: 'quarantined_reference_cleanup',
+        parentRepairRunId: args.parentRepairRunId,
+        conversationId: args.scopeConversationId,
+        quarantinedUploadedFileIds: parent.approvedTargetUploadedFileIds,
+        derivedReferenceMatches: matches.map((match) => ({ category: match.category })),
+        clearPendingInteraction: args.clearPendingInteraction,
+      }),
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const item of parentItems) {
+      await ctx.db.insert('productionStateRepairItems', {
+        repairRunId: args.repairRunId,
+        uploadedFileId: item.uploadedFileId,
+        conversationId: item.conversationId,
+        caseId: item.caseId,
+        classification: item.classification,
+        confidence: item.confidence,
+        discoveryReasons: uniqueStrings([...item.discoveryReasons, 'scoped_quarantined_reference_cleanup']),
+        referenceCategories: item.referenceCategories,
+        referenceSummaryJson: item.referenceSummaryJson,
+        selectedForRepair: false,
+        adjudicatedBy: item.adjudicatedBy,
+        adjudicationApprovalId: item.adjudicationApprovalId,
+        adjudicatedAt: item.adjudicatedAt,
+        adjudicationEvidenceJson: item.adjudicationEvidenceJson,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    await insertEvent(ctx, {
+      repairRunId: args.repairRunId,
+      eventType: 'quarantined_reference_cleanup_audit_completed',
+      operatorId: args.operatorId,
+      detail: {
+        parentRepairRunId: args.parentRepairRunId,
+        conversationId: args.scopeConversationId,
+        matchCount: matches.length,
+        targetCount: parentItems.length,
+      },
+    });
+    return { created: true as const, repairRunId: args.repairRunId, targetCount: parentItems.length, matchCount: matches.length };
+  },
+});
+
 async function snapshotRecord(
   ctx: MutationCtx,
   args: {
@@ -734,7 +901,7 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
   args: { repairRunId: v.string() },
   handler: async (ctx, args) => {
     const run = await getRun(ctx, args.repairRunId);
-    if (!run.parentRepairRunId || !run.scopeConversationId || !run.canonicalUploadedFileId) {
+    if (!run.parentRepairRunId || !run.scopeConversationId) {
       throw new Error('Repair run is not a derived-state repair');
     }
     if (run.status === 'snapshotted') {
@@ -753,22 +920,32 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
     }
     const duplicateIds = new Set((run.duplicateUploadedFileIds ?? []).map(String));
     const removedIds = new Set([...targetIds, ...duplicateIds]);
-    const canonicalId = run.canonicalUploadedFileId.toString();
+    const canonicalId = run.canonicalUploadedFileId?.toString();
     const [conversation, canonical, targetFiles, duplicateFiles] = await Promise.all([
       ctx.db.get(run.scopeConversationId),
-      ctx.db.get(run.canonicalUploadedFileId),
+      run.canonicalUploadedFileId ? ctx.db.get(run.canonicalUploadedFileId) : Promise.resolve(null),
       Promise.all(run.approvedTargetUploadedFileIds.map((id) => ctx.db.get(id))),
       Promise.all((run.duplicateUploadedFileIds ?? []).map((id) => ctx.db.get(id))),
     ]);
-    if (!conversation || !canonical) throw new Error('Derived repair scope no longer exists');
+    if (!conversation || (run.canonicalUploadedFileId && !canonical)) throw new Error('Derived repair scope no longer exists');
     const owner = await ctx.db.get(conversation.userId);
-    if (!owner?.clerkId || canonical.clerkUserId !== owner.clerkId || canonical.status === 'quarantined' || canonical.status === 'deleted') {
+    if (!owner?.clerkId) throw new Error('Derived repair owner no longer exists');
+    if (canonical && (canonical.clerkUserId !== owner.clerkId || canonical.status === 'quarantined' || canonical.status === 'deleted')) {
       throw new Error('Canonical document changed or left owner scope');
     }
     if (targetFiles.some((file) => !file || file.status !== 'quarantined')) throw new Error('A parent repair target is no longer quarantined');
     if (duplicateFiles.some((file) => !file || file.clerkUserId !== owner.clerkId || file.status === 'quarantined' || file.status === 'deleted')) {
       throw new Error('A genuine duplicate changed or left owner scope');
     }
+
+    const removedGenerationIds = new Set<string>();
+    for (const uploadedFileId of [...run.approvedTargetUploadedFileIds, ...(run.duplicateUploadedFileIds ?? [])]) {
+      const generations = await ctx.db.query('documentMemoryGenerations')
+        .withIndex('by_file_generation', (q) => q.eq('uploadedFileId', uploadedFileId))
+        .collect();
+      generations.forEach((generation) => removedGenerationIds.add(generation._id.toString()));
+    }
+    const canonicalGenerationId = canonical?.activeMemoryGenerationId?.toString();
 
     const [documentState, controlState, tasks, plans, issues] = await Promise.all([
       ctx.db.query('conversationDocumentState').withIndex('by_conversation', (q) => q.eq('conversationId', run.scopeConversationId!)).first(),
@@ -778,7 +955,11 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
       ctx.db.query('conversationLegalIssueState').withIndex('by_conversation_status', (q) => q.eq('conversationId', run.scopeConversationId!)).collect(),
     ]);
     const repairAt = Date.now();
-    const reasons = ['linked_verified_quarantine', 'cross_conversation_reference_cleanup', 'canonical_active_document'];
+    const reasons = [
+      'linked_verified_quarantine',
+      'cross_conversation_reference_cleanup',
+      ...(canonicalId ? ['canonical_active_document'] : ['cleanup_without_document_replacement']),
+    ];
     let sequence = 0;
 
     if (documentState) {
@@ -788,16 +969,19 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
         pinnedUploadedFileIds: documentState.pinnedUploadedFileIds,
         updatedAt: documentState.updatedAt,
       };
+      const activeWasRemoved = documentState.activeUploadedFileId
+        ? removedIds.has(documentState.activeUploadedFileId.toString())
+        : false;
+      const repairedReferences = documentIdsForDerivedRepair({
+        existingIds: documentState.lastReferencedUploadedFileIds.map(String),
+        canonicalUploadedFileId: canonicalId,
+        removedUploadedFileIds: removedIds,
+      });
       const after = {
         ...before,
-        activeUploadedFileId: run.canonicalUploadedFileId,
-        lastReferencedUploadedFileIds: canonicalDocumentIdsForRepair({
-          existingIds: documentState.lastReferencedUploadedFileIds.map(String),
-          canonicalUploadedFileId: canonicalId,
-          quarantinedUploadedFileIds: targetIds,
-          duplicateUploadedFileIds: duplicateIds,
-        }),
-        pinnedUploadedFileIds: documentState.pinnedUploadedFileIds.filter((id) => !targetIds.has(id.toString())),
+        activeUploadedFileId: run.canonicalUploadedFileId ?? (activeWasRemoved ? null : documentState.activeUploadedFileId),
+        lastReferencedUploadedFileIds: repairedReferences,
+        pinnedUploadedFileIds: documentState.pinnedUploadedFileIds.filter((id) => !removedIds.has(id.toString())),
         updatedAt: repairAt,
       };
       if (await snapshotRecord(ctx, { repairRunId: args.repairRunId, sequence, targetTable: 'conversationDocumentState', targetId: documentState._id.toString(), before, after, reasons })) sequence += 1;
@@ -815,19 +999,39 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
         pendingSourceTurnId: controlState.pendingSourceTurnId,
         lastAssistantOfferJson: controlState.lastAssistantOfferJson,
         lastResolvedReferentsJson: controlState.lastResolvedReferentsJson,
+        activeTaskId: controlState.activeTaskId,
+        activeTaskKind: controlState.activeTaskKind,
+        activeEvidenceGenerationIds: controlState.activeEvidenceGenerationIds,
         confidence: controlState.confidence,
         provenance: controlState.provenance,
         updatedAt: controlState.updatedAt,
       };
+      const repairedActiveDocuments = documentIdsForDerivedRepair({
+        existingIds: controlState.activeDocumentIds.map(String),
+        canonicalUploadedFileId: canonicalId,
+        removedUploadedFileIds: removedIds,
+      });
+      const activeTaskLosesEveryDocument = tasks.some((task) =>
+        task.taskId === controlState.activeTaskId &&
+        task.documentIds.some((id) => removedIds.has(id.toString())) &&
+        documentIdsForDerivedRepair({
+          existingIds: task.documentIds.map(String),
+          canonicalUploadedFileId: canonicalId,
+          removedUploadedFileIds: removedIds,
+        }).length === 0
+      );
+      const repairedEvidenceGenerations = documentIdsForDerivedRepair({
+        existingIds: controlState.activeEvidenceGenerationIds.map(String),
+        canonicalUploadedFileId: canonicalGenerationId,
+        removedUploadedFileIds: removedGenerationIds,
+      });
       const after = {
         ...before,
         focusRevision: controlState.focusRevision + 1,
-        activeDocumentIds: canonicalDocumentIdsForRepair({
-          existingIds: controlState.activeDocumentIds.map(String),
-          canonicalUploadedFileId: canonicalId,
-          quarantinedUploadedFileIds: targetIds,
-          duplicateUploadedFileIds: duplicateIds,
-        }),
+        activeTaskId: activeTaskLosesEveryDocument ? null : controlState.activeTaskId,
+        activeTaskKind: activeTaskLosesEveryDocument ? null : controlState.activeTaskKind,
+        activeDocumentIds: repairedActiveDocuments,
+        activeEvidenceGenerationIds: repairedEvidenceGenerations,
         pendingAct: pendingAffected ? null : controlState.pendingAct,
         pendingOptionsJson: pendingAffected ? '[]' : controlState.pendingOptionsJson,
         pendingSourceTurnId: pendingAffected ? null : controlState.pendingSourceTurnId,
@@ -841,48 +1045,62 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
     }
 
     for (const task of tasks) {
-      if (!referencesAny(task.documentIds, new Set([...removedIds, canonicalId]))) continue;
-      const before = { documentIds: task.documentIds, updatedAt: task.updatedAt };
+      if (!referencesAny(task.documentIds, removedIds) &&
+          !task.evidenceGenerationIds.some((id) => removedGenerationIds.has(id.toString()))) continue;
+      const repairedDocumentIds = documentIdsForDerivedRepair({
+        existingIds: task.documentIds.map(String),
+        canonicalUploadedFileId: canonicalId,
+        removedUploadedFileIds: removedIds,
+      });
+      const repairedGenerationIds = documentIdsForDerivedRepair({
+        existingIds: task.evidenceGenerationIds.map(String),
+        canonicalUploadedFileId: canonicalGenerationId,
+        removedUploadedFileIds: removedGenerationIds,
+      });
+      const before = { documentIds: task.documentIds, evidenceGenerationIds: task.evidenceGenerationIds, status: task.status, updatedAt: task.updatedAt };
       const after = {
         ...before,
-        documentIds: canonicalDocumentIdsForRepair({
-          existingIds: task.documentIds.map(String),
-          canonicalUploadedFileId: canonicalId,
-          quarantinedUploadedFileIds: targetIds,
-          duplicateUploadedFileIds: duplicateIds,
-        }),
+        documentIds: repairedDocumentIds,
+        evidenceGenerationIds: repairedGenerationIds,
+        status: repairedDocumentIds.length === 0 && (task.kind === 'document_review' || task.kind === 'document_question')
+          ? 'abandoned'
+          : task.status,
         updatedAt: repairAt,
       };
       if (await snapshotRecord(ctx, { repairRunId: args.repairRunId, sequence, targetTable: 'conversationTasks', targetId: task._id.toString(), before, after, reasons })) sequence += 1;
     }
     for (const plan of plans) {
-      if (!referencesAny(plan.selectedDocumentIds, new Set([...removedIds, canonicalId]))) continue;
-      const before = { selectedDocumentIds: plan.selectedDocumentIds, updatedAt: plan.updatedAt };
+      if (!referencesAny(plan.selectedDocumentIds, removedIds)) continue;
+      const repairedDocumentIds = documentIdsForDerivedRepair({
+        existingIds: plan.selectedDocumentIds.map(String),
+        canonicalUploadedFileId: canonicalId,
+        removedUploadedFileIds: removedIds,
+      });
+      const before = { selectedDocumentIds: plan.selectedDocumentIds, status: plan.status, updatedAt: plan.updatedAt };
       const after = {
         ...before,
-        selectedDocumentIds: canonicalDocumentIdsForRepair({
-          existingIds: plan.selectedDocumentIds.map(String),
-          canonicalUploadedFileId: canonicalId,
-          quarantinedUploadedFileIds: targetIds,
-          duplicateUploadedFileIds: duplicateIds,
-        }),
+        selectedDocumentIds: repairedDocumentIds,
+        status: repairedDocumentIds.length === 0 && (plan.status === 'planned' || plan.status === 'executing')
+          ? 'failed_recoverable'
+          : plan.status,
         updatedAt: repairAt,
       };
       if (await snapshotRecord(ctx, { repairRunId: args.repairRunId, sequence, targetTable: 'turnExecutionPlans', targetId: plan._id.toString(), before, after, reasons })) sequence += 1;
     }
     for (const issue of issues) {
       if (!issue.sourceAnchors.some((anchor) => removedIds.has(anchor.uploadedFileId.toString()))) continue;
-      const before = { sourceAnchors: issue.sourceAnchors, updatedAt: issue.updatedAt };
+      const before = { sourceAnchors: issue.sourceAnchors, status: issue.status, updatedAt: issue.updatedAt };
       const seen = new Set<string>();
       const sourceAnchors = issue.sourceAnchors.flatMap((anchor) => {
         if (targetIds.has(anchor.uploadedFileId.toString())) return [];
+        if (duplicateIds.has(anchor.uploadedFileId.toString()) && !run.canonicalUploadedFileId) return [];
         const uploadedFileId = duplicateIds.has(anchor.uploadedFileId.toString()) ? run.canonicalUploadedFileId! : anchor.uploadedFileId;
         const key = `${uploadedFileId}:${anchor.pageStart}:${anchor.pageEnd}`;
         if (seen.has(key)) return [];
         seen.add(key);
         return [{ ...anchor, uploadedFileId }];
       });
-      const after = { ...before, sourceAnchors, updatedAt: repairAt };
+      const after = { ...before, sourceAnchors, status: sourceAnchors.length === 0 ? 'dormant' : issue.status, updatedAt: repairAt };
       if (await snapshotRecord(ctx, { repairRunId: args.repairRunId, sequence, targetTable: 'conversationLegalIssueState', targetId: issue._id.toString(), before, after, reasons })) sequence += 1;
     }
     await ctx.db.patch(run._id, { status: 'snapshotted', updatedAt: repairAt });
@@ -1114,11 +1332,18 @@ export const verifyRepair = internalMutation({
       if (!current || stableRepairHash(projectCurrent(current, snapshot.intendedAfterJson)) !== snapshot.intendedAfterHash) mismatches += 1;
     }
     let derivedSemanticMismatches = 0;
-    if (run.parentRepairRunId && run.scopeConversationId && run.canonicalUploadedFileId) {
+    if (run.parentRepairRunId && run.scopeConversationId) {
       const removedIds = new Set([
         ...run.approvedTargetUploadedFileIds.map(String),
         ...(run.duplicateUploadedFileIds ?? []).map(String),
       ]);
+      const removedGenerationIds = new Set<string>();
+      for (const uploadedFileId of [...run.approvedTargetUploadedFileIds, ...(run.duplicateUploadedFileIds ?? [])]) {
+        const generations = await ctx.db.query('documentMemoryGenerations')
+          .withIndex('by_file_generation', (q) => q.eq('uploadedFileId', uploadedFileId))
+          .collect();
+        generations.forEach((generation) => removedGenerationIds.add(generation._id.toString()));
+      }
       const [documentState, controlState, tasks, plans, issues] = await Promise.all([
         ctx.db.query('conversationDocumentState').withIndex('by_conversation', (q) => q.eq('conversationId', run.scopeConversationId!)).first(),
         ctx.db.query('conversationControlStates').withIndex('by_conversation', (q) => q.eq('conversationId', run.scopeConversationId!)).first(),
@@ -1126,20 +1351,25 @@ export const verifyRepair = internalMutation({
         ctx.db.query('turnExecutionPlans').withIndex('by_conversation_status', (q) => q.eq('conversationId', run.scopeConversationId!)).collect(),
         ctx.db.query('conversationLegalIssueState').withIndex('by_conversation_status', (q) => q.eq('conversationId', run.scopeConversationId!)).collect(),
       ]);
-      const canonicalId = run.canonicalUploadedFileId.toString();
-      if (!documentState || documentState.activeUploadedFileId?.toString() !== canonicalId) derivedSemanticMismatches += 1;
-      if (!controlState || !controlState.activeDocumentIds.map(String).includes(canonicalId)) derivedSemanticMismatches += 1;
+      const canonicalId = run.canonicalUploadedFileId?.toString();
+      if (canonicalId && (!documentState || documentState.activeUploadedFileId?.toString() !== canonicalId)) derivedSemanticMismatches += 1;
+      if (canonicalId && (!controlState || !controlState.activeDocumentIds.map(String).includes(canonicalId))) derivedSemanticMismatches += 1;
       if (documentState && [
+        ...(documentState.activeUploadedFileId ? [documentState.activeUploadedFileId.toString()] : []),
         ...documentState.lastReferencedUploadedFileIds.map(String),
         ...documentState.pinnedUploadedFileIds.map(String),
       ].some((id) => removedIds.has(id))) derivedSemanticMismatches += 1;
       if (controlState && (
         controlState.activeDocumentIds.map(String).some((id) => removedIds.has(id)) ||
+        controlState.activeEvidenceGenerationIds.map(String).some((id) => removedGenerationIds.has(id)) ||
         containsAnyTarget(controlState.pendingOptionsJson, removedIds) ||
         containsAnyTarget(controlState.lastAssistantOfferJson, removedIds) ||
         containsAnyTarget(controlState.lastResolvedReferentsJson, removedIds)
       )) derivedSemanticMismatches += 1;
-      if (tasks.some((task) => task.documentIds.some((id) => removedIds.has(id.toString())))) derivedSemanticMismatches += 1;
+      if (tasks.some((task) =>
+        task.documentIds.some((id) => removedIds.has(id.toString())) ||
+        task.evidenceGenerationIds.some((id) => removedGenerationIds.has(id.toString()))
+      )) derivedSemanticMismatches += 1;
       if (plans.some((plan) => plan.selectedDocumentIds.some((id) => removedIds.has(id.toString())))) derivedSemanticMismatches += 1;
       if (issues.some((issue) => issue.sourceAnchors.some((anchor) => removedIds.has(anchor.uploadedFileId.toString())))) derivedSemanticMismatches += 1;
     }

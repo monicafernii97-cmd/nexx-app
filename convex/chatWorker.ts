@@ -3838,7 +3838,7 @@ export const processChatGenerationJob = internalAction({
             if (shouldOfferReviewDepthChoices({
                 message: context.turn.message,
                 analysisMode: context.turn.analysisMode,
-                hasCurrentAttachment: fullReviewAttachments.length > 0,
+                hasAvailableDocument: baselineAttachments.length > 0,
             })) {
                 workerStage = 'publishing_review_depth_choices';
                 const content = reviewDepthChoiceMessage();
@@ -3851,7 +3851,7 @@ export const processChatGenerationJob = internalAction({
                     response,
                     content,
                     capabilitySnapshot: baselineCapabilitySnapshot,
-                    evidenceIds: uniqueDocumentChunkIds(fullReviewAttachments).map(String),
+                    evidenceIds: uniqueDocumentChunkIds(baselineAttachments).map(String),
                     citationVerificationPassed: true,
                     usedDocumentIds: [],
                     artifactsJson: JSON.stringify(emptyArtifacts()),

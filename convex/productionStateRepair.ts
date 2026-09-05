@@ -395,6 +395,90 @@ export const authorizeRepair = internalMutation({
   },
 });
 
+/** Read-only inventory of every remaining future-facing quarantined reference in an owner/case graph. */
+export const inspectDerivedStateGraph = internalQuery({
+  args: {
+    parentRepairRunId: v.string(),
+    scopeConversationId: v.id('conversations'),
+  },
+  handler: async (ctx, args) => {
+    const [parent, scopeConversation] = await Promise.all([
+      ctx.db.query('productionStateRepairRuns')
+        .withIndex('by_repair_run', (q) => q.eq('repairRunId', args.parentRepairRunId))
+        .unique(),
+      ctx.db.get(args.scopeConversationId),
+    ]);
+    if (!parent || parent.status !== 'verified') throw new Error('Parent quarantine repair must be verified');
+    if (!scopeConversation) throw new Error('Derived repair scope is missing');
+    const targetIds = new Set(parent.approvedTargetUploadedFileIds.map(String));
+    const conversations = await ctx.db.query('conversations')
+      .withIndex('by_user_case', (q) => q.eq('userId', scopeConversation.userId).eq('caseId', scopeConversation.caseId))
+      .take(MAX_DERIVED_GRAPH_CONVERSATIONS + 1);
+    if (conversations.length > MAX_DERIVED_GRAPH_CONVERSATIONS) {
+      throw new Error(`Derived-state graph exceeds ${MAX_DERIVED_GRAPH_CONVERSATIONS} conversations; use a bounded operator batch`);
+    }
+
+    const reports = [];
+    for (const conversation of conversations) {
+      const [documentState, controlState, tasks, plans, issues] = await Promise.all([
+        ctx.db.query('conversationDocumentState').withIndex('by_conversation', (q) => q.eq('conversationId', conversation._id)).first(),
+        ctx.db.query('conversationControlStates').withIndex('by_conversation', (q) => q.eq('conversationId', conversation._id)).first(),
+        ctx.db.query('conversationTasks').withIndex('by_conversation_status', (q) => q.eq('conversationId', conversation._id)).collect(),
+        ctx.db.query('turnExecutionPlans').withIndex('by_conversation_status', (q) => q.eq('conversationId', conversation._id)).collect(),
+        ctx.db.query('conversationLegalIssueState').withIndex('by_conversation_status', (q) => q.eq('conversationId', conversation._id)).collect(),
+      ]);
+      const records = [
+        ...(documentState ? [{
+          conversationId: conversation._id.toString(),
+          category: 'conversation_document_state',
+          documentIds: [
+            ...(documentState.activeUploadedFileId ? [documentState.activeUploadedFileId.toString()] : []),
+            ...documentState.lastReferencedUploadedFileIds.map(String),
+            ...documentState.pinnedUploadedFileIds.map(String),
+          ],
+        }] : []),
+        ...(controlState ? [{
+          conversationId: conversation._id.toString(),
+          category: 'conversation_control',
+          documentIds: controlState.activeDocumentIds.map(String),
+          serializedState: [
+            controlState.pendingOptionsJson,
+            controlState.lastAssistantOfferJson,
+            controlState.lastResolvedReferentsJson,
+          ].filter(Boolean).join('\n'),
+        }] : []),
+        ...tasks.map((task) => ({ conversationId: conversation._id.toString(), category: 'conversation_task', documentIds: task.documentIds.map(String) })),
+        ...plans.map((plan) => ({ conversationId: conversation._id.toString(), category: 'turn_execution_plan', documentIds: plan.selectedDocumentIds.map(String) })),
+        ...issues.map((issue) => ({
+          conversationId: conversation._id.toString(),
+          category: 'legal_issue_anchor',
+          documentIds: issue.sourceAnchors.map((anchor) => anchor.uploadedFileId.toString()),
+        })),
+      ];
+      const matches = findDerivedDocumentReferences(records, targetIds);
+      if (matches.length === 0) continue;
+      reports.push({
+        conversationId: conversation._id,
+        title: conversation.title,
+        isRequestedScope: conversation._id === args.scopeConversationId,
+        categories: [...new Set(matches.map((match) => match.category))],
+        matchedUploadedFileIds: [...targetIds].filter((targetId) => matches.some((match) =>
+          match.documentIds?.includes(targetId) || match.serializedState?.includes(targetId)
+        )),
+      });
+    }
+
+    return {
+      parentRepairRunId: args.parentRepairRunId,
+      requestedScopeConversationId: args.scopeConversationId,
+      targetUploadedFileIds: [...targetIds],
+      affectedConversationCount: reports.length,
+      outsideRequestedScopeCount: reports.filter((report) => !report.isRequestedScope).length,
+      conversations: reports,
+    };
+  },
+});
+
 /**
  * Create an approval-gated repair run for references that escaped an earlier
  * quarantine because they lived in another conversation in the same case.

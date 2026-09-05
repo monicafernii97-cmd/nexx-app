@@ -26,6 +26,8 @@ Quarantining an upload does not prove that every future-facing reference was rem
 6. Replace the active set with the canonical document, remove quarantined and exact-duplicate IDs from tasks/plans/anchors, and clear pending options or assistant offers that contain a removed ID.
 7. Apply, verify, and run a second idempotence pass before enabling a live test.
 
+Use the read-only `productionStateRepair:inspectDerivedStateGraph` operation before creating a linked repair. It returns the exact affected conversation IDs, titles, reference categories, and quarantined IDs so an outside-scope finding can be adjudicated without weakening the apply-time guard. A failed `startDerivedStateAudit` call rolls back completely and does not create a repair run.
+
 Runtime conversation loading also filters quarantined, deleted, QA-only, out-of-owner, out-of-case, and exact-duplicate document IDs before planning. This is a containment layer, not a substitute for the auditable repair.
 
 The system may quarantine confirmed QA/synthetic records and rebuild derived references. It may not delete source evidence, rewrite a user message, modify court-document content, or classify an unknown production document as synthetic.

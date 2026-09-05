@@ -407,6 +407,48 @@ export default defineSchema({
         .index('by_status_recoveryCheckedAt', ['status', 'recoveryCheckedAt'])
         .index('by_conversation_status', ['conversationId', 'status']),
 
+    chatGenerationAttempts: defineTable({
+        jobId: v.id('chatGenerationJobs'),
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        attemptNumber: v.number(),
+        strategy: v.union(
+            v.literal('full'),
+            v.literal('continue'),
+            v.literal('compact'),
+            v.literal('deterministic_scoped')
+        ),
+        status: v.union(
+            v.literal('started'),
+            v.literal('completed'),
+            v.literal('retry_scheduled'),
+            v.literal('failed')
+        ),
+        model: v.string(),
+        providerResponseId: v.optional(v.string()),
+        inputTokenEstimate: v.number(),
+        maxOutputTokens: v.number(),
+        sourceDocumentCount: v.number(),
+        sourcePacketCount: v.number(),
+        sourceCharacterCount: v.number(),
+        firstEventAt: v.optional(v.number()),
+        lastEventAt: v.optional(v.number()),
+        lastEventType: v.optional(v.string()),
+        partialOutputCharacters: v.number(),
+        failureCode: v.optional(v.string()),
+        failureStage: v.optional(v.string()),
+        incompleteReason: v.optional(v.string()),
+        startedAt: v.number(),
+        completedAt: v.optional(v.number()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_job_attempt', ['jobId', 'attemptNumber'])
+        .index('by_turn', ['turnId'])
+        .index('by_status_created', ['status', 'createdAt'])
+        .index('by_conversation_created', ['conversationId', 'createdAt']),
+
     chatUploadSessions: defineTable({
         clerkUserId: v.string(),
         dataProvenance: v.optional(dataProvenanceValidator),
@@ -874,8 +916,18 @@ export default defineSchema({
         decision: v.union(
             v.literal('publish'), v.literal('publish_scoped'),
             v.literal('ask_clarification'), v.literal('publish_limitation'),
+            v.literal('publish_recovery'),
             v.literal('rejected')
         ),
+        responseClass: v.optional(v.union(
+            v.literal('answer'),
+            v.literal('clarification'),
+            v.literal('limitation'),
+            v.literal('recovery')
+        )),
+        failureCode: v.optional(v.string()),
+        attemptCount: v.optional(v.number()),
+        recoveryReceiptJson: v.optional(v.string()),
         checksJson: v.string(),
         rejectionCodes: v.array(v.string()),
         capabilitySnapshotHash: v.string(),
@@ -934,6 +986,7 @@ export default defineSchema({
 
     productionStateRepairRuns: defineTable({
         repairRunId: v.string(),
+        parentRepairRunId: v.optional(v.string()),
         codeVersion: v.string(),
         scopeConversationId: v.optional(v.id('conversations')),
         scopeCaseId: v.optional(v.id('cases')),

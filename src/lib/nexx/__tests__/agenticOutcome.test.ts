@@ -33,6 +33,14 @@ describe('agentic outcome and recovery policy', () => {
   it('classifies bounded transient conditions as retryable', () => {
     expect(normalizeProviderFailure({ status: 429, message: 'Rate limit' }).retryable).toBe(true);
     expect(normalizeProviderFailure({ status: 503, message: 'Unavailable' }).retryable).toBe(true);
+    expect(normalizeProviderFailure({
+      code: 'provider_stream_interrupted',
+      message: 'Provider stream ended before a terminal event.',
+    })).toMatchObject({ code: 'provider_stream_interrupted', retryable: true, category: 'temporary' });
+    expect(normalizeProviderFailure({
+      code: 'provider_stream_timeout',
+      message: 'Absolute deadline reached.',
+    })).toMatchObject({ code: 'provider_stream_timeout', retryable: true, category: 'temporary' });
   });
 
   it('locks correction metadata to the actual challenged message', () => {

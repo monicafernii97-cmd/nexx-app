@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mergeDocumentUnderstandingPayloads,
   renderVerifiedDocumentReview,
   verifyDocumentUnderstanding,
   verifyDocumentUnderstandingNode,
@@ -20,6 +21,23 @@ const payload = {
 };
 
 describe('document understanding verification', () => {
+  it('deterministically preserves distinct findings and collapses only exact duplicates', () => {
+    const secondFinding = {
+      category: 'Relief',
+      title: 'Remaining relief',
+      detail: 'The court denied all other relief.',
+      quote: 'All other relief is denied',
+      sourceIds: ['SOURCE_CHUNK_2'],
+    };
+    const merged = mergeDocumentUnderstandingPayloads([
+      { ...payload, uncertainties: ['Check the signed original.'] },
+      { overview: 'Second node.', findings: [payload.findings[0], secondFinding], uncertainties: ['Check the signed original.'] },
+    ]);
+    expect(merged.findings).toEqual([payload.findings[0], secondFinding]);
+    expect(merged.uncertainties).toEqual(['Check the signed original.']);
+    expect(merged.overview).toContain('2 distinct source-verified findings');
+  });
+
   it('accepts complete provenance and exact source evidence', () => {
     expect(verifyDocumentUnderstanding({
       payload, chunks, provenance: { sourceChunkStart: 0, sourceChunkEnd: 2, sourceChunkCount: 3 },

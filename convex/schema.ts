@@ -1765,7 +1765,7 @@ export default defineSchema({
         runId: v.id('documentUnderstandingRuns'),
         attempt: v.number(),
         cycleAttempt: v.optional(v.number()),
-        mode: v.union(v.literal('initial'), v.literal('same_input_retry'), v.literal('strict_retry'), v.literal('operator_resume')),
+        mode: v.union(v.literal('initial'), v.literal('same_input_retry'), v.literal('strict_retry'), v.literal('operator_resume'), v.literal('deterministic_reduce')),
         inputHash: v.string(),
         status: v.union(v.literal('running'), v.literal('verified'), v.literal('failed')),
         outputJson: v.optional(v.string()),

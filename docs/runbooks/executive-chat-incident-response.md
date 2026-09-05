@@ -25,4 +25,6 @@ For an interrupted provider stream, inspect `chatGenerationAttempts` in attempt-
 
 Tell the user specifically what is known, what is being rechecked, and what action is safe next. Do not use an invented analysis, claim to have inspected evidence without a receipt, or hide a recoverable error behind a generic fallback.
 
+System recovery notices use the same publication boundary as normal answers. Confirm a `publish_recovery` audit exists with `responseClass=recovery`, the exact failure code, attempt count, contextual-appropriateness checks, and a recovery receipt. A greeting must remain a greeting without mentioning the active document. A promised reupload must acknowledge and wait for the new file. A failed document answer may mention saved evidence only when the current turn or an authorized continuation actually activated that document task. Never publish “I’m retrying” unless a retry is truly scheduled.
+
 Recovery requires a regression test for the exact sequence, a compatible artifact pair, isolated preview proof, production smoke, and an empty hard-stop dashboard. Resume at the prior safe cohort; never jump directly back to 100%.

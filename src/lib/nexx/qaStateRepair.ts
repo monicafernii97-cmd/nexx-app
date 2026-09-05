@@ -70,3 +70,100 @@ export function stableRepairHash(value: unknown) {
   }
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
+
+export type DocumentRepairCandidate = {
+  uploadedFileId: string;
+  eligible: boolean;
+  storageSha256?: string;
+  fullTextSha256?: string;
+  sha256Hash?: string;
+};
+
+export type CanonicalDocumentSelection = {
+  selectedDocumentIds: string[];
+  rejected: Array<{
+    uploadedFileId: string;
+    reason: 'ineligible' | 'exact_duplicate';
+    canonicalUploadedFileId?: string;
+  }>;
+};
+
+function exactDocumentFingerprints(candidate: DocumentRepairCandidate) {
+  return [
+    candidate.fullTextSha256 ? `full:${candidate.fullTextSha256}` : undefined,
+    candidate.storageSha256 ? `storage:${candidate.storageSha256}` : undefined,
+    candidate.sha256Hash ? `sha:${candidate.sha256Hash}` : undefined,
+  ].filter((value): value is string => Boolean(value));
+}
+
+/**
+ * Preserve caller priority while excluding ineligible records and collapsing
+ * only exact hash duplicates. Similar names or lengths are never sufficient.
+ */
+export function canonicalizeDocumentCandidates(candidates: DocumentRepairCandidate[]): CanonicalDocumentSelection {
+  const selectedDocumentIds: string[] = [];
+  const rejected: CanonicalDocumentSelection['rejected'] = [];
+  const selectedIds = new Set<string>();
+  const canonicalByFingerprint = new Map<string, string>();
+
+  for (const candidate of candidates) {
+    if (selectedIds.has(candidate.uploadedFileId)) continue;
+    if (!candidate.eligible) {
+      rejected.push({ uploadedFileId: candidate.uploadedFileId, reason: 'ineligible' });
+      continue;
+    }
+    const fingerprints = exactDocumentFingerprints(candidate);
+    const canonicalUploadedFileId = fingerprints
+      .map((fingerprint) => canonicalByFingerprint.get(fingerprint))
+      .find((value): value is string => Boolean(value));
+    if (canonicalUploadedFileId) {
+      rejected.push({
+        uploadedFileId: candidate.uploadedFileId,
+        reason: 'exact_duplicate',
+        canonicalUploadedFileId,
+      });
+      continue;
+    }
+    selectedIds.add(candidate.uploadedFileId);
+    selectedDocumentIds.push(candidate.uploadedFileId);
+    fingerprints.forEach((fingerprint) => canonicalByFingerprint.set(fingerprint, candidate.uploadedFileId));
+  }
+  return { selectedDocumentIds, rejected };
+}
+
+export function canonicalDocumentIdsForRepair(args: {
+  existingIds: string[];
+  canonicalUploadedFileId: string;
+  quarantinedUploadedFileIds: ReadonlySet<string>;
+  duplicateUploadedFileIds: ReadonlySet<string>;
+}) {
+  const removed = new Set([
+    ...args.quarantinedUploadedFileIds,
+    ...args.duplicateUploadedFileIds,
+  ]);
+  return [
+    args.canonicalUploadedFileId,
+    ...args.existingIds.filter((id) => id !== args.canonicalUploadedFileId && !removed.has(id)),
+  ].filter((id, index, values) => values.indexOf(id) === index);
+}
+
+export type DerivedDocumentReferenceRecord = {
+  conversationId: string;
+  category: string;
+  documentIds?: string[];
+  serializedState?: string;
+};
+
+/**
+ * Locate future-facing derived references independently of the upload row's
+ * original conversation. This closes the cross-conversation repair gap.
+ */
+export function findDerivedDocumentReferences(
+  records: DerivedDocumentReferenceRecord[],
+  targetUploadedFileIds: ReadonlySet<string>,
+) {
+  return records.filter((record) =>
+    record.documentIds?.some((id) => targetUploadedFileIds.has(id)) ||
+    containsAnyTarget(record.serializedState, targetUploadedFileIds)
+  );
+}

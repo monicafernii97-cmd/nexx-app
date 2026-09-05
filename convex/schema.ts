@@ -987,6 +987,9 @@ export default defineSchema({
     productionStateRepairRuns: defineTable({
         repairRunId: v.string(),
         parentRepairRunId: v.optional(v.string()),
+        canonicalUploadedFileId: v.optional(v.id('uploadedFiles')),
+        duplicateUploadedFileIds: v.optional(v.array(v.id('uploadedFiles'))),
+        clearPendingInteraction: v.optional(v.boolean()),
         codeVersion: v.string(),
         scopeConversationId: v.optional(v.id('conversations')),
         scopeCaseId: v.optional(v.id('cases')),

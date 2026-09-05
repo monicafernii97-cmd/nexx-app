@@ -385,15 +385,26 @@ export const verify = mutation({
       sourceUnitsVerified: coverage.verification.unitsRead === operation.expectedUnits,
     };
     const passed = Object.values(checks).every(Boolean);
-    if (passed && operation.status !== 'verified') {
+    if (passed) {
       const now = Date.now();
-      await ctx.db.patch(operation._id, {
-        status: 'verified',
-        verifiedUnits: coverage.verification.unitsRead,
-        verificationJson: JSON.stringify(checks),
-        verifiedAt: now,
-        updatedAt: now,
-      });
+      if (run && (run.errorCode || run.errorMessage || run.deadLetterNodeId || run.deadLetterFailureClass)) {
+        await ctx.db.patch(run._id, {
+          errorCode: undefined,
+          errorMessage: undefined,
+          deadLetterNodeId: undefined,
+          deadLetterFailureClass: undefined,
+          updatedAt: now,
+        });
+      }
+      if (operation.status !== 'verified') {
+        await ctx.db.patch(operation._id, {
+          status: 'verified',
+          verifiedUnits: coverage.verification.unitsRead,
+          verificationJson: JSON.stringify(checks),
+          verifiedAt: now,
+          updatedAt: now,
+        });
+      }
     }
     return {
       operationId: operation.operationId,
@@ -409,8 +420,8 @@ export const verify = mutation({
       nextNodeIndex: run?.nextNodeIndex ?? 0,
       resumeCount: operation.resumeCount ?? 0,
       checks,
-      errorCode: run?.errorCode,
-      errorMessage: run?.errorMessage,
+      errorCode: passed ? undefined : run?.errorCode,
+      errorMessage: passed ? undefined : run?.errorMessage,
     };
   },
 });

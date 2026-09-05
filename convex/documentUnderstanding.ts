@@ -24,6 +24,7 @@ import {
 } from '../src/lib/nexx/durableReviewPolicy';
 import { getAuthenticatedUser } from './lib/auth';
 import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
+import { verifyCompleteSourceCoverage } from '../src/lib/nexx/sourceCoverageVerification';
 
 const LEGACY_UNDERSTANDING_VERSION = 'dur_v1';
 const UNDERSTANDING_VERSION = 'dur_v2';
@@ -939,6 +940,7 @@ export const processRun = internalAction({
       const chunks = await ctx.runQuery(internal.documentUnderstanding.getAllChunks, { runId: work.run._id });
       const coverageReceipt = await ctx.runQuery(internal.documentUnderstanding.getCoverageReceipt, { runId: work.run._id });
       if (!root) throw new Error('Understanding reduction produced no root node.');
+      if (!coverageReceipt) throw new Error('Document source coverage could not be verified complete.');
       const payload = parsePayload(root.payloadJson);
       const verification = verifyDocumentUnderstanding({ payload, chunks, provenance: root });
       if (!verification.passed) throw new Error(verification.errors.join(' | '));
@@ -951,7 +953,7 @@ export const processRun = internalAction({
           payload,
           chunks,
           sourceUrl: `/api/documents/source/${work.file._id}`,
-          coverageReceipt: coverageReceipt ?? undefined,
+          coverageReceipt,
         }),
         sourceChunkIds: chunks.map((chunk) => chunk._id),
         sourceChunkIndexes,
@@ -992,10 +994,12 @@ export const getCoverageReceipt = internalQuery({
     const units = await ctx.db.query('documentSourceUnitCoverage')
       .withIndex('by_manifest_unit', (q) => q.eq('manifestId', manifest._id))
       .collect();
+    const verification = verifyCompleteSourceCoverage({ manifest, units });
+    if (!verification.passed) return undefined;
     return {
       unitKind: manifest.unitKind,
-      unitsRead: manifest.succeededUnits + manifest.lowConfidenceUnits + manifest.verifiedBlankUnits,
-      unitsExpected: manifest.expectedUnits,
+      unitsRead: verification.unitsRead,
+      unitsExpected: verification.unitsExpected,
       ocrUnits: units.filter((unit) => unit.ocrApplied).length,
       lowConfidenceUnits: manifest.lowConfidenceUnits,
     };
@@ -1103,6 +1107,13 @@ export const restartOwnedDocumentVersion = mutation({
     if (!generation?.coverageManifestId) throw new Error('Document has no complete coverage manifest.');
     const manifest = await ctx.db.get(generation.coverageManifestId);
     if (!manifest || manifest.status !== 'complete') throw new Error('Document coverage is not complete.');
+    const coverageUnits = await ctx.db.query('documentSourceUnitCoverage')
+      .withIndex('by_manifest_unit', (q) => q.eq('manifestId', manifest._id))
+      .collect();
+    const coverageVerification = verifyCompleteSourceCoverage({ manifest, units: coverageUnits });
+    if (!coverageVerification.passed) {
+      throw new Error(`Document coverage verification failed: ${coverageVerification.errors.join(', ')}.`);
+    }
     const chunks = await ctx.db.query('documentChunks')
       .withIndex('by_generation_chunk', (q) => q.eq('memoryGenerationId', generation._id))
       .collect();

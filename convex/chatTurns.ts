@@ -79,6 +79,11 @@ import {
     buildContextualRecoveryContent,
     type RecoveryPublicationCode,
 } from '../src/lib/nexx/response/recoveryPublication';
+import {
+    documentEvidenceBudgetForTurn,
+    takeEvidenceWithinBudget,
+} from '../src/lib/nexx/documentEvidenceBudget';
+import type { DocumentAnalysisMode } from '../src/lib/chat/documentAnalysisMode';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -91,7 +96,6 @@ const MAX_ALIAS_MATCHES_PER_TERM = 8;
 const MAX_EXPLICIT_ALIAS_MATCHED_FILES = 50;
 const MAX_DOCUMENT_CHUNKS_TO_SCAN_PER_FILE = 300;
 const MAX_DOCUMENT_CHUNKS_FROM_SEARCH_PER_FILE = 80;
-const MAX_RETRIEVED_CHUNKS_PER_FILE = 12;
 const MAX_CONVERSATION_SUMMARY_JSON_CHARS = 60_000;
 
 /** Compact JSON formatting without ever persisting a truncated document. */
@@ -522,10 +526,17 @@ async function getRelevantDocumentChunkContexts(
         detection: DocumentReferenceDetection;
         accessScope: DocumentAccessScope;
         understandingJson?: string;
+        analysisMode?: DocumentAnalysisMode;
     }
 ) {
     const uploadedFile = await ctx.db.get(args.uploadedFileId);
     if (!uploadedFile) return [];
+
+    const evidenceBudget = documentEvidenceBudgetForTurn({
+        analysisMode: args.analysisMode,
+        detection: args.detection,
+    });
+    if (evidenceBudget.maxChunksPerFile === 0) return [];
 
     if (!canUseDocumentMemoryCandidate(uploadedFileAccessCandidate(uploadedFile), args.accessScope)) {
         return [];
@@ -586,7 +597,7 @@ async function getRelevantDocumentChunkContexts(
         uploadedFile,
         searchChunks: mergeDocumentChunkDocs([
             ...requestedPageChunks,
-            ...searchChunks.slice(0, MAX_RETRIEVED_CHUNKS_PER_FILE),
+            ...searchChunks.slice(0, evidenceBudget.maxChunksPerFile),
             ...understandingChunks,
         ]),
         generationId,
@@ -604,7 +615,7 @@ async function getRelevantDocumentChunkContexts(
     const retrieved = retrieveRelevantDocumentChunks({
         message: args.message,
         detection: args.detection,
-        maxChunks: MAX_RETRIEVED_CHUNKS_PER_FILE,
+        maxChunks: evidenceBudget.maxChunksPerFile,
         chunks: chunks.map(documentChunkCandidate),
     });
     const understandingIds = new Set(understandingChunks.map((chunk) => chunk._id.toString()));
@@ -616,18 +627,18 @@ async function getRelevantDocumentChunkContexts(
         filingRetrievalBuckets: [],
     }));
     const merged = new Map([...retrieved, ...guided].map((chunk) => [chunk.chunkId, chunk]));
-    return Array.from(merged.values())
+    const ranked = Array.from(merged.values())
         .map((chunk) => understandingIds.has(chunk.chunkId)
             ? { ...chunk, retrievalScore: Math.max(chunk.retrievalScore, 250), retrievalReasons: Array.from(new Set([...chunk.retrievalReasons, 'understanding_map' as const])) }
             : chunk)
         .sort((a, b) => b.retrievalScore - a.retrievalScore || a.chunkIndex - b.chunkIndex)
-        .slice(0, MAX_RETRIEVED_CHUNKS_PER_FILE)
-        .sort((a, b) => a.chunkIndex - b.chunkIndex)
         .filter((chunk) => {
             const chunkDoc = chunksById.get(chunk.chunkId);
             if (!chunkDoc || !chunkMatchesActiveDocumentMemory(chunkDoc, uploadedFile)) return false;
             return canUseDocumentMemoryCandidate(uploadedFileAccessCandidate(uploadedFile), args.accessScope);
-        })
+        });
+    return takeEvidenceWithinBudget(ranked, evidenceBudget)
+        .sort((a, b) => a.chunkIndex - b.chunkIndex)
         .map((chunk) => ({
             ...chunk,
             chunkId: chunk.chunkId as Id<'documentChunks'>,
@@ -1963,6 +1974,7 @@ export const getGenerationContext = internalQuery({
                         detection: documentReference,
                         accessScope,
                         understandingJson: understandingRecord?.structuredJson,
+                        analysisMode: turn.analysisMode,
                     }),
                 });
             }
@@ -2172,6 +2184,7 @@ export const getGenerationContext = internalQuery({
                         detection: documentReference,
                         accessScope,
                         understandingJson: understandingRecord?.structuredJson,
+                        analysisMode: turn.analysisMode,
                     }),
                 });
             }

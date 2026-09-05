@@ -25,12 +25,18 @@ import {
 import { getAuthenticatedUser } from './lib/auth';
 import { getExecutiveChatFeatureFlags } from '../src/lib/nexx/orchestration/featureFlags';
 import { verifyCompleteSourceCoverage } from '../src/lib/nexx/sourceCoverageVerification';
+import {
+  DURABLE_REVIEW_MAP_BATCH_SIZE,
+  DURABLE_REVIEW_MODEL,
+  DURABLE_REVIEW_REDUCE_BATCH_SIZE,
+  DURABLE_REVIEW_VERSION,
+} from '../src/lib/nexx/durableReviewRuntime';
 
 const LEGACY_UNDERSTANDING_VERSION = 'dur_v1';
-const UNDERSTANDING_VERSION = 'dur_v2';
-const UNDERSTANDING_MODEL = 'gpt-5.4';
-const MAP_CHUNKS = 6;
-const REDUCE_NODES = 6;
+const UNDERSTANDING_VERSION = DURABLE_REVIEW_VERSION;
+const UNDERSTANDING_MODEL = DURABLE_REVIEW_MODEL;
+const MAP_CHUNKS = DURABLE_REVIEW_MAP_BATCH_SIZE;
+const REDUCE_NODES = DURABLE_REVIEW_REDUCE_BATCH_SIZE;
 const MAX_OUTPUT_TOKENS = 12_000;
 const STRICT_RETRY_OUTPUT_TOKENS = 6_000;
 const NODE_LEASE_MS = 120_000;

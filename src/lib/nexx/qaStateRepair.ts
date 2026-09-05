@@ -147,6 +147,23 @@ export function canonicalDocumentIdsForRepair(args: {
   ].filter((id, index, values) => values.indexOf(id) === index);
 }
 
+/**
+ * Remove adjudicated references and, when supplied, promote one genuine
+ * canonical document. Cleanup-only runs deliberately do not invent a
+ * replacement document for an unrelated conversation.
+ */
+export function documentIdsForDerivedRepair(args: {
+  existingIds: string[];
+  canonicalUploadedFileId?: string;
+  removedUploadedFileIds: ReadonlySet<string>;
+}) {
+  const remaining = args.existingIds.filter((id) => !args.removedUploadedFileIds.has(id));
+  return [
+    ...(args.canonicalUploadedFileId ? [args.canonicalUploadedFileId] : []),
+    ...remaining.filter((id) => id !== args.canonicalUploadedFileId),
+  ].filter((id, index, values) => values.indexOf(id) === index);
+}
+
 export type DerivedDocumentReferenceRecord = {
   conversationId: string;
   category: string;

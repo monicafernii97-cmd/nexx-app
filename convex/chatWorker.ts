@@ -9,6 +9,7 @@ import type { Id } from './_generated/dataModel';
 import { classifyMessage } from '../src/lib/nexx/router';
 import type { DocumentAnalysisMode } from '../src/lib/chat/documentAnalysisMode';
 import {
+    acceptedReviewProgressMessage,
     buildCoverageGateMessage,
     requiresVerifiedCoverage,
     type DocumentCoverageStatus,
@@ -141,7 +142,7 @@ import type { CapabilityOperation, DocumentCapabilitySnapshot } from '../src/lib
 import { verifyResponseClaims } from '../src/lib/nexx/response/claimVerifier';
 import {
     PUBLICATION_VALIDATOR_VERSION,
-    PUBLICATION_VALIDATOR_V2_VERSION,
+    PUBLICATION_VALIDATOR_V3_VERSION,
     mintPublicationEnvelope,
     serializePublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
@@ -152,8 +153,15 @@ import {
     type PriorTurnInspectionReceipt,
     type SelfCorrectionPlan,
 } from '../src/lib/nexx/response/selfCorrection';
-import type { TurnExecutionPlan } from '../src/lib/nexx/orchestration/types';
-import { derivePendingInteraction } from '../src/lib/nexx/orchestration/pendingInteraction';
+import type { AssistantOffer, PendingOption, RecommendationReceipt, TurnExecutionPlan } from '../src/lib/nexx/orchestration/types';
+import { createReviewDepthPendingInteraction, derivePendingInteraction } from '../src/lib/nexx/orchestration/pendingInteraction';
+import { recommendationForOption } from '../src/lib/nexx/orchestration/semanticInteraction';
+import {
+    SEMANTIC_INTERACTION_CLASSIFIER_SCHEMA,
+    arbitrateSemanticClassifierResult,
+    buildSemanticClassifierInput,
+    parseSemanticClassifierResult,
+} from '../src/lib/nexx/orchestration/semanticClassifier';
 import { featureFlagsForPersistedRollout } from '../src/lib/nexx/orchestration/featureFlags';
 import {
     buildCanonicalAnswerPlanV2,
@@ -165,6 +173,89 @@ const DEGRADED_MESSAGE =
 const PROVIDER_TIMEOUT_MS = 80_000;
 const STANDARD_MAX_OUTPUT_TOKENS = 16_000;
 const COMPLEX_MAX_OUTPUT_TOKENS = 24_000;
+
+function isReviewDepthRecommendationQuestion(message: string) {
+    return /^(?:which|which one|which is (?:better|best)|what do you recommend|which do you recommend|what(?:'s| is) the difference)[?!. ]*$/i.test(message.trim());
+}
+
+function reviewDepthRecommendationMessage() {
+    return [
+        'A focused review looks only at the particular terms or issue you care about.',
+        '',
+        'A full-document review covers the entire current order and is the most complete option.',
+        '',
+        'I recommend the full-document review when you want the complete picture.',
+    ].join('\n');
+}
+
+function pendingOptionsFromContext(context: GenerationContext) {
+    let options: PendingOption[] = [];
+    try {
+        const parsed = JSON.parse(context.conversationControlState?.pendingOptionsJson ?? '[]') as unknown;
+        options = Array.isArray(parsed) ? parsed as PendingOption[] : [];
+    } catch {
+        options = [];
+    }
+    return options;
+}
+
+function fullReviewPendingOption(context: GenerationContext) {
+    return pendingOptionsFromContext(context).find((option) =>
+        option.operation?.kind === 'document_review' && option.operation.analysisMode === 'full_document_review'
+    );
+}
+
+function activeRecommendationFromContext(context: GenerationContext) {
+    try {
+        const parsed = JSON.parse(context.conversationControlState?.activeRecommendationJson ?? 'null') as unknown;
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? parsed as RecommendationReceipt
+            : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function shouldConsultSemanticClassifier(context: GenerationContext) {
+    return context.turn.message.length <= 2_000 &&
+        context.turnUnderstanding?.interactionIntent === 'uncertain' &&
+        ['clarify', 'unknown'].includes(context.turnUnderstanding.speechAct) &&
+        pendingOptionsFromContext(context).length > 0;
+}
+
+async function classifyPendingInteraction(context: GenerationContext) {
+    const options = pendingOptionsFromContext(context);
+    const recommendation = activeRecommendationFromContext(context);
+    const response = await getOpenAIClient().responses.create({
+        model: 'gpt-5.4-mini',
+        reasoning: { effort: 'low' },
+        max_output_tokens: 500,
+        input: [
+            {
+                role: 'system',
+                content: [
+                    'Classify only how the newest user message relates to the current pending choices.',
+                    'Do not invent an option ID or action. A mention is not acceptance. Questions, negation, quotation, deferral, and unrelated messages must not execute.',
+                    'Use accept_recommendation only when the user conversationally agrees to the currently recommended option.',
+                    'Return modifiers separately; do not treat a constrained or changed request as unconditional acceptance.',
+                ].join(' '),
+            },
+            {
+                role: 'user',
+                content: buildSemanticClassifierInput({ message: context.turn.message, options, recommendation }),
+            },
+        ],
+        text: { format: SEMANTIC_INTERACTION_CLASSIFIER_SCHEMA },
+    }, { timeout: 10_000, maxRetries: 0 });
+    const parsed = parseSemanticClassifierResult(JSON.parse(response.output_text));
+    if (!parsed) throw new Error('semantic_classifier_invalid_output');
+    return arbitrateSemanticClassifierResult({
+        message: context.turn.message,
+        classification: parsed,
+        options,
+        recommendation,
+    });
+}
 
 let cachedOpenAI: OpenAI | null = null;
 
@@ -649,11 +740,17 @@ type GenerationContext = {
         focusRevision: number;
         activeTaskId?: string;
         activeDocumentIds: Id<'uploadedFiles'>[];
+        activeEvidenceGenerationIds?: Id<'documentMemoryGenerations'>[];
+        pendingOptionsJson?: string;
+        activeRecommendationJson?: string;
     } | null;
     turnUnderstanding?: {
         speechAct: string;
         continuity: string;
         requestedOperation?: string;
+        interactionIntent?: string;
+        interactionConfidence?: number;
+        interactionReasonCodes?: string[];
         ambiguityMaterial: boolean;
         reasonCodes: string[];
     } | null;
@@ -669,6 +766,11 @@ type GenerationContext = {
         capabilityRequirements: string[];
         fallbackOrder: string[];
         questionContractJson: string;
+        interactionResolutionId?: string;
+        selectedOptionId?: string;
+        requestedOperation?: string;
+        analysisMode?: DocumentAnalysisMode;
+        selectedEvidenceGenerationIds?: Id<'documentMemoryGenerations'>[];
     } | null;
     publicationRepair?: {
         attempt: 1;
@@ -836,6 +938,11 @@ function executionPlanFromContext(context: GenerationContext): TurnExecutionPlan
         capabilityRequirements: plan.capabilityRequirements,
         fallbackOrder: plan.fallbackOrder,
         questionKind,
+        interactionResolutionId: plan.interactionResolutionId,
+        selectedOptionId: plan.selectedOptionId,
+        requestedOperation: plan.requestedOperation,
+        analysisMode: plan.analysisMode,
+        selectedEvidenceGenerationIds: plan.selectedEvidenceGenerationIds?.map(String),
     };
 }
 
@@ -881,6 +988,11 @@ async function commitVerifiedResponse(args: {
     artifactsJson?: string;
     decision?: 'publish' | 'publish_scoped' | 'ask_clarification' | 'publish_limitation';
     repairHistory?: string[];
+    pendingInteraction?: {
+        options: PendingOption[];
+        offer?: AssistantOffer;
+        recommendation?: RecommendationReceipt;
+    };
 }) {
     const plan = executionPlanFromContext(args.context);
     if (!plan || !args.context.conversationControlState?.activeTaskId) {
@@ -896,12 +1008,24 @@ async function commitVerifiedResponse(args: {
     }
     const operation = capabilityOperationForTurn(args.context, plan);
     const capabilityDecision = canPerformOperation(operation, args.capabilitySnapshot);
-    const pending = derivePendingInteraction({
+    const derivedPending = derivePendingInteraction({
         content: args.content,
         taskId: plan.taskId,
         documentIds: plan.selectedDocumentIds,
+        evidenceGenerationIds: plan.selectedEvidenceGenerationIds,
         focusRevision: plan.focusRevision,
+        sourceTurnId: args.context.turn._id.toString(),
+        sourcePlanId: plan.planId,
+        capabilitySnapshotHash: args.capabilitySnapshot.snapshotHash,
     });
+    const pending = args.pendingInteraction
+        ? {
+            pendingAct: args.pendingInteraction.options.length > 1 ? 'select' as const : args.pendingInteraction.options.length === 1 ? 'confirm' as const : undefined,
+            options: args.pendingInteraction.options,
+            offer: args.pendingInteraction.offer,
+            recommendation: args.pendingInteraction.recommendation,
+          }
+        : { ...derivedPending, recommendation: undefined as RecommendationReceipt | undefined };
     const canonicalPlan = buildCanonicalAnswerPlanV2({
         executionPlan: plan,
         response: args.response,
@@ -927,10 +1051,12 @@ async function commitVerifiedResponse(args: {
         requiresDirectAnswer: plan.responseAct === 'answer' && args.decision !== 'publish_limitation',
         unresolvedReferent: Boolean(args.context.turnUnderstanding?.ambiguityMaterial && plan.responseAct !== 'clarify'),
         publicationV2: effectiveFlags.publicationGateV2,
+        publicationDecision: args.decision,
         speechAct: args.context.turnUnderstanding?.speechAct,
         requestedOperation: args.context.turnUnderstanding?.requestedOperation,
         documentContextAllowed: plan.selectedDocumentIds.length > 0 ||
             (args.context.attachmentContexts?.length ?? 0) > 0 ||
+            Boolean(args.pendingInteraction?.options.some((option) => option.documentIds.length > 0)) ||
             args.context.turnUnderstanding?.requestedOperation === 'await_upload' ||
             detectDocumentReference(args.context.turn.message).referencesDocument,
         citationVerificationPassed: args.citationVerificationPassed,
@@ -980,6 +1106,7 @@ async function commitVerifiedResponse(args: {
         artifactsJson: args.artifactsJson,
         pendingOptionsJson: pending.options.length > 0 ? JSON.stringify(pending.options) : undefined,
         assistantOfferJson: pending.offer ? JSON.stringify(pending.offer) : undefined,
+        recommendationJson: pending.recommendation ? JSON.stringify(pending.recommendation) : undefined,
         decision: args.decision ?? (capabilityDecision.supportLevel === 'scoped' ? 'publish_scoped' : 'publish'),
         checks: verification.checks,
         capabilitySnapshotHash: args.capabilitySnapshot.snapshotHash,
@@ -987,7 +1114,7 @@ async function commitVerifiedResponse(args: {
         canonicalPlanHash: stableCapabilityHash(canonicalPlan),
     }, {
         validatorVersion: publicationV2
-            ? PUBLICATION_VALIDATOR_V2_VERSION
+            ? PUBLICATION_VALIDATOR_V3_VERSION
             : PUBLICATION_VALIDATOR_VERSION,
     });
     const completion = await args.ctx.runMutation(internal.chatTurns.commitValidatedAssistant, {
@@ -3715,10 +3842,10 @@ export const processChatGenerationJob = internalAction({
 
         try {
             workerStage = 'loading_generation_context';
-            let context: GenerationContext | null = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
+            const loadedContext = await ctx.runQuery(internal.chatTurns.getGenerationContext, {
                 turnId: lease.turnId,
             });
-            if (!context) {
+            if (!loadedContext) {
                 await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                     jobId: args.jobId,
                     leaseOwner,
@@ -3732,8 +3859,75 @@ export const processChatGenerationJob = internalAction({
                 });
                 return null;
             }
+            let context = loadedContext as GenerationContext;
 
             const executiveChatFlags = executiveChatFlagsForContext(context);
+            if (executiveChatFlags.semanticArbiter && shouldConsultSemanticClassifier(context)) {
+                workerStage = 'classifying_pending_interaction';
+                let semanticExecutionApplied = false;
+                try {
+                    const resolution = await classifyPendingInteraction(context);
+                    console.info('[ChatWorker] Semantic classifier completed', {
+                        jobId: args.jobId,
+                        decision: resolution.decision,
+                        intent: resolution.intent,
+                        confidence: resolution.confidence,
+                        candidateCount: resolution.candidateOptionIds.length,
+                    });
+                    if (resolution.decision === 'execute' && resolution.selectedOptionId) {
+                        await ctx.runMutation(internal.conversationControl.applySemanticClassifierResolution, {
+                            turnId: context.turn._id,
+                            resolutionId: resolution.resolutionId,
+                            selectedOptionId: resolution.selectedOptionId,
+                            recommendationId: resolution.recommendationId,
+                            intent: resolution.intent,
+                            confidence: resolution.confidence,
+                            reasonCodes: resolution.reasonCodes,
+                            classifierVersion: 'semantic-interaction-model-v1',
+                        });
+                        semanticExecutionApplied = true;
+                        const reloadedContext = await ctx.runQuery(internal.chatTurns.getGenerationContext, { turnId: lease.turnId });
+                        if (!reloadedContext) throw new Error('semantic_classifier_context_reload_failed');
+                        context = reloadedContext as GenerationContext;
+                    } else if (resolution.decision !== 'execute') {
+                        await ctx.runMutation(internal.conversationControl.recordSemanticClassifierFallback, {
+                            turnId: context.turn._id,
+                            resolutionId: resolution.resolutionId,
+                            intent: resolution.intent,
+                            decision: resolution.decision,
+                            candidateOptionIds: resolution.candidateOptionIds,
+                            recommendationId: resolution.recommendationId,
+                            confidence: resolution.confidence,
+                            reasonCodes: resolution.reasonCodes,
+                            classifierVersion: 'semantic-interaction-model-v1',
+                        });
+                    }
+                } catch (semanticError) {
+                    console.warn('[ChatWorker] Semantic classifier fell back to clarification', {
+                        jobId: args.jobId,
+                        error: semanticError instanceof Error ? semanticError.message : String(semanticError),
+                    });
+                    if (!semanticExecutionApplied) {
+                        try {
+                            await ctx.runMutation(internal.conversationControl.recordSemanticClassifierFallback, {
+                                turnId: context.turn._id,
+                                resolutionId: `ires_classifier_fallback_${context.turn._id}`,
+                                intent: 'uncertain',
+                                decision: 'clarify',
+                                candidateOptionIds: [],
+                                confidence: 0,
+                                reasonCodes: ['semantic_classifier_provider_or_validation_failure'],
+                                classifierVersion: 'semantic-interaction-model-v1',
+                            });
+                        } catch (auditError) {
+                            console.warn('[ChatWorker] Semantic classifier fallback audit failed', {
+                                jobId: args.jobId,
+                                error: auditError instanceof Error ? auditError.message : String(auditError),
+                            });
+                        }
+                    }
+                }
+            }
             const reassessmentTarget = findReassessmentTarget(
                 context.turn.message,
                 context.recentMessages.map((message) => ({
@@ -3771,7 +3965,19 @@ export const processChatGenerationJob = internalAction({
                 });
             }
 
-            const fullReviewAttachments: AttachmentContext[] = context.attachmentContexts ?? [];
+            const selectedFullReviewDocumentIds = new Set(
+                context.turn.analysisMode === 'full_document_review'
+                    ? (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String)
+                    : []
+            );
+            const fullReviewAttachments: AttachmentContext[] = [
+                ...(context.attachmentContexts ?? []),
+                ...(context.availableDocumentContexts ?? []).filter((attachment) =>
+                    selectedFullReviewDocumentIds.has(attachment.uploadedFileId.toString())
+                ),
+            ].filter((attachment, index, values) =>
+                values.findIndex((candidate) => candidate.uploadedFileId === attachment.uploadedFileId) === index
+            );
             const baselineAttachments = [
                 ...fullReviewAttachments,
                 ...(context.availableDocumentContexts ?? []),
@@ -3843,6 +4049,31 @@ export const processChatGenerationJob = internalAction({
                 workerStage = 'publishing_review_depth_choices';
                 const content = reviewDepthChoiceMessage();
                 const response = plainTextAssistantResponse(content);
+                const evidenceBinding = await ctx.runMutation(internal.conversationControl.bindTurnEvidenceGenerations, {
+                    turnId: context.turn._id,
+                    documentIds: context.turnExecutionPlan?.selectedDocumentIds ?? [],
+                });
+                if (context.conversationControlState) {
+                    context.conversationControlState.activeEvidenceGenerationIds = evidenceBinding.activeEvidenceGenerationIds;
+                }
+                if (context.turnExecutionPlan) {
+                    context.turnExecutionPlan.selectedEvidenceGenerationIds = evidenceBinding.evidenceGenerationIds;
+                }
+                const pendingInteraction = createReviewDepthPendingInteraction({
+                    taskId: context.turnExecutionPlan?.taskId ?? context.conversationControlState?.activeTaskId ?? '',
+                    documentIds: (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String),
+                    evidenceGenerationIds: evidenceBinding.evidenceGenerationIds.map(String),
+                    focusRevision: context.turnExecutionPlan?.focusRevision ?? context.conversationControlState?.focusRevision ?? 0,
+                    sourceTurnId: context.turn._id.toString(),
+                    sourcePlanId: context.turnExecutionPlan?.planId,
+                    capabilitySnapshotHash: baselineCapabilitySnapshot.snapshotHash,
+                    authorizationScopeHash: stableCapabilityHash({
+                        userId: context.turn.userId.toString(),
+                        conversationId: context.turn.conversationId.toString(),
+                        documentIds: (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String),
+                        evidenceGenerationIds: evidenceBinding.evidenceGenerationIds.map(String),
+                    }),
+                });
                 const choicePublication = await commitVerifiedResponse({
                     ctx,
                     jobId: args.jobId,
@@ -3856,6 +4087,9 @@ export const processChatGenerationJob = internalAction({
                     usedDocumentIds: [],
                     artifactsJson: JSON.stringify(emptyArtifacts()),
                     decision: 'ask_clarification',
+                    pendingInteraction: {
+                        options: pendingInteraction.options,
+                    },
                     metadata: {
                         deterministicInteraction: 'review_depth_choice',
                         analysisMode: context.turn.analysisMode,
@@ -3873,9 +4107,56 @@ export const processChatGenerationJob = internalAction({
                 }
                 return null;
             }
+            const recommendedFullReview = fullReviewPendingOption(context);
+            if (recommendedFullReview && isReviewDepthRecommendationQuestion(context.turn.message)) {
+                workerStage = 'publishing_review_depth_recommendation';
+                const options = pendingOptionsFromContext(context);
+                const content = reviewDepthRecommendationMessage();
+                const recommendation = recommendationForOption({
+                    option: recommendedFullReview,
+                    options,
+                    focusRevision: context.conversationControlState?.focusRevision ?? context.turnExecutionPlan?.focusRevision ?? 0,
+                    sourceTurnId: context.turn._id.toString(),
+                    basisCodes: ['most_complete_review_depth'],
+                });
+                const recommendationPublication = await commitVerifiedResponse({
+                    ctx,
+                    jobId: args.jobId,
+                    leaseOwner,
+                    context,
+                    response: plainTextAssistantResponse(content),
+                    content,
+                    capabilitySnapshot: baselineCapabilitySnapshot,
+                    evidenceIds: [],
+                    citationVerificationPassed: true,
+                    usedDocumentIds: [],
+                    artifactsJson: JSON.stringify(emptyArtifacts()),
+                    decision: 'ask_clarification',
+                    pendingInteraction: { options, recommendation },
+                    metadata: {
+                        deterministicInteraction: 'review_depth_recommendation',
+                        recommendationId: recommendation.recommendationId,
+                        recommendedOptionId: recommendation.recommendedOptionId,
+                    },
+                });
+                if (!recommendationPublication?.committed) {
+                    await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
+                        jobId: args.jobId,
+                        leaseOwner,
+                        recoveryCode: 'validation_exhausted',
+                        errorCode: 'review_depth_recommendation_publication_failed',
+                        errorMessage: recommendationPublication?.verification.errors.join(', '),
+                        retryable: true,
+                    });
+                }
+                return null;
+            }
             if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
                 workerStage = 'completing_coverage_gate';
-                const gateResponse = degradedResponse(buildCoverageGateMessage(fullReviewAttachments));
+                const gateContent = context.turnExecutionPlan?.selectedOptionId
+                    ? acceptedReviewProgressMessage(fullReviewAttachments)
+                    : buildCoverageGateMessage(fullReviewAttachments);
+                const gateResponse = degradedResponse(gateContent);
                 const gateCommit = await commitVerifiedResponse({
                     ctx,
                     jobId: args.jobId,
@@ -3921,7 +4202,10 @@ export const processChatGenerationJob = internalAction({
                 const missingRecord = fullReviewAttachments.find((attachment) => !attachment.fullDocumentReviewMarkdown?.trim());
                 if (missingRecord) {
                     workerStage = 'completing_review_gate';
-                    const gateResponse = degradedResponse(buildCoverageGateMessage(fullReviewAttachments));
+                    const gateContent = context.turnExecutionPlan?.selectedOptionId
+                        ? acceptedReviewProgressMessage(fullReviewAttachments)
+                        : buildCoverageGateMessage(fullReviewAttachments);
+                    const gateResponse = degradedResponse(gateContent);
                     const gateCommit = await commitVerifiedResponse({
                         ctx,
                         jobId: args.jobId,
@@ -3971,6 +4255,8 @@ export const processChatGenerationJob = internalAction({
                     content,
                     capabilitySnapshot: baselineCapabilitySnapshot,
                     evidenceIds: reviewCitations.map((citation) => citation.chunkId.toString()),
+                    citationVerificationPassed: reviewCitations.length > 0,
+                    usedDocumentIds: fullReviewAttachments.map((attachment) => attachment.uploadedFileId.toString()),
                     artifactsJson: JSON.stringify(emptyArtifacts()),
                     decision: 'publish',
                     metadata: {
@@ -3987,7 +4273,9 @@ export const processChatGenerationJob = internalAction({
                 if (!reviewCommit?.committed) {
                     await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                         jobId: args.jobId, leaseOwner, recoveryCode: 'validation_exhausted',
-                        errorCode: 'full_review_publication_failed', retryable: true,
+                        errorCode: 'full_review_publication_failed',
+                        errorMessage: reviewCommit?.verification.errors.join(', '),
+                        retryable: true,
                     });
                     return null;
                 }

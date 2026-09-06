@@ -2,8 +2,13 @@ import { expect, test } from '@playwright/test';
 import { beginSyntheticRun, finishSyntheticRun } from '../support/lifecycle';
 import { ensureUploadFixtures } from '../support/files';
 import { uploadAndSend } from '../support/upload-journey';
+import { inspectSyntheticRunUpload, waitForSyntheticFullReviewReady } from '../support/convex';
 
-async function sendAndWait(page: import('@playwright/test').Page, text: string) {
+async function sendAndWait(
+  page: import('@playwright/test').Page,
+  text: string,
+  options: { inspectBeforeStatusAssertion?: boolean } = {},
+) {
   const assistants = page.getByTestId('chat-message-assistant');
   const before = await assistants.count();
   await page.getByTestId('chat-composer').fill(text);
@@ -11,7 +16,9 @@ async function sendAndWait(page: import('@playwright/test').Page, text: string) 
   await expect(assistants).toHaveCount(before + 1, { timeout: 4 * 60 * 1000 });
   const answer = assistants.last();
   await expect(answer).toHaveAttribute('data-message-streaming', 'false', { timeout: 4 * 60 * 1000 });
-  await expect(answer).not.toHaveAttribute('data-message-status', 'degraded');
+  if (!options.inspectBeforeStatusAssertion) {
+    await expect(answer).not.toHaveAttribute('data-message-status', 'degraded');
+  }
   const content = answer.getByTestId('assistant-message-content');
   await expect(content).toBeVisible();
   return content;
@@ -30,9 +37,28 @@ test('critical executive-chat sequence matrix preserves focus without unwanted d
       prompt: 'Analyze this file. If more than one review depth is possible, offer the choices.',
     });
     await sendAndWait(page, 'which');
-    const finalAnswer = await sendAndWait(page, 'please do so');
-    await expect(finalAnswer).not.toContainText(/(?:cannot|can't|do not) (?:read|access|see).*(?:file|document|pdf)/i);
+    await waitForSyntheticFullReviewReady(page, environment.runId);
+    const finalAnswer = await sendAndWait(page, 'please do so', { inspectBeforeStatusAssertion: true });
+    await expect(finalAnswer).not.toContainText(/(?:cannot|can't|do not|don't|unable to).{0,140}(?:read|access|see|have).{0,140}(?:file|document|order|pdf|text)|(?:re[- ]?upload|upload again).{0,140}(?:file|document|order|pdf)/i);
     await expect(page.getByTestId('chat-message-attachment').filter({ hasText: fixture.path.split(/[\\/]/).pop()! })).toBeVisible();
+    const inspected = await inspectSyntheticRunUpload(page, environment.runId);
+    const acceptedTurn = inspected.semanticTurns.find((turn) => turn.message.toLowerCase() === 'please do so');
+    console.log(JSON.stringify({ event: 'executive_chat_acceptance_inspection', turn: acceptedTurn }));
+    await expect(page.getByTestId('chat-message-assistant').last()).not.toHaveAttribute('data-message-status', 'degraded');
+    expect(acceptedTurn).toMatchObject({
+      status: 'assistant_saved',
+      speechAct: 'confirm',
+      interactionIntent: 'accept_recommendation',
+      interactionDecision: 'execute',
+      analysisMode: 'full_document_review',
+      publicationRejectionCodes: [],
+      shadowRejectionCodes: [],
+    });
+    expect(acceptedTurn?.selectedOptionId).toBeTruthy();
+    expect(acceptedTurn?.selectedDocumentIds).toHaveLength(1);
+    expect(acceptedTurn?.selectedEvidenceGenerationIds.length).toBeGreaterThan(0);
+    expect(acceptedTurn?.answerEvidenceDocumentCount).toBeGreaterThan(0);
+    expect(acceptedTurn?.answerEvidenceChunkCount).toBeGreaterThan(0);
 
     const greeting = await sendAndWait(page, 'hey');
     await expect(greeting).toContainText(/\b(?:hey|hi|hello|good (?:morning|afternoon|evening))\b/i);

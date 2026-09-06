@@ -1,6 +1,6 @@
 import type { RouteMode } from '../../types';
 import type { DocumentActivationDecision } from './documentActivation';
-import type { FocusTransition, QuestionKind, TurnExecutionPlan, TurnUnderstanding } from './types';
+import type { FocusTransition, PendingOption, QuestionKind, TurnExecutionPlan, TurnUnderstanding } from './types';
 
 function fingerprint(value: string) {
   let hash = 5381;
@@ -33,6 +33,9 @@ export function buildExecutionPlan(args: {
   activeDocumentIds: string[];
   attachmentDocumentIds?: string[];
   documentActivation?: DocumentActivationDecision;
+  resolvedOption?: PendingOption;
+  interactionResolutionId?: string;
+  activeEvidenceGenerationIds?: string[];
 }): TurnExecutionPlan {
   const responseAct = args.transition.kind === 'clarify' || args.understanding.ambiguityMaterial
     ? 'clarify'
@@ -53,8 +56,11 @@ export function buildExecutionPlan(args: {
   const activatedDocumentIds = documentActivation.useCurrentAttachmentsOnly
     ? args.attachmentDocumentIds ?? []
     : args.activeDocumentIds;
+  const optionDocumentIds = args.resolvedOption?.documentIds ?? [];
   const selectedDocumentIds = documentActivation.active
-    ? Array.from(new Set([...activatedDocumentIds, ...resolvedDocumentIds]))
+    ? Array.from(new Set(optionDocumentIds.length > 0
+      ? [...optionDocumentIds, ...resolvedDocumentIds]
+      : [...activatedDocumentIds, ...resolvedDocumentIds]))
     : [];
   const requiresDocuments = selectedDocumentIds.length > 0;
   const kind = questionKind(args.message, args.understanding);
@@ -76,5 +82,22 @@ export function buildExecutionPlan(args: {
       : [],
     fallbackOrder: ['deterministic_repair', 'rerender', 'single_regeneration', 'scoped_answer', 'clarification', 'safe_limitation'],
     questionKind: kind,
+    interactionResolutionId: args.resolvedOption ? args.interactionResolutionId : undefined,
+    selectedOptionId: args.resolvedOption?.optionId,
+    requestedOperation: args.resolvedOption?.operation?.kind ?? args.understanding.requestedOperation,
+    analysisMode: args.resolvedOption?.operation?.kind === 'document_review'
+      ? args.resolvedOption.operation.analysisMode
+      : undefined,
+    selectedEvidenceGenerationIds: args.resolvedOption?.evidenceGenerationIds?.length
+      ? Array.from(new Set(args.resolvedOption.evidenceGenerationIds))
+      : args.activeEvidenceGenerationIds,
+    interactionContractHash: args.resolvedOption
+      ? fingerprint(JSON.stringify({
+          optionId: args.resolvedOption.optionId,
+          operation: args.resolvedOption.operation,
+          documentIds: args.resolvedOption.documentIds,
+          evidenceGenerationIds: args.resolvedOption.evidenceGenerationIds ?? [],
+        }))
+      : undefined,
   };
 }

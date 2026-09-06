@@ -68,7 +68,7 @@ import { featureFlagsForPersistedRollout, featureFlagsForRollout, getExecutiveCh
 import { resolveRolloutForSubject } from './executiveChatRollout';
 import {
     PUBLICATION_VALIDATOR_VERSION,
-    PUBLICATION_VALIDATOR_V2_VERSION,
+    PUBLICATION_VALIDATOR_V3_VERSION,
     validatePersistedEnvelope,
     type PersistedPublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
@@ -1442,6 +1442,7 @@ export const acceptChatTurn = mutation({
             focusRevision: orchestration.focusRevision,
             understandingId: orchestration.understandingId,
             executionPlanId: orchestration.executionPlanId,
+            analysisMode: orchestration.plan.analysisMode ?? analysisMode,
             status: 'understanding_saved',
             updatedAt: now,
         });
@@ -2574,14 +2575,18 @@ export const resolveFullReviewEvidence = internalQuery({
     handler: async (ctx, args) => {
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return [];
-        const [conversation, user, attachmentRows] = await Promise.all([
+        const [conversation, user, attachmentRows, executionPlan] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
             ctx.db.query('messageAttachments').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+            ctx.db.query('turnExecutionPlans').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).first(),
         ]);
         if (!conversation || !user?.clerkId) return [];
         const allowQaDocuments = isUploadE2ERobotEmail(user.email);
-        const attachedFileIds = new Set(attachmentRows.map((row) => row.uploadedFileId.toString()));
+        const authorizedFileIds = new Set([
+            ...attachmentRows.map((row) => row.uploadedFileId.toString()),
+            ...(executionPlan?.userId === turn.userId ? executionPlan.selectedDocumentIds.map(String) : []),
+        ]);
         const results: Array<{
             sourceId: string;
             chunkId: Id<'documentChunks'>;
@@ -2597,7 +2602,7 @@ export const resolveFullReviewEvidence = internalQuery({
                     !chunk ||
                     !uploadedFile ||
                     !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
-                    !attachedFileIds.has(uploadedFile._id.toString()) ||
+                    !authorizedFileIds.has(uploadedFile._id.toString()) ||
                     (uploadedFile.clerkUserId !== user.clerkId && !(await hasActiveUserChatGrant(ctx, {
                         clerkUserId: user.clerkId,
                         uploadedFileId: uploadedFile._id,
@@ -3340,7 +3345,7 @@ export const commitValidatedAssistant = internalMutation({
             capabilitySnapshotHash: args.capabilitySnapshotHash,
             evidenceSetHash: args.evidenceSetHash,
             expectedValidatorVersion: executiveChatFlags.publicationGateV2
-                ? PUBLICATION_VALIDATOR_V2_VERSION
+                ? PUBLICATION_VALIDATOR_V3_VERSION
                 : PUBLICATION_VALIDATOR_VERSION,
         });
         if (!validation.passed) {
@@ -3426,9 +3431,10 @@ export const commitValidatedAssistant = internalMutation({
 
         if (
             understanding?.requestedOperation !== 'await_upload' &&
-            (envelope.pendingOptionsJson || envelope.assistantOfferJson || envelope.responseAct === 'clarify')
+            (envelope.pendingOptionsJson || envelope.assistantOfferJson || envelope.recommendationJson || envelope.responseAct === 'clarify')
         ) {
             let optionCount = 0;
+            const optionIds = new Set<string>();
             if (envelope.pendingOptionsJson) {
                 try {
                     const parsed = JSON.parse(envelope.pendingOptionsJson) as unknown;
@@ -3439,13 +3445,35 @@ export const commitValidatedAssistant = internalMutation({
                             option.targetTaskId !== turn.taskId ||
                             option.expiresAfterFocusRevision !== control.focusRevision ||
                             !Array.isArray(option.documentIds) ||
-                            option.documentIds.some((id) => !control.activeDocumentIds.some((activeId) => activeId.toString() === id))
+                            option.documentIds.some((id) => !control.activeDocumentIds.some((activeId) => activeId.toString() === id)) ||
+                            (option.schemaVersion === 2 && (
+                                !Array.isArray(option.evidenceGenerationIds) ||
+                                option.evidenceGenerationIds.some((id) => !control.activeEvidenceGenerationIds.some((activeId) => activeId.toString() === id))
+                            ))
                         ) {
                             throw new Error('pending_option_scope_mismatch');
                         }
+                        if (typeof option.optionId !== 'string') throw new Error('pending_option_id_missing');
+                        optionIds.add(option.optionId);
                     }
                 } catch (error) {
                     throw new Error(`publication_pending_options_invalid:${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+            if (envelope.recommendationJson) {
+                try {
+                    const recommendation = JSON.parse(envelope.recommendationJson) as Record<string, unknown>;
+                    if (
+                        recommendation.schemaVersion !== 1 ||
+                        recommendation.targetTaskId !== turn.taskId ||
+                        recommendation.focusRevision !== control.focusRevision ||
+                        typeof recommendation.recommendedOptionId !== 'string' ||
+                        !optionIds.has(recommendation.recommendedOptionId)
+                    ) {
+                        throw new Error('recommendation_scope_mismatch');
+                    }
+                } catch (error) {
+                    throw new Error(`publication_recommendation_invalid:${error instanceof Error ? error.message : String(error)}`);
                 }
             }
             const pendingAct = optionCount > 1
@@ -3460,6 +3488,8 @@ export const commitValidatedAssistant = internalMutation({
                 pendingOptionsJson: envelope.pendingOptionsJson,
                 pendingSourceTurnId: pendingAct ? turn._id : undefined,
                 lastAssistantOfferJson: envelope.assistantOfferJson,
+                pendingInteractionVersion: envelope.pendingOptionsJson ? 2 : undefined,
+                activeRecommendationJson: envelope.recommendationJson,
                 updatedAt: now,
             });
         }

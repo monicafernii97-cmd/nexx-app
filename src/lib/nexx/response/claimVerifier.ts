@@ -26,7 +26,14 @@ export type ClaimVerificationError =
   | 'RESP_GENERIC_MULTI_SENTENCE'
   | 'RESP_FALLBACK_NOT_CONTEXTUAL'
   | 'RESP_WRONG_DOCUMENT_SCOPE'
-  | 'RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION';
+  | 'RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION'
+  | 'RESP_ACCEPTED_ACTION_NOT_EXECUTED'
+  | 'RESP_RECOMMENDATION_REFERENCE_DROPPED'
+  | 'RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE'
+  | 'RESP_EXECUTION_WITHOUT_OPERATION'
+  | 'RESP_EXECUTION_WITHOUT_EVIDENCE'
+  | 'RESP_REUPLOAD_UNNECESSARY'
+  | 'RESP_REPEATED_CHOICE_AFTER_RESOLUTION';
 
 export type ClaimVerificationResult = {
   passed: boolean;
@@ -61,6 +68,28 @@ const INPUT_WAIT_ACKNOWLEDGMENT = /\b(?:upload|re[- ]?upload|attach|send|provide
 const HISTORICAL_DOCUMENT_WORK = /\b(?:review|analy[sz]e|extract|read|process|check|use)\b.{0,60}\b(?:the\s+)?(?:existing|previous|prior|old|historical|current|available|uploaded|saved)?\s*(?:order|document|file|pdf)\b/i;
 const ACTION_COMPLETION_CLAIM = /\b(?:i|we)(?:'ve| have)? (?:now )?(?:reviewed|analy[sz]ed|extracted|read|processed|completed|finished|checked)\b|\b(?:the\s+)?(?:review|analysis|extraction|processing|check)\s+(?:is|was|has been)\s+(?:complete|completed|finished|done)\b/i;
 const SELF_ASSESSMENT_CLAIM = /\b(?:i|we)\s+(?:checked|rechecked|reassessed|inspected|reviewed|looked\s+again)\b/i;
+const UPLOAD_ACTION = /\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
+const UPLOAD_OBJECT = /\b(?:file|order|document|pdf|attachment|it)\b/i;
+const NEGATED_UPLOAD_REQUEST = /\b(?:no need|need(?:s)? not|needn't|do not need|don't need|does not need|doesn't need|should not|shouldn't|must not|mustn't|without|rather than|instead of|not (?:ask|asking|require|requiring|request|requesting)(?:ing)?(?: you)? to)\b.{0,100}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
+const PROMISE_ONLY = /\b(?:i can|i will|i'll|once you|after you|next step)\b.{0,140}\b(?:review|analy[sz]e|read|start)\b/i;
+const REPEATED_CHOICE = /\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i;
+const CONTEXTUAL_LIMITATION = /\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b.{0,180}\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b|\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b.{0,180}\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b/i;
+
+function requestsUploadFromUser(content: string): boolean {
+  return content
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .some((sentence) => {
+      if (!UPLOAD_ACTION.test(sentence) || !UPLOAD_OBJECT.test(sentence) || NEGATED_UPLOAD_REQUEST.test(sentence)) {
+        return false;
+      }
+      return /\b(?:please|kindly)\b.{0,40}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /\b(?:could|can|would|will)\s+you\b.{0,60}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /\byou\s+(?:need|must|should|have)\s+to\b.{0,60}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /^(?:upload|re[- ]?upload|attach|send|provide)\b.{0,100}\b(?:the|your|this|that|a|an)\s+(?:file|order|document|pdf|attachment|it)\b/i.test(sentence);
+    });
+}
 
 export function verifyResponseClaims(args: {
   content: string;
@@ -75,6 +104,7 @@ export function verifyResponseClaims(args: {
   requiresDirectAnswer?: boolean;
   unresolvedReferent?: boolean;
   publicationV2?: boolean;
+  publicationDecision?: 'publish' | 'publish_scoped' | 'ask_clarification' | 'publish_limitation';
   speechAct?: string;
   requestedOperation?: string;
   documentContextAllowed?: boolean;
@@ -89,22 +119,32 @@ export function verifyResponseClaims(args: {
     document.authorized && (document.textExtracted || document.chunksAvailable));
   const exhaustiveReady = args.capabilitySnapshot.documents.length > 0 && args.capabilitySnapshot.documents.every((document) =>
     document.authorized && document.coverageStatus === 'complete' && document.fullDocumentReviewStatus === 'ready');
+  const publishingLimitation = args.publicationDecision === 'publish_limitation';
 
   if (args.requiresDirectAnswer && args.speechAct !== 'social' && content.length < 20) {
     errors.push('RESP_MISSING_DIRECT_ANSWER');
   }
   const genericAssessment = assessGenericAnswer(content);
   const generic = args.publicationV2 ? genericAssessment.isGeneric : GENERIC.test(content);
-  if (generic && (args.evidenceIds.length > 0 || args.requiresDirectAnswer)) {
+  if (generic && (args.evidenceIds.length > 0 || args.requiresDirectAnswer || publishingLimitation)) {
     errors.push('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE');
     if (genericAssessment.sentenceCount > 1) errors.push('RESP_GENERIC_MULTI_SENTENCE');
     if (genericAssessment.paddingSentenceCount > 0 || genericAssessment.limitationSentenceCount > 0) {
       errors.push('RESP_FALLBACK_NOT_CONTEXTUAL');
     }
   }
+  if (args.publicationV2 && publishingLimitation && !CONTEXTUAL_LIMITATION.test(content)) {
+    errors.push('RESP_FALLBACK_NOT_CONTEXTUAL');
+  }
   if (UNREADABLE_CLAIM.test(content) && readable && args.capabilityDecision.prohibitedClaims.includes('file_unreadable')) errors.push('RESP_FALSE_UNREADABLE_CLAIM');
+  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && UNREADABLE_CLAIM.test(content)) {
+    errors.push('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE');
+  }
+  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && requestsUploadFromUser(content) && args.requestedOperation !== 'await_upload') {
+    errors.push('RESP_REUPLOAD_UNNECESSARY');
+  }
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');
-  if (args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
+  if (!publishingLimitation && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
   if (args.publicationV2 && args.citationVerificationPassed === false) {
     errors.push('RESP_CITATION_MISMATCH');
   }
@@ -117,6 +157,21 @@ export function verifyResponseClaims(args: {
   if (args.expectedFocusRevision !== args.currentFocusRevision) errors.push('RESP_STALE_FOCUS');
   if (args.unresolvedReferent && args.plan.responseAct !== 'clarify') errors.push('RESP_UNRESOLVED_REFERENT');
   if (INTERNAL_PAYLOAD.test(content)) errors.push('RESP_INTERNAL_PAYLOAD');
+  if (args.publicationV2 && ACTION_COMPLETION_CLAIM.test(content) && !args.plan.requestedOperation && !args.plan.analysisMode) {
+    errors.push('RESP_EXECUTION_WITHOUT_OPERATION');
+  }
+  if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
+    errors.push('RESP_EXECUTION_WITHOUT_EVIDENCE', 'RESP_ACCEPTED_ACTION_NOT_EXECUTED');
+  }
+  if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && PROMISE_ONLY.test(content) && args.evidenceIds.length === 0) {
+    errors.push('RESP_ACCEPTED_ACTION_NOT_EXECUTED');
+  }
+  if (args.publicationV2 && args.plan.selectedOptionId && REPEATED_CHOICE.test(content)) {
+    errors.push('RESP_REPEATED_CHOICE_AFTER_RESOLUTION');
+  }
+  if (args.publicationV2 && args.plan.interactionResolutionId && !args.plan.selectedOptionId && ['confirm', 'select'].includes(args.speechAct ?? '')) {
+    errors.push('RESP_RECOMMENDATION_REFERENCE_DROPPED');
+  }
 
   if (args.publicationV2 && args.speechAct === 'social' && (
     DOCUMENT_CONTEXT_MENTION.test(content) || DOCUMENT_ANALYSIS_CLAIM.test(content)
@@ -184,7 +239,10 @@ export function verifyResponseClaims(args: {
         !has('RESP_INTENT_NOT_FULFILLED') &&
         !has('RESP_AWAITED_INPUT_NOT_ACKNOWLEDGED'),
       evidence: !has('RESP_UNSUPPORTED_PROPOSITION') && !has('RESP_CITATION_MISMATCH'),
-      capabilityClaims: !has('RESP_FALSE_UNREADABLE_CLAIM') && !has('RESP_FALSE_EXHAUSTIVE_CLAIM'),
+      capabilityClaims: !has('RESP_FALSE_UNREADABLE_CLAIM') &&
+        !has('RESP_FALSE_EXHAUSTIVE_CLAIM') &&
+        !has('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE') &&
+        !has('RESP_REUPLOAD_UNNECESSARY'),
       continuity: !has('RESP_WRONG_TASK') &&
         !has('RESP_UNRESOLVED_REFERENT') &&
         !has('RESP_STALE_FOCUS') &&
@@ -194,11 +252,16 @@ export function verifyResponseClaims(args: {
         !has('RESP_LATENT_DOCUMENT_CONTEXT_SURFACED') &&
         !has('RESP_WRONG_DOCUMENT_SCOPE') &&
         !has('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN') &&
-        !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD'),
+        !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD') &&
+        !has('RESP_ACCEPTED_ACTION_NOT_EXECUTED') &&
+        !has('RESP_RECOMMENDATION_REFERENCE_DROPPED') &&
+        !has('RESP_REPEATED_CHOICE_AFTER_RESOLUTION'),
       contradictions: !has('RESP_UNSUPPORTED_PROPOSITION') &&
         !has('RESP_FALSE_ACTION_COMPLETION') &&
         !has('RESP_FUTURE_ACTION_EXECUTED_EARLY') &&
-        !has('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION'),
+        !has('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION') &&
+        !has('RESP_EXECUTION_WITHOUT_OPERATION') &&
+        !has('RESP_EXECUTION_WITHOUT_EVIDENCE'),
       safety: true,
       internalPayload: !has('RESP_INTERNAL_PAYLOAD'),
     },

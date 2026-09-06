@@ -1,5 +1,6 @@
 export const ORCHESTRATION_POLICY_VERSION = 'exec-chat-v1';
 export const ORCHESTRATION_POLICY_V2_VERSION = 'exec-chat-v2';
+export const ORCHESTRATION_POLICY_V3_VERSION = 'exec-chat-v3';
 export const AUTO_RESOLVE_THRESHOLD = 0.72;
 export const AUTO_RESOLVE_MARGIN = 0.18;
 

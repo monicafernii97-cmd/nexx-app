@@ -282,6 +282,122 @@ describe('publication quality v2', () => {
     }).passed).toBe(true);
   });
 
+  it('allows a contextual pending-review receipt after an accepted option without pretending completion', () => {
+    const result = verify(
+      'I accepted the full-document review and verified the source coverage for Signed Final Order.pdf. The exhaustive synthesis is still finishing from the saved evidence, and the selected review remains active; no new file is needed.',
+      {
+        publicationDecision: 'publish_limitation',
+        plan: plan({
+          selectedOptionId: 'full-review',
+          selectedDocumentIds: ['signed-order'],
+          selectedEvidenceGenerationIds: ['evidence-1'],
+          evidenceRequirements: ['relevant_source_unit'],
+          analysisMode: 'full_document_review',
+        }),
+      },
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.errors).not.toEqual(expect.arrayContaining([
+      'RESP_CITATION_MISMATCH',
+      'RESP_EXECUTION_WITHOUT_EVIDENCE',
+      'RESP_ACCEPTED_ACTION_NOT_EXECUTED',
+      'RESP_REPEATED_CHOICE_AFTER_RESOLUTION',
+    ]));
+  });
+
+  it('does not mistake a no-reupload assurance inside a completed analysis for an upload request', () => {
+    const readableSnapshot: DocumentCapabilitySnapshot = {
+      ...snapshot,
+      documents: [{
+        uploadedFileId: 'signed-order',
+        filename: 'Signed Final Order.pdf',
+        status: 'ready',
+        authorized: true,
+        binaryStored: true,
+        metadataAvailable: true,
+        textExtracted: true,
+        extractedCharacterCount: 5_000,
+        pageCountKnown: true,
+        pagesTotal: 10,
+        availablePageRanges: [[1, 10]],
+        requestedPagesAvailable: true,
+        chunksAvailable: true,
+        activeMemoryAvailable: true,
+        keywordSearchAvailable: true,
+        semanticSearchAvailable: true,
+        hostedFileSearchAvailable: false,
+        citationAnchorsAvailable: true,
+        coverageStatus: 'complete',
+        fullDocumentReviewStatus: 'ready',
+        limitations: [],
+      }],
+    };
+    const result = verify(
+      'The order was reviewed from the saved evidence, so you do not need to reupload the signed-order file.',
+      {
+        capabilitySnapshot: readableSnapshot,
+        evidenceIds: ['chunk-1'],
+        citationVerificationPassed: true,
+        usedDocumentIds: ['signed-order'],
+        plan: plan({ selectedDocumentIds: ['signed-order'] }),
+      },
+    );
+
+    expect(result.errors).not.toContain('RESP_REUPLOAD_UNNECESSARY');
+  });
+
+  it('still blocks actual requests to reupload an already-readable selected document', () => {
+    const readableSnapshot: DocumentCapabilitySnapshot = {
+      ...snapshot,
+      documents: [{
+        uploadedFileId: 'signed-order',
+        filename: 'Signed Final Order.pdf',
+        status: 'ready',
+        authorized: true,
+        binaryStored: true,
+        metadataAvailable: true,
+        textExtracted: true,
+        extractedCharacterCount: 5_000,
+        pageCountKnown: true,
+        pagesTotal: 10,
+        availablePageRanges: [[1, 10]],
+        requestedPagesAvailable: true,
+        chunksAvailable: true,
+        activeMemoryAvailable: true,
+        keywordSearchAvailable: true,
+        semanticSearchAvailable: true,
+        hostedFileSearchAvailable: false,
+        citationAnchorsAvailable: true,
+        coverageStatus: 'complete',
+        fullDocumentReviewStatus: 'ready',
+        limitations: [],
+      }],
+    };
+    const selectedPlan = plan({ selectedDocumentIds: ['signed-order'] });
+
+    for (const content of [
+      'Please reupload the signed-order file.',
+      'Could you attach the document again?',
+      'You need to send the PDF before I can continue.',
+      'Upload the file again.',
+    ]) {
+      expect(verify(content, {
+        capabilitySnapshot: readableSnapshot,
+        plan: selectedPlan,
+      }).errors).toContain('RESP_REUPLOAD_UNNECESSARY');
+    }
+  });
+
+  it('does not let a publication-limitation decision bypass contextual quality checks', () => {
+    expect(verify('I can help you with that.', {
+      publicationDecision: 'publish_limitation',
+    }).errors).toEqual(expect.arrayContaining([
+      'RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE',
+      'RESP_FALLBACK_NOT_CONTEXTUAL',
+    ]));
+  });
+
   it('composes narrow deterministic repairs for greetings and promised uploads', () => {
     expect(buildPublicationRepairContent({
       errors: ['RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN'],

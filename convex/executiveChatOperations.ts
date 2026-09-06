@@ -17,7 +17,7 @@ function rate(numerator: number, denominator: number) {
 async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview' | 'production') {
   const now = Date.now();
   const since = now - WINDOW_MS;
-  const [turns, publications, repairs, reviewRuns, retrievals, canaries, manifests, configs] = await Promise.all([
+  const [turns, publications, repairs, reviewRuns, retrievals, canaries, manifests, configs, interactionResolutions] = await Promise.all([
     ctx.db.query('chatTurns').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
     ctx.db.query('responsePublicationAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
     ctx.db.query('conversationRepairAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
@@ -26,6 +26,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ctx.db.query('chatQualityCanaryRuns').withIndex('by_scenario_created', (q) => q.eq('scenarioId', 'executive-chat-critical-matrix-v2')).order('desc').take(3),
     ctx.db.query('releaseManifests').withIndex('by_environment_active', (q) => q.eq('environment', environment).eq('active', true)).collect(),
     ctx.db.query('executiveChatRolloutConfigs').withIndex('by_environment_status', (q) => q.eq('environment', environment).eq('status', 'active')).order('desc').take(1),
+    ctx.db.query('interactionResolutionAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
   ]);
 
   const recentTurns = turns.slice(0, 250);
@@ -48,6 +49,14 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
   const loopBudgetViolations = repairs.filter((repair) => repair.attempt > repair.maxAttempts).length;
   const rejectedPublications = publications.filter((publication) => publication.decision === 'rejected').length;
   const shadowPublicationBlocks = publications.filter((publication) => (publication.shadowRejectionCodes?.length ?? 0) > 0).length;
+  const falseAvailabilityPublications = publications.filter((publication) =>
+    (publication.shadowRejectionCodes ?? []).includes('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE') ||
+    publication.rejectionCodes.includes('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE')
+  ).length;
+  const acceptedActionNotExecuted = publications.filter((publication) =>
+    (publication.shadowRejectionCodes ?? []).includes('RESP_ACCEPTED_ACTION_NOT_EXECUTED') ||
+    publication.rejectionCodes.includes('RESP_ACCEPTED_ACTION_NOT_EXECUTED')
+  ).length;
   const completedReviewRuns = reviewRuns.filter((run) => ['ready', 'partial', 'failed', 'dead_letter'].includes(run.status));
   const successfulReviewRuns = completedReviewRuns.filter((run) => run.status === 'ready').length;
   const resumedReviewRuns = reviewRuns.filter((run) => (run.resumeCount ?? 0) > 0).length;
@@ -71,6 +80,18 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     shadowPublicationBlocks,
     shadowPublicationBlockRate: rate(shadowPublicationBlocks, publications.filter((publication) => publication.rolloutMode === 'shadow').length),
     publicationWithoutEnvelope,
+    interactionResolutions: interactionResolutions.length,
+    executedInteractionResolutions: interactionResolutions.filter((resolution) => resolution.decision === 'execute').length,
+    clarifiedInteractionResolutions: interactionResolutions.filter((resolution) => resolution.decision === 'clarify').length,
+    recommendationAcceptances: interactionResolutions.filter((resolution) => resolution.intent === 'accept_recommendation').length,
+    semanticClassifierExecutions: interactionResolutions.filter((resolution) =>
+      resolution.classifierVersion === 'semantic-interaction-model-v1' && resolution.decision === 'execute'
+    ).length,
+    semanticClassifierFallbacks: interactionResolutions.filter((resolution) =>
+      resolution.classifierVersion === 'semantic-interaction-model-v1' && resolution.decision !== 'execute'
+    ).length,
+    falseAvailabilityPublications,
+    acceptedActionNotExecuted,
     repairs: repairs.length,
     successfulRepairs: repairs.filter((repair) => repair.status === 'succeeded').length,
     exhaustedRepairs,
@@ -90,6 +111,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ...(publicationWithoutEnvelope > 0 ? ['publication_without_envelope'] : []),
     ...(loopBudgetViolations > 0 ? ['self_correction_loop_budget_exceeded'] : []),
     ...(consecutiveCanaryFailures ? ['consecutive_semantic_canary_failures'] : []),
+    ...(falseAvailabilityPublications > 0 ? ['false_document_unavailable_published'] : []),
   ];
   const softStopCodes = [
     ...(metrics.unexplainedFallbackRate > 0.01 ? ['fallback_rate_above_1_percent'] : []),

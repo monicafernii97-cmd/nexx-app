@@ -2575,14 +2575,18 @@ export const resolveFullReviewEvidence = internalQuery({
     handler: async (ctx, args) => {
         const turn = await ctx.db.get(args.turnId);
         if (!turn) return [];
-        const [conversation, user, attachmentRows] = await Promise.all([
+        const [conversation, user, attachmentRows, executionPlan] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
             ctx.db.query('messageAttachments').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+            ctx.db.query('turnExecutionPlans').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).first(),
         ]);
         if (!conversation || !user?.clerkId) return [];
         const allowQaDocuments = isUploadE2ERobotEmail(user.email);
-        const attachedFileIds = new Set(attachmentRows.map((row) => row.uploadedFileId.toString()));
+        const authorizedFileIds = new Set([
+            ...attachmentRows.map((row) => row.uploadedFileId.toString()),
+            ...(executionPlan?.userId === turn.userId ? executionPlan.selectedDocumentIds.map(String) : []),
+        ]);
         const results: Array<{
             sourceId: string;
             chunkId: Id<'documentChunks'>;
@@ -2598,7 +2602,7 @@ export const resolveFullReviewEvidence = internalQuery({
                     !chunk ||
                     !uploadedFile ||
                     !isDocumentEligibleForChat(uploadedFile, allowQaDocuments) ||
-                    !attachedFileIds.has(uploadedFile._id.toString()) ||
+                    !authorizedFileIds.has(uploadedFile._id.toString()) ||
                     (uploadedFile.clerkUserId !== user.clerkId && !(await hasActiveUserChatGrant(ctx, {
                         clerkUserId: user.clerkId,
                         uploadedFileId: uploadedFile._id,

@@ -3965,7 +3965,19 @@ export const processChatGenerationJob = internalAction({
                 });
             }
 
-            const fullReviewAttachments: AttachmentContext[] = context.attachmentContexts ?? [];
+            const selectedFullReviewDocumentIds = new Set(
+                context.turn.analysisMode === 'full_document_review'
+                    ? (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String)
+                    : []
+            );
+            const fullReviewAttachments: AttachmentContext[] = [
+                ...(context.attachmentContexts ?? []),
+                ...(context.availableDocumentContexts ?? []).filter((attachment) =>
+                    selectedFullReviewDocumentIds.has(attachment.uploadedFileId.toString())
+                ),
+            ].filter((attachment, index, values) =>
+                values.findIndex((candidate) => candidate.uploadedFileId === attachment.uploadedFileId) === index
+            );
             const baselineAttachments = [
                 ...fullReviewAttachments,
                 ...(context.availableDocumentContexts ?? []),
@@ -4243,6 +4255,8 @@ export const processChatGenerationJob = internalAction({
                     content,
                     capabilitySnapshot: baselineCapabilitySnapshot,
                     evidenceIds: reviewCitations.map((citation) => citation.chunkId.toString()),
+                    citationVerificationPassed: reviewCitations.length > 0,
+                    usedDocumentIds: fullReviewAttachments.map((attachment) => attachment.uploadedFileId.toString()),
                     artifactsJson: JSON.stringify(emptyArtifacts()),
                     decision: 'publish',
                     metadata: {

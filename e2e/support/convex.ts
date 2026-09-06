@@ -70,6 +70,26 @@ export async function inspectSyntheticRunUpload(page: Page, runId: string) {
   }>(page, { operation: "inspect", runId });
 }
 
+export async function waitForSyntheticFullReviewReady(
+  page: Page,
+  runId: string,
+  timeoutMs = 8 * 60 * 1000,
+) {
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = "not_found";
+  while (Date.now() < deadline) {
+    const inspected = await inspectSyntheticRunUpload(page, runId);
+    const statuses = inspected.files.map((file) => file.fullDocumentReviewStatus ?? "not_started");
+    if (statuses.length > 0 && statuses.every((status) => status === "ready")) return inspected;
+    lastStatus = statuses.join(",") || "not_found";
+    if (statuses.some((status) => status === "failed")) {
+      throw new Error(`Synthetic full-document review failed before acceptance: ${lastStatus}.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+  throw new Error(`Synthetic full-document review was not ready within ${timeoutMs}ms: ${lastStatus}.`);
+}
+
 export async function cleanupSyntheticRun(page: Page, runId: string) {
   await operation(page, { operation: "cleanup", runId });
   const deadline = Date.now() + 120_000;

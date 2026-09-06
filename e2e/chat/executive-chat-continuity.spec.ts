@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { beginSyntheticRun, finishSyntheticRun } from '../support/lifecycle';
 import { ensureUploadFixtures } from '../support/files';
 import { uploadAndSend } from '../support/upload-journey';
-import { inspectSyntheticRunUpload } from '../support/convex';
+import { inspectSyntheticRunUpload, waitForSyntheticFullReviewReady } from '../support/convex';
 
 async function sendAndWait(page: import('@playwright/test').Page, text: string) {
   const assistants = page.getByTestId('chat-message-assistant');
@@ -31,6 +31,7 @@ test('critical executive-chat sequence matrix preserves focus without unwanted d
       prompt: 'Analyze this file. If more than one review depth is possible, offer the choices.',
     });
     await sendAndWait(page, 'which');
+    await waitForSyntheticFullReviewReady(page, environment.runId);
     const finalAnswer = await sendAndWait(page, 'please do so');
     await expect(finalAnswer).not.toContainText(/(?:cannot|can't|do not|don't|unable to).{0,140}(?:read|access|see|have).{0,140}(?:file|document|order|pdf|text)|(?:re[- ]?upload|upload again).{0,140}(?:file|document|order|pdf)/i);
     await expect(page.getByTestId('chat-message-attachment').filter({ hasText: fixture.path.split(/[\\/]/).pop()! })).toBeVisible();

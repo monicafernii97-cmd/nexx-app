@@ -2,9 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { buildFileFallbackMessage } from '@/components/chat/ChatInput';
 import { analysisModeForUploadIntent } from '@/lib/chat/documentAnalysisMode';
 import { detectDocumentReference } from '../documentReferenceDetection';
-import { buildCoverageGateMessage, requiresVerifiedCoverage } from '../fullDocumentReviewGate';
+import { acceptedReviewProgressMessage, buildCoverageGateMessage, requiresVerifiedCoverage } from '../fullDocumentReviewGate';
 
 describe('full court-order review intent and coverage gate', () => {
+  it('keeps an accepted full review active without re-offering choices', () => {
+    const message = acceptedReviewProgressMessage([{
+      filename: 'Signed Final Order.pdf',
+      status: 'ready',
+      coverageStatus: 'complete',
+      fullDocumentReviewStatus: 'building',
+      pagesProcessed: 46,
+      pagesTotal: 46,
+    }]);
+
+    expect(message).toContain('accepted the full-document review');
+    expect(message).toContain('still finishing from the saved evidence');
+    expect(message).toContain('selected review remains active');
+    expect(message).toContain('no new file is needed');
+    expect(message).not.toMatch(/\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i);
+  });
   it('uses explicit full review intent without accidentally creating a deadline lookup', () => {
     const prompt = buildFileFallbackMessage('court_order', 'Signed Final Order.pdf');
     const detection = detectDocumentReference(prompt);

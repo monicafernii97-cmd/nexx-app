@@ -282,6 +282,39 @@ describe('publication quality v2', () => {
     }).passed).toBe(true);
   });
 
+  it('allows a contextual pending-review receipt after an accepted option without pretending completion', () => {
+    const result = verify(
+      'I accepted the full-document review and verified the source coverage for Signed Final Order.pdf. The exhaustive synthesis is still finishing from the saved evidence, and the selected review remains active; no new file is needed.',
+      {
+        publicationDecision: 'publish_limitation',
+        plan: plan({
+          selectedOptionId: 'full-review',
+          selectedDocumentIds: ['signed-order'],
+          selectedEvidenceGenerationIds: ['evidence-1'],
+          evidenceRequirements: ['relevant_source_unit'],
+          analysisMode: 'full_document_review',
+        }),
+      },
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.errors).not.toEqual(expect.arrayContaining([
+      'RESP_CITATION_MISMATCH',
+      'RESP_EXECUTION_WITHOUT_EVIDENCE',
+      'RESP_ACCEPTED_ACTION_NOT_EXECUTED',
+      'RESP_REPEATED_CHOICE_AFTER_RESOLUTION',
+    ]));
+  });
+
+  it('does not let a publication-limitation decision bypass contextual quality checks', () => {
+    expect(verify('I can help you with that.', {
+      publicationDecision: 'publish_limitation',
+    }).errors).toEqual(expect.arrayContaining([
+      'RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE',
+      'RESP_FALLBACK_NOT_CONTEXTUAL',
+    ]));
+  });
+
   it('composes narrow deterministic repairs for greetings and promised uploads', () => {
     expect(buildPublicationRepairContent({
       errors: ['RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN'],

@@ -9,6 +9,7 @@ import type { Id } from './_generated/dataModel';
 import { classifyMessage } from '../src/lib/nexx/router';
 import type { DocumentAnalysisMode } from '../src/lib/chat/documentAnalysisMode';
 import {
+    acceptedReviewProgressMessage,
     buildCoverageGateMessage,
     requiresVerifiedCoverage,
     type DocumentCoverageStatus,
@@ -1050,6 +1051,7 @@ async function commitVerifiedResponse(args: {
         requiresDirectAnswer: plan.responseAct === 'answer' && args.decision !== 'publish_limitation',
         unresolvedReferent: Boolean(args.context.turnUnderstanding?.ambiguityMaterial && plan.responseAct !== 'clarify'),
         publicationV2: effectiveFlags.publicationGateV2,
+        publicationDecision: args.decision,
         speechAct: args.context.turnUnderstanding?.speechAct,
         requestedOperation: args.context.turnUnderstanding?.requestedOperation,
         documentContextAllowed: plan.selectedDocumentIds.length > 0 ||
@@ -4128,7 +4130,10 @@ export const processChatGenerationJob = internalAction({
             }
             if (requiresVerifiedCoverage(context.turn.analysisMode, fullReviewAttachments)) {
                 workerStage = 'completing_coverage_gate';
-                const gateResponse = degradedResponse(buildCoverageGateMessage(fullReviewAttachments));
+                const gateContent = context.turnExecutionPlan?.selectedOptionId
+                    ? acceptedReviewProgressMessage(fullReviewAttachments)
+                    : buildCoverageGateMessage(fullReviewAttachments);
+                const gateResponse = degradedResponse(gateContent);
                 const gateCommit = await commitVerifiedResponse({
                     ctx,
                     jobId: args.jobId,
@@ -4174,7 +4179,10 @@ export const processChatGenerationJob = internalAction({
                 const missingRecord = fullReviewAttachments.find((attachment) => !attachment.fullDocumentReviewMarkdown?.trim());
                 if (missingRecord) {
                     workerStage = 'completing_review_gate';
-                    const gateResponse = degradedResponse(buildCoverageGateMessage(fullReviewAttachments));
+                    const gateContent = context.turnExecutionPlan?.selectedOptionId
+                        ? acceptedReviewProgressMessage(fullReviewAttachments)
+                        : buildCoverageGateMessage(fullReviewAttachments);
+                    const gateResponse = degradedResponse(gateContent);
                     const gateCommit = await commitVerifiedResponse({
                         ctx,
                         jobId: args.jobId,

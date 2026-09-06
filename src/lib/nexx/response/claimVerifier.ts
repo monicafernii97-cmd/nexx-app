@@ -71,6 +71,7 @@ const SELF_ASSESSMENT_CLAIM = /\b(?:i|we)\s+(?:checked|rechecked|reassessed|insp
 const REUPLOAD_REQUEST = /\b(?:upload|re[- ]?upload|attach|send|provide)\b.{0,100}\b(?:file|order|document|pdf|it)\b|\b(?:file|order|document|pdf)\b.{0,100}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
 const PROMISE_ONLY = /\b(?:i can|i will|i'll|once you|after you|next step)\b.{0,140}\b(?:review|analy[sz]e|read|start)\b/i;
 const REPEATED_CHOICE = /\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i;
+const CONTEXTUAL_LIMITATION = /\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b.{0,180}\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b|\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b.{0,180}\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b/i;
 
 export function verifyResponseClaims(args: {
   content: string;
@@ -85,6 +86,7 @@ export function verifyResponseClaims(args: {
   requiresDirectAnswer?: boolean;
   unresolvedReferent?: boolean;
   publicationV2?: boolean;
+  publicationDecision?: 'publish' | 'publish_scoped' | 'ask_clarification' | 'publish_limitation';
   speechAct?: string;
   requestedOperation?: string;
   documentContextAllowed?: boolean;
@@ -99,18 +101,22 @@ export function verifyResponseClaims(args: {
     document.authorized && (document.textExtracted || document.chunksAvailable));
   const exhaustiveReady = args.capabilitySnapshot.documents.length > 0 && args.capabilitySnapshot.documents.every((document) =>
     document.authorized && document.coverageStatus === 'complete' && document.fullDocumentReviewStatus === 'ready');
+  const publishingLimitation = args.publicationDecision === 'publish_limitation';
 
   if (args.requiresDirectAnswer && args.speechAct !== 'social' && content.length < 20) {
     errors.push('RESP_MISSING_DIRECT_ANSWER');
   }
   const genericAssessment = assessGenericAnswer(content);
   const generic = args.publicationV2 ? genericAssessment.isGeneric : GENERIC.test(content);
-  if (generic && (args.evidenceIds.length > 0 || args.requiresDirectAnswer)) {
+  if (generic && (args.evidenceIds.length > 0 || args.requiresDirectAnswer || publishingLimitation)) {
     errors.push('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE');
     if (genericAssessment.sentenceCount > 1) errors.push('RESP_GENERIC_MULTI_SENTENCE');
     if (genericAssessment.paddingSentenceCount > 0 || genericAssessment.limitationSentenceCount > 0) {
       errors.push('RESP_FALLBACK_NOT_CONTEXTUAL');
     }
+  }
+  if (args.publicationV2 && publishingLimitation && !CONTEXTUAL_LIMITATION.test(content)) {
+    errors.push('RESP_FALLBACK_NOT_CONTEXTUAL');
   }
   if (UNREADABLE_CLAIM.test(content) && readable && args.capabilityDecision.prohibitedClaims.includes('file_unreadable')) errors.push('RESP_FALSE_UNREADABLE_CLAIM');
   if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && UNREADABLE_CLAIM.test(content)) {
@@ -120,7 +126,7 @@ export function verifyResponseClaims(args: {
     errors.push('RESP_REUPLOAD_UNNECESSARY');
   }
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');
-  if (args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
+  if (!publishingLimitation && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
   if (args.publicationV2 && args.citationVerificationPassed === false) {
     errors.push('RESP_CITATION_MISMATCH');
   }
@@ -136,10 +142,10 @@ export function verifyResponseClaims(args: {
   if (args.publicationV2 && ACTION_COMPLETION_CLAIM.test(content) && !args.plan.requestedOperation && !args.plan.analysisMode) {
     errors.push('RESP_EXECUTION_WITHOUT_OPERATION');
   }
-  if (args.publicationV2 && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
+  if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
     errors.push('RESP_EXECUTION_WITHOUT_EVIDENCE', 'RESP_ACCEPTED_ACTION_NOT_EXECUTED');
   }
-  if (args.publicationV2 && args.plan.selectedOptionId && PROMISE_ONLY.test(content) && args.evidenceIds.length === 0) {
+  if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && PROMISE_ONLY.test(content) && args.evidenceIds.length === 0) {
     errors.push('RESP_ACCEPTED_ACTION_NOT_EXECUTED');
   }
   if (args.publicationV2 && args.plan.selectedOptionId && REPEATED_CHOICE.test(content)) {

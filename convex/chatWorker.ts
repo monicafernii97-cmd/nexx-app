@@ -4273,7 +4273,9 @@ export const processChatGenerationJob = internalAction({
                 if (!reviewCommit?.committed) {
                     await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                         jobId: args.jobId, leaseOwner, recoveryCode: 'validation_exhausted',
-                        errorCode: 'full_review_publication_failed', retryable: true,
+                        errorCode: 'full_review_publication_failed',
+                        errorMessage: reviewCommit?.verification.errors.join(', '),
+                        retryable: true,
                     });
                     return null;
                 }

@@ -68,10 +68,28 @@ const INPUT_WAIT_ACKNOWLEDGMENT = /\b(?:upload|re[- ]?upload|attach|send|provide
 const HISTORICAL_DOCUMENT_WORK = /\b(?:review|analy[sz]e|extract|read|process|check|use)\b.{0,60}\b(?:the\s+)?(?:existing|previous|prior|old|historical|current|available|uploaded|saved)?\s*(?:order|document|file|pdf)\b/i;
 const ACTION_COMPLETION_CLAIM = /\b(?:i|we)(?:'ve| have)? (?:now )?(?:reviewed|analy[sz]ed|extracted|read|processed|completed|finished|checked)\b|\b(?:the\s+)?(?:review|analysis|extraction|processing|check)\s+(?:is|was|has been)\s+(?:complete|completed|finished|done)\b/i;
 const SELF_ASSESSMENT_CLAIM = /\b(?:i|we)\s+(?:checked|rechecked|reassessed|inspected|reviewed|looked\s+again)\b/i;
-const REUPLOAD_REQUEST = /\b(?:upload|re[- ]?upload|attach|send|provide)\b.{0,100}\b(?:file|order|document|pdf|it)\b|\b(?:file|order|document|pdf)\b.{0,100}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
+const UPLOAD_ACTION = /\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
+const UPLOAD_OBJECT = /\b(?:file|order|document|pdf|attachment|it)\b/i;
+const NEGATED_UPLOAD_REQUEST = /\b(?:no need|need(?:s)? not|needn't|do not need|don't need|does not need|doesn't need|should not|shouldn't|must not|mustn't|without|rather than|instead of|not (?:ask|asking|require|requiring|request|requesting)(?:ing)?(?: you)? to)\b.{0,100}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
 const PROMISE_ONLY = /\b(?:i can|i will|i'll|once you|after you|next step)\b.{0,140}\b(?:review|analy[sz]e|read|start)\b/i;
 const REPEATED_CHOICE = /\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i;
 const CONTEXTUAL_LIMITATION = /\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b.{0,180}\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b|\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b.{0,180}\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b/i;
+
+function requestsUploadFromUser(content: string): boolean {
+  return content
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .some((sentence) => {
+      if (!UPLOAD_ACTION.test(sentence) || !UPLOAD_OBJECT.test(sentence) || NEGATED_UPLOAD_REQUEST.test(sentence)) {
+        return false;
+      }
+      return /\b(?:please|kindly)\b.{0,40}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /\b(?:could|can|would|will)\s+you\b.{0,60}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /\byou\s+(?:need|must|should|have)\s+to\b.{0,60}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i.test(sentence) ||
+        /^(?:upload|re[- ]?upload|attach|send|provide)\b.{0,100}\b(?:the|your|this|that|a|an)\s+(?:file|order|document|pdf|attachment|it)\b/i.test(sentence);
+    });
+}
 
 export function verifyResponseClaims(args: {
   content: string;
@@ -122,7 +140,7 @@ export function verifyResponseClaims(args: {
   if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && UNREADABLE_CLAIM.test(content)) {
     errors.push('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE');
   }
-  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && REUPLOAD_REQUEST.test(content) && args.requestedOperation !== 'await_upload') {
+  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && requestsUploadFromUser(content) && args.requestedOperation !== 'await_upload') {
     errors.push('RESP_REUPLOAD_UNNECESSARY');
   }
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');

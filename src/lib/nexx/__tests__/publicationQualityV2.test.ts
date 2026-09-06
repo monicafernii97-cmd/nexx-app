@@ -306,6 +306,89 @@ describe('publication quality v2', () => {
     ]));
   });
 
+  it('does not mistake a no-reupload assurance inside a completed analysis for an upload request', () => {
+    const readableSnapshot: DocumentCapabilitySnapshot = {
+      ...snapshot,
+      documents: [{
+        uploadedFileId: 'signed-order',
+        filename: 'Signed Final Order.pdf',
+        status: 'ready',
+        authorized: true,
+        binaryStored: true,
+        metadataAvailable: true,
+        textExtracted: true,
+        extractedCharacterCount: 5_000,
+        pageCountKnown: true,
+        pagesTotal: 10,
+        availablePageRanges: [[1, 10]],
+        requestedPagesAvailable: true,
+        chunksAvailable: true,
+        activeMemoryAvailable: true,
+        keywordSearchAvailable: true,
+        semanticSearchAvailable: true,
+        hostedFileSearchAvailable: false,
+        citationAnchorsAvailable: true,
+        coverageStatus: 'complete',
+        fullDocumentReviewStatus: 'ready',
+        limitations: [],
+      }],
+    };
+    const result = verify(
+      'The order was reviewed from the saved evidence, so you do not need to reupload the signed-order file.',
+      {
+        capabilitySnapshot: readableSnapshot,
+        evidenceIds: ['chunk-1'],
+        citationVerificationPassed: true,
+        usedDocumentIds: ['signed-order'],
+        plan: plan({ selectedDocumentIds: ['signed-order'] }),
+      },
+    );
+
+    expect(result.errors).not.toContain('RESP_REUPLOAD_UNNECESSARY');
+  });
+
+  it('still blocks actual requests to reupload an already-readable selected document', () => {
+    const readableSnapshot: DocumentCapabilitySnapshot = {
+      ...snapshot,
+      documents: [{
+        uploadedFileId: 'signed-order',
+        filename: 'Signed Final Order.pdf',
+        status: 'ready',
+        authorized: true,
+        binaryStored: true,
+        metadataAvailable: true,
+        textExtracted: true,
+        extractedCharacterCount: 5_000,
+        pageCountKnown: true,
+        pagesTotal: 10,
+        availablePageRanges: [[1, 10]],
+        requestedPagesAvailable: true,
+        chunksAvailable: true,
+        activeMemoryAvailable: true,
+        keywordSearchAvailable: true,
+        semanticSearchAvailable: true,
+        hostedFileSearchAvailable: false,
+        citationAnchorsAvailable: true,
+        coverageStatus: 'complete',
+        fullDocumentReviewStatus: 'ready',
+        limitations: [],
+      }],
+    };
+    const selectedPlan = plan({ selectedDocumentIds: ['signed-order'] });
+
+    for (const content of [
+      'Please reupload the signed-order file.',
+      'Could you attach the document again?',
+      'You need to send the PDF before I can continue.',
+      'Upload the file again.',
+    ]) {
+      expect(verify(content, {
+        capabilitySnapshot: readableSnapshot,
+        plan: selectedPlan,
+      }).errors).toContain('RESP_REUPLOAD_UNNECESSARY');
+    }
+  });
+
   it('does not let a publication-limitation decision bypass contextual quality checks', () => {
     expect(verify('I can help you with that.', {
       publicationDecision: 'publish_limitation',

@@ -58,6 +58,7 @@ export function featureFlagsForRollout(
     !explicitlyDisabled(env.EXEC_CHAT_DOCUMENT_ACTIVATION_V2);
   return {
     ...base,
+    semanticArbiter: documentActivationV2 && !explicitlyDisabled(env.EXEC_CHAT_SEMANTIC_ARBITER),
     documentActivationV2,
     publicationGateV2: enforce('publication_v2') && !explicitlyDisabled(env.EXEC_CHAT_PUBLICATION_V2),
     selfCorrectionV2: enforce('self_correction_v1') && !explicitlyDisabled(env.EXEC_CHAT_SELF_CORRECTION_V2),

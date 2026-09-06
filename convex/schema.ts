@@ -89,6 +89,28 @@ const dataProvenanceValidator = v.union(
     v.literal('synthetic')
 );
 
+const interactionIntentValidator = v.union(
+    v.literal('accept_recommendation'),
+    v.literal('accept_offer'),
+    v.literal('select_option'),
+    v.literal('reject_recommendation'),
+    v.literal('reject_option'),
+    v.literal('modify_option'),
+    v.literal('ask_about_options'),
+    v.literal('defer_action'),
+    v.literal('cancel_action'),
+    v.literal('unrelated_turn'),
+    v.literal('uncertain')
+);
+
+const documentAnalysisModeValidator = v.union(
+    v.literal('full_document_review'),
+    v.literal('obligations_and_deadlines'),
+    v.literal('custody_and_possession'),
+    v.literal('compare_with_conversation'),
+    v.literal('focused_question')
+);
+
 export default defineSchema({
     // ═══ Users ═══
     users: defineTable({
@@ -333,13 +355,7 @@ export default defineSchema({
         rolloutConfigVersion: v.optional(v.number()),
         rolloutModesJson: v.optional(v.string()),
         rolloutSelectionReason: v.optional(v.string()),
-        analysisMode: v.optional(v.union(
-            v.literal('full_document_review'),
-            v.literal('obligations_and_deadlines'),
-            v.literal('custody_and_possession'),
-            v.literal('compare_with_conversation'),
-            v.literal('focused_question')
-        )),
+        analysisMode: v.optional(documentAnalysisModeValidator),
         userMessageId: v.optional(v.id('messages')),
         assistantMessageId: v.optional(v.id('messages')),
         assistantDraftMessageId: v.optional(v.id('messages')),
@@ -790,6 +806,9 @@ export default defineSchema({
         pendingOptionsJson: v.optional(v.string()),
         pendingSourceTurnId: v.optional(v.id('chatTurns')),
         lastAssistantOfferJson: v.optional(v.string()),
+        pendingInteractionVersion: v.optional(v.literal(2)),
+        activeRecommendationJson: v.optional(v.string()),
+        lastInteractionResolutionId: v.optional(v.string()),
         lastResolvedReferentsJson: v.optional(v.string()),
         confidence: v.number(),
         provenance: v.union(
@@ -862,6 +881,11 @@ export default defineSchema({
             v.literal('new_task'), v.literal('uncertain')
         ),
         requestedOperation: v.optional(v.string()),
+        interactionIntent: v.optional(interactionIntentValidator),
+        interactionCandidateOptionIds: v.optional(v.array(v.string())),
+        interactionClassifierVersion: v.optional(v.string()),
+        interactionConfidence: v.optional(v.number()),
+        interactionReasonCodes: v.optional(v.array(v.string())),
         referentsJson: v.string(),
         candidateTasksJson: v.string(),
         confidence: v.number(),
@@ -892,6 +916,12 @@ export default defineSchema({
         capabilityRequirements: v.array(v.string()),
         fallbackOrder: v.array(v.string()),
         questionContractJson: v.string(),
+        interactionResolutionId: v.optional(v.string()),
+        selectedOptionId: v.optional(v.string()),
+        requestedOperation: v.optional(v.string()),
+        analysisMode: v.optional(documentAnalysisModeValidator),
+        selectedEvidenceGenerationIds: v.optional(v.array(v.id('documentMemoryGenerations'))),
+        interactionContractHash: v.optional(v.string()),
         documentActivationJson: v.optional(v.string()),
         status: v.union(
             v.literal('planned'), v.literal('executing'), v.literal('superseded'),
@@ -944,6 +974,41 @@ export default defineSchema({
         .index('by_envelope', ['envelopeId'])
         .index('by_turn', ['turnId'])
         .index('by_conversation', ['conversationId'])
+        .index('by_created', ['createdAt']),
+
+    interactionResolutionAudits: defineTable({
+        resolutionId: v.string(),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        turnId: v.id('chatTurns'),
+        interactionId: v.optional(v.string()),
+        recommendationId: v.optional(v.string()),
+        candidateOptionIds: v.array(v.string()),
+        selectedOptionId: v.optional(v.string()),
+        intent: interactionIntentValidator,
+        decision: v.union(
+            v.literal('execute'),
+            v.literal('clarify'),
+            v.literal('cancel'),
+            v.literal('defer'),
+            v.literal('unrelated'),
+            v.literal('rejected')
+        ),
+        confidence: v.number(),
+        reasonCodes: v.array(v.string()),
+        classifierVersion: v.string(),
+        arbiterVersion: v.string(),
+        taskId: v.optional(v.string()),
+        documentIds: v.array(v.id('uploadedFiles')),
+        evidenceGenerationIds: v.array(v.id('documentMemoryGenerations')),
+        operationJson: v.optional(v.string()),
+        authorizationScopeHash: v.string(),
+        createdAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_conversation_created', ['conversationId', 'createdAt'])
+        .index('by_interaction', ['interactionId'])
+        .index('by_decision_created', ['decision', 'createdAt'])
         .index('by_created', ['createdAt']),
 
     conversationRepairAudits: defineTable({

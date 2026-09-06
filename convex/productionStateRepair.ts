@@ -449,6 +449,7 @@ export const inspectDerivedStateGraph = internalQuery({
           serializedState: [
             controlState.pendingOptionsJson,
             controlState.lastAssistantOfferJson,
+            controlState.activeRecommendationJson,
             controlState.lastResolvedReferentsJson,
           ].filter(Boolean).join('\n'),
         }] : []),
@@ -611,6 +612,7 @@ export const startDerivedStateAudit = internalMutation({
           serializedState: [
             controlState.pendingOptionsJson,
             controlState.lastAssistantOfferJson,
+            controlState.activeRecommendationJson,
             controlState.lastResolvedReferentsJson,
           ].filter(Boolean).join('\n'),
         }] : []),
@@ -773,7 +775,7 @@ export const startQuarantinedReferenceCleanup = internalMutation({
         conversationId: args.scopeConversationId.toString(),
         category: 'conversation_control',
         documentIds: controlState.activeDocumentIds.map(String),
-        serializedState: [controlState.pendingOptionsJson, controlState.lastAssistantOfferJson, controlState.lastResolvedReferentsJson]
+        serializedState: [controlState.pendingOptionsJson, controlState.lastAssistantOfferJson, controlState.activeRecommendationJson, controlState.lastResolvedReferentsJson]
           .filter(Boolean).join('\n'),
       }] : []),
       ...tasks.map((task) => ({ conversationId: args.scopeConversationId.toString(), category: 'conversation_task', documentIds: task.documentIds.map(String) })),
@@ -990,7 +992,9 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
     if (controlState) {
       const pendingAffected = run.clearPendingInteraction ||
         containsAnyTarget(controlState.pendingOptionsJson, removedIds) ||
-        containsAnyTarget(controlState.lastAssistantOfferJson, removedIds);
+        containsAnyTarget(controlState.lastAssistantOfferJson, removedIds) ||
+        containsAnyTarget(controlState.activeRecommendationJson, removedIds) ||
+        containsAnyTarget(controlState.activeRecommendationJson, removedIds);
       const before = {
         focusRevision: controlState.focusRevision,
         activeDocumentIds: controlState.activeDocumentIds,
@@ -998,6 +1002,9 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
         pendingOptionsJson: controlState.pendingOptionsJson,
         pendingSourceTurnId: controlState.pendingSourceTurnId,
         lastAssistantOfferJson: controlState.lastAssistantOfferJson,
+        pendingInteractionVersion: controlState.pendingInteractionVersion,
+        activeRecommendationJson: controlState.activeRecommendationJson,
+        lastInteractionResolutionId: controlState.lastInteractionResolutionId,
         lastResolvedReferentsJson: controlState.lastResolvedReferentsJson,
         activeTaskId: controlState.activeTaskId,
         activeTaskKind: controlState.activeTaskKind,
@@ -1036,6 +1043,9 @@ export const snapshotAuthorizedDerivedRepair = internalMutation({
         pendingOptionsJson: pendingAffected ? '[]' : controlState.pendingOptionsJson,
         pendingSourceTurnId: pendingAffected ? null : controlState.pendingSourceTurnId,
         lastAssistantOfferJson: pendingAffected ? null : controlState.lastAssistantOfferJson,
+        pendingInteractionVersion: pendingAffected ? null : controlState.pendingInteractionVersion,
+        activeRecommendationJson: pendingAffected ? null : controlState.activeRecommendationJson,
+        lastInteractionResolutionId: controlState.lastInteractionResolutionId,
         lastResolvedReferentsJson: containsAnyTarget(controlState.lastResolvedReferentsJson, removedIds) ? '[]' : controlState.lastResolvedReferentsJson,
         confidence: 1,
         provenance: 'recovered',
@@ -1197,6 +1207,7 @@ export const snapshotAuthorizedRepair = internalMutation({
       if (controlState) {
         const pendingTargetsQuarantined = containsAnyTarget(controlState.pendingOptionsJson, targetIds);
         const offerTargetsQuarantined = containsAnyTarget(controlState.lastAssistantOfferJson, targetIds);
+        const recommendationTargetsQuarantined = containsAnyTarget(controlState.activeRecommendationJson, targetIds);
         const referentsTargetQuarantined = containsAnyTarget(controlState.lastResolvedReferentsJson, targetIds);
         const remainingActiveDocuments = withoutTargets(controlState.activeDocumentIds.map(String), targetIds);
         const activeTaskTargetsQuarantined = tasks.some((task) =>
@@ -1206,10 +1217,10 @@ export const snapshotAuthorizedRepair = internalMutation({
           (remainingActiveDocuments.length !== controlState.activeDocumentIds.length &&
             (controlState.activeTaskKind === 'document_review' || controlState.activeTaskKind === 'document_question'));
         const remainingEvidenceGenerations = withoutTargets(controlState.activeEvidenceGenerationIds.map(String), targetGenerationIds);
-        const controlAffected = shouldClearActiveTask || pendingTargetsQuarantined || offerTargetsQuarantined ||
+        const controlAffected = shouldClearActiveTask || pendingTargetsQuarantined || offerTargetsQuarantined || recommendationTargetsQuarantined ||
           referentsTargetQuarantined || remainingActiveDocuments.length !== controlState.activeDocumentIds.length ||
           remainingEvidenceGenerations.length !== controlState.activeEvidenceGenerationIds.length;
-        const before = { activeTaskId: controlState.activeTaskId, activeTaskKind: controlState.activeTaskKind, activeDocumentIds: controlState.activeDocumentIds, activeEvidenceGenerationIds: controlState.activeEvidenceGenerationIds, pendingAct: controlState.pendingAct, pendingOptionsJson: controlState.pendingOptionsJson, pendingSourceTurnId: controlState.pendingSourceTurnId, lastAssistantOfferJson: controlState.lastAssistantOfferJson, lastResolvedReferentsJson: controlState.lastResolvedReferentsJson, confidence: controlState.confidence, provenance: controlState.provenance, updatedAt: controlState.updatedAt };
+        const before = { activeTaskId: controlState.activeTaskId, activeTaskKind: controlState.activeTaskKind, activeDocumentIds: controlState.activeDocumentIds, activeEvidenceGenerationIds: controlState.activeEvidenceGenerationIds, pendingAct: controlState.pendingAct, pendingOptionsJson: controlState.pendingOptionsJson, pendingSourceTurnId: controlState.pendingSourceTurnId, lastAssistantOfferJson: controlState.lastAssistantOfferJson, pendingInteractionVersion: controlState.pendingInteractionVersion, activeRecommendationJson: controlState.activeRecommendationJson, lastInteractionResolutionId: controlState.lastInteractionResolutionId, lastResolvedReferentsJson: controlState.lastResolvedReferentsJson, confidence: controlState.confidence, provenance: controlState.provenance, updatedAt: controlState.updatedAt };
         const after = {
           ...before,
           activeTaskId: shouldClearActiveTask ? null : controlState.activeTaskId,
@@ -1220,6 +1231,9 @@ export const snapshotAuthorizedRepair = internalMutation({
           pendingOptionsJson: pendingTargetsQuarantined ? null : controlState.pendingOptionsJson,
           pendingSourceTurnId: pendingTargetsQuarantined ? null : controlState.pendingSourceTurnId,
           lastAssistantOfferJson: offerTargetsQuarantined ? null : controlState.lastAssistantOfferJson,
+          pendingInteractionVersion: pendingTargetsQuarantined || recommendationTargetsQuarantined ? null : controlState.pendingInteractionVersion,
+          activeRecommendationJson: recommendationTargetsQuarantined ? null : controlState.activeRecommendationJson,
+          lastInteractionResolutionId: controlState.lastInteractionResolutionId,
           lastResolvedReferentsJson: referentsTargetQuarantined ? null : controlState.lastResolvedReferentsJson,
           confidence: controlAffected ? 1 : controlState.confidence,
           provenance: controlAffected ? 'recovered' : controlState.provenance,

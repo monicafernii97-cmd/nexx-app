@@ -2,9 +2,11 @@ import { stableCapabilityHash } from '../capabilities/documentCapabilityLedger';
 
 export const PUBLICATION_VALIDATOR_VERSION = 'response-publication-v1';
 export const PUBLICATION_VALIDATOR_V2_VERSION = 'response-publication-v2';
+export const PUBLICATION_VALIDATOR_V3_VERSION = 'response-publication-v3';
 export type PublicationValidatorVersion =
   | typeof PUBLICATION_VALIDATOR_VERSION
-  | typeof PUBLICATION_VALIDATOR_V2_VERSION;
+  | typeof PUBLICATION_VALIDATOR_V2_VERSION
+  | typeof PUBLICATION_VALIDATOR_V3_VERSION;
 
 export type PublicationCheckName =
   | 'responsiveness'
@@ -32,6 +34,7 @@ export type ValidatedPublicationEnvelope = {
   artifactsJson?: string;
   pendingOptionsJson?: string;
   assistantOfferJson?: string;
+  recommendationJson?: string;
   decision: 'publish' | 'publish_scoped' | 'ask_clarification' | 'publish_limitation';
   checks: PublicationChecks;
   capabilitySnapshotHash: string;

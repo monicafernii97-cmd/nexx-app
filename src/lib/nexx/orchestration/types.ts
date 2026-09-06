@@ -1,4 +1,5 @@
 import type { RouteMode } from '../../types';
+import type { DocumentAnalysisMode } from '../../chat/documentAnalysisMode';
 
 export type SpeechAct =
   | 'ask'
@@ -29,15 +30,69 @@ export type ConversationTaskKind =
 
 export type PendingAct = 'select' | 'confirm' | 'continue' | 'clarify' | 'supply_detail' | 'await_upload';
 
+export type InteractionIntent =
+  | 'accept_recommendation'
+  | 'accept_offer'
+  | 'select_option'
+  | 'reject_recommendation'
+  | 'reject_option'
+  | 'modify_option'
+  | 'ask_about_options'
+  | 'defer_action'
+  | 'cancel_action'
+  | 'unrelated_turn'
+  | 'uncertain';
+
+export type PendingOperation =
+  | {
+      kind: 'document_review';
+      analysisMode: DocumentAnalysisMode;
+      focusedIssue?: string;
+    }
+  | { kind: 'draft'; draftMode: string }
+  | { kind: 'procedure'; procedureMode: string }
+  | { kind: 'answer'; requestedOperation: string }
+  | { kind: 'supply_fact'; fieldKey: string };
+
 export type PendingOption = {
+  schemaVersion?: 2;
   optionId: string;
+  interactionId?: string;
   label: string;
   aliases: string[];
   action: 'select_document' | 'select_scope' | 'confirm_action' | 'supply_fact';
+  operation?: PendingOperation;
   targetTaskId: string;
   documentIds: string[];
+  evidenceGenerationIds?: string[];
   sourceMessageId?: string;
+  sourceTurnId?: string;
+  sourcePlanId?: string;
+  capabilitySnapshotHash?: string;
+  authorizationScopeHash?: string;
+  recommended?: boolean;
+  recommendationRank?: number;
+  expiresAt?: number;
+  consumedAt?: number;
+  cancelledAt?: number;
   expiresAfterFocusRevision: number;
+};
+
+export type RecommendationReceipt = {
+  schemaVersion: 1;
+  recommendationId: string;
+  interactionId: string;
+  recommendedOptionId: string;
+  alternativeOptionIds: string[];
+  targetTaskId: string;
+  sourceTurnId?: string;
+  sourceMessageId?: string;
+  focusRevision: number;
+  basisCodes: string[];
+  capabilitySnapshotHash?: string;
+  authorizationScopeHash?: string;
+  createdAt: number;
+  expiresAt?: number;
 };
 
 export type AssistantOffer = {
@@ -60,6 +115,9 @@ export type ConversationControlSnapshot = {
   pendingAct?: PendingAct;
   pendingOptions: PendingOption[];
   lastAssistantOffer?: AssistantOffer;
+  pendingInteractionVersion?: 2;
+  activeRecommendation?: RecommendationReceipt;
+  lastInteractionResolutionId?: string;
   confidence: number;
   provenance: 'native_v1' | 'migrated_route' | 'migrated_issue' | 'recovered';
 };
@@ -90,6 +148,10 @@ export type TurnUnderstanding = {
   speechAct: SpeechAct;
   continuity: ContinuityKind;
   requestedOperation?: string;
+  interactionIntent?: InteractionIntent;
+  interactionCandidateOptionIds?: string[];
+  interactionConfidence?: number;
+  interactionReasonCodes?: string[];
   referents: TurnReferent[];
   candidateTasks: Array<{ taskId: string; score: number; reasonCodes: string[] }>;
   confidence: number;
@@ -166,5 +228,34 @@ export type TurnExecutionPlan = {
   capabilityRequirements: string[];
   fallbackOrder: string[];
   questionKind: QuestionKind;
+  interactionResolutionId?: string;
+  selectedOptionId?: string;
+  requestedOperation?: string;
+  analysisMode?: DocumentAnalysisMode;
+  selectedEvidenceGenerationIds?: string[];
+  interactionContractHash?: string;
+};
+
+export type InteractionResolution = {
+  resolutionId: string;
+  decision: 'execute' | 'clarify' | 'cancel' | 'defer' | 'unrelated' | 'rejected';
+  intent: InteractionIntent;
+  candidateOptionIds: string[];
+  selectedOptionId?: string;
+  recommendationId?: string;
+  taskId?: string;
+  operation?: PendingOperation;
+  documentIds: string[];
+  evidenceGenerationIds: string[];
+  confidence: number;
+  reasonCodes: string[];
+};
+
+export type SemanticClassifierResult = {
+  intent: InteractionIntent;
+  candidates: Array<{ optionId: string; score: number }>;
+  modifiers: string[];
+  confidence: number;
+  reasonCodes: string[];
 };
 

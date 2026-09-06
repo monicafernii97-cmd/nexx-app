@@ -45,6 +45,28 @@ export async function inspectSyntheticRunUpload(page: Page, runId: string) {
     }>;
     transports: string[];
     attemptCount: number;
+    conversationIds: string[];
+    semanticTurns: Array<{
+      turnId: string;
+      message: string;
+      status: string;
+      speechAct?: string;
+      interactionIntent?: string;
+      interactionDecision?: string;
+      selectedOptionId?: string;
+      analysisMode?: string;
+      selectedDocumentIds: string[];
+      selectedEvidenceGenerationIds: string[];
+      evidenceRequirementCount: number;
+      sourceDocumentCount: number;
+      sourcePacketCount: number;
+      sourceCharacterCount: number;
+      answerEvidenceDocumentCount: number;
+      answerEvidenceChunkCount: number;
+      publicationDecision?: string;
+      publicationRejectionCodes: string[];
+      shadowRejectionCodes: string[];
+    }>;
   }>(page, { operation: "inspect", runId });
 }
 

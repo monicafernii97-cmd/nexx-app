@@ -149,6 +149,48 @@ export const inspectRunUpload = query({
         ),
       )
     ).flat();
+    const conversationIds = Array.from(new Set(sessions.flatMap((session) =>
+      session.conversationId ? [session.conversationId] : []
+    )));
+    const semanticTurns = (
+      await Promise.all(conversationIds.map(async (conversationId) => {
+        const turns = await ctx.db.query("chatTurns")
+          .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+          .order("desc")
+          .take(12);
+        return Promise.all(turns.map(async (turn) => {
+          const [understanding, plan, resolution, publication, generationAttempt, answerEvidence] = await Promise.all([
+            turn.understandingId ? ctx.db.get(turn.understandingId) : null,
+            turn.executionPlanId ? ctx.db.get(turn.executionPlanId) : null,
+            ctx.db.query("interactionResolutionAudits").withIndex("by_turn", (q) => q.eq("turnId", turn._id)).order("desc").first(),
+            ctx.db.query("responsePublicationAudits").withIndex("by_turn", (q) => q.eq("turnId", turn._id)).order("desc").first(),
+            ctx.db.query("chatGenerationAttempts").withIndex("by_turn", (q) => q.eq("turnId", turn._id)).order("desc").first(),
+            ctx.db.query("documentAnswerEvidence").withIndex("by_turn", (q) => q.eq("turnId", turn._id)).order("desc").first(),
+          ]);
+          return {
+            turnId: turn._id,
+            message: turn.message.slice(0, 500),
+            status: turn.status,
+            speechAct: understanding?.speechAct,
+            interactionIntent: understanding?.interactionIntent,
+            interactionDecision: resolution?.decision,
+            selectedOptionId: plan?.selectedOptionId,
+            analysisMode: plan?.analysisMode ?? turn.analysisMode,
+            selectedDocumentIds: plan?.selectedDocumentIds.map(String) ?? [],
+            selectedEvidenceGenerationIds: plan?.selectedEvidenceGenerationIds?.map(String) ?? [],
+            evidenceRequirementCount: plan?.evidenceRequirements.length ?? 0,
+            sourceDocumentCount: generationAttempt?.sourceDocumentCount ?? 0,
+            sourcePacketCount: generationAttempt?.sourcePacketCount ?? 0,
+            sourceCharacterCount: generationAttempt?.sourceCharacterCount ?? 0,
+            answerEvidenceDocumentCount: answerEvidence?.usedUploadedFileIds.length ?? 0,
+            answerEvidenceChunkCount: answerEvidence?.usedChunkIds.length ?? 0,
+            publicationDecision: publication?.decision,
+            publicationRejectionCodes: publication?.rejectionCodes ?? [],
+            shadowRejectionCodes: publication?.shadowRejectionCodes ?? [],
+          };
+        }));
+      }))
+    ).flat();
 
     return {
       sessionCount: sessions.length,
@@ -174,6 +216,8 @@ export const inspectRunUpload = query({
         .map((attempt) => attempt.transport)
         .filter(Boolean),
       attemptCount: attemptRows.length,
+      conversationIds: conversationIds.map(String),
+      semanticTurns,
     };
   },
 });

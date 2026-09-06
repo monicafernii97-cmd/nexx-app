@@ -26,7 +26,14 @@ export type ClaimVerificationError =
   | 'RESP_GENERIC_MULTI_SENTENCE'
   | 'RESP_FALLBACK_NOT_CONTEXTUAL'
   | 'RESP_WRONG_DOCUMENT_SCOPE'
-  | 'RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION';
+  | 'RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION'
+  | 'RESP_ACCEPTED_ACTION_NOT_EXECUTED'
+  | 'RESP_RECOMMENDATION_REFERENCE_DROPPED'
+  | 'RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE'
+  | 'RESP_EXECUTION_WITHOUT_OPERATION'
+  | 'RESP_EXECUTION_WITHOUT_EVIDENCE'
+  | 'RESP_REUPLOAD_UNNECESSARY'
+  | 'RESP_REPEATED_CHOICE_AFTER_RESOLUTION';
 
 export type ClaimVerificationResult = {
   passed: boolean;
@@ -61,6 +68,9 @@ const INPUT_WAIT_ACKNOWLEDGMENT = /\b(?:upload|re[- ]?upload|attach|send|provide
 const HISTORICAL_DOCUMENT_WORK = /\b(?:review|analy[sz]e|extract|read|process|check|use)\b.{0,60}\b(?:the\s+)?(?:existing|previous|prior|old|historical|current|available|uploaded|saved)?\s*(?:order|document|file|pdf)\b/i;
 const ACTION_COMPLETION_CLAIM = /\b(?:i|we)(?:'ve| have)? (?:now )?(?:reviewed|analy[sz]ed|extracted|read|processed|completed|finished|checked)\b|\b(?:the\s+)?(?:review|analysis|extraction|processing|check)\s+(?:is|was|has been)\s+(?:complete|completed|finished|done)\b/i;
 const SELF_ASSESSMENT_CLAIM = /\b(?:i|we)\s+(?:checked|rechecked|reassessed|inspected|reviewed|looked\s+again)\b/i;
+const REUPLOAD_REQUEST = /\b(?:upload|re[- ]?upload|attach|send|provide)\b.{0,100}\b(?:file|order|document|pdf|it)\b|\b(?:file|order|document|pdf)\b.{0,100}\b(?:upload|re[- ]?upload|attach|send|provide)\b/i;
+const PROMISE_ONLY = /\b(?:i can|i will|i'll|once you|after you|next step)\b.{0,140}\b(?:review|analy[sz]e|read|start)\b/i;
+const REPEATED_CHOICE = /\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i;
 
 export function verifyResponseClaims(args: {
   content: string;
@@ -103,6 +113,12 @@ export function verifyResponseClaims(args: {
     }
   }
   if (UNREADABLE_CLAIM.test(content) && readable && args.capabilityDecision.prohibitedClaims.includes('file_unreadable')) errors.push('RESP_FALSE_UNREADABLE_CLAIM');
+  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && UNREADABLE_CLAIM.test(content)) {
+    errors.push('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE');
+  }
+  if (args.publicationV2 && args.plan.selectedDocumentIds.length > 0 && readable && REUPLOAD_REQUEST.test(content) && args.requestedOperation !== 'await_upload') {
+    errors.push('RESP_REUPLOAD_UNNECESSARY');
+  }
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');
   if (args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
   if (args.publicationV2 && args.citationVerificationPassed === false) {
@@ -117,6 +133,21 @@ export function verifyResponseClaims(args: {
   if (args.expectedFocusRevision !== args.currentFocusRevision) errors.push('RESP_STALE_FOCUS');
   if (args.unresolvedReferent && args.plan.responseAct !== 'clarify') errors.push('RESP_UNRESOLVED_REFERENT');
   if (INTERNAL_PAYLOAD.test(content)) errors.push('RESP_INTERNAL_PAYLOAD');
+  if (args.publicationV2 && ACTION_COMPLETION_CLAIM.test(content) && !args.plan.requestedOperation && !args.plan.analysisMode) {
+    errors.push('RESP_EXECUTION_WITHOUT_OPERATION');
+  }
+  if (args.publicationV2 && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
+    errors.push('RESP_EXECUTION_WITHOUT_EVIDENCE', 'RESP_ACCEPTED_ACTION_NOT_EXECUTED');
+  }
+  if (args.publicationV2 && args.plan.selectedOptionId && PROMISE_ONLY.test(content) && args.evidenceIds.length === 0) {
+    errors.push('RESP_ACCEPTED_ACTION_NOT_EXECUTED');
+  }
+  if (args.publicationV2 && args.plan.selectedOptionId && REPEATED_CHOICE.test(content)) {
+    errors.push('RESP_REPEATED_CHOICE_AFTER_RESOLUTION');
+  }
+  if (args.publicationV2 && args.plan.interactionResolutionId && !args.plan.selectedOptionId && ['confirm', 'select'].includes(args.speechAct ?? '')) {
+    errors.push('RESP_RECOMMENDATION_REFERENCE_DROPPED');
+  }
 
   if (args.publicationV2 && args.speechAct === 'social' && (
     DOCUMENT_CONTEXT_MENTION.test(content) || DOCUMENT_ANALYSIS_CLAIM.test(content)
@@ -184,7 +215,10 @@ export function verifyResponseClaims(args: {
         !has('RESP_INTENT_NOT_FULFILLED') &&
         !has('RESP_AWAITED_INPUT_NOT_ACKNOWLEDGED'),
       evidence: !has('RESP_UNSUPPORTED_PROPOSITION') && !has('RESP_CITATION_MISMATCH'),
-      capabilityClaims: !has('RESP_FALSE_UNREADABLE_CLAIM') && !has('RESP_FALSE_EXHAUSTIVE_CLAIM'),
+      capabilityClaims: !has('RESP_FALSE_UNREADABLE_CLAIM') &&
+        !has('RESP_FALSE_EXHAUSTIVE_CLAIM') &&
+        !has('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE') &&
+        !has('RESP_REUPLOAD_UNNECESSARY'),
       continuity: !has('RESP_WRONG_TASK') &&
         !has('RESP_UNRESOLVED_REFERENT') &&
         !has('RESP_STALE_FOCUS') &&
@@ -194,11 +228,16 @@ export function verifyResponseClaims(args: {
         !has('RESP_LATENT_DOCUMENT_CONTEXT_SURFACED') &&
         !has('RESP_WRONG_DOCUMENT_SCOPE') &&
         !has('RESP_DOCUMENT_ANALYSIS_ON_SOCIAL_TURN') &&
-        !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD'),
+        !has('RESP_HISTORICAL_DOCUMENT_WHILE_AWAITING_UPLOAD') &&
+        !has('RESP_ACCEPTED_ACTION_NOT_EXECUTED') &&
+        !has('RESP_RECOMMENDATION_REFERENCE_DROPPED') &&
+        !has('RESP_REPEATED_CHOICE_AFTER_RESOLUTION'),
       contradictions: !has('RESP_UNSUPPORTED_PROPOSITION') &&
         !has('RESP_FALSE_ACTION_COMPLETION') &&
         !has('RESP_FUTURE_ACTION_EXECUTED_EARLY') &&
-        !has('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION'),
+        !has('RESP_SELF_ASSESSMENT_WITHOUT_INSPECTION') &&
+        !has('RESP_EXECUTION_WITHOUT_OPERATION') &&
+        !has('RESP_EXECUTION_WITHOUT_EVIDENCE'),
       safety: true,
       internalPayload: !has('RESP_INTERNAL_PAYLOAD'),
     },

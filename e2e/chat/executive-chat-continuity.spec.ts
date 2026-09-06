@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { beginSyntheticRun, finishSyntheticRun } from '../support/lifecycle';
 import { ensureUploadFixtures } from '../support/files';
 import { uploadAndSend } from '../support/upload-journey';
+import { inspectSyntheticRunUpload } from '../support/convex';
 
 async function sendAndWait(page: import('@playwright/test').Page, text: string) {
   const assistants = page.getByTestId('chat-message-assistant');
@@ -31,8 +32,24 @@ test('critical executive-chat sequence matrix preserves focus without unwanted d
     });
     await sendAndWait(page, 'which');
     const finalAnswer = await sendAndWait(page, 'please do so');
-    await expect(finalAnswer).not.toContainText(/(?:cannot|can't|do not) (?:read|access|see).*(?:file|document|pdf)/i);
+    await expect(finalAnswer).not.toContainText(/(?:cannot|can't|do not|don't|unable to).{0,140}(?:read|access|see|have).{0,140}(?:file|document|order|pdf|text)|(?:re[- ]?upload|upload again).{0,140}(?:file|document|order|pdf)/i);
     await expect(page.getByTestId('chat-message-attachment').filter({ hasText: fixture.path.split(/[\\/]/).pop()! })).toBeVisible();
+    const inspected = await inspectSyntheticRunUpload(page, environment.runId);
+    const acceptedTurn = inspected.semanticTurns.find((turn) => turn.message.toLowerCase() === 'please do so');
+    expect(acceptedTurn).toMatchObject({
+      status: 'assistant_saved',
+      speechAct: 'confirm',
+      interactionIntent: 'accept_recommendation',
+      interactionDecision: 'execute',
+      analysisMode: 'full_document_review',
+      publicationRejectionCodes: [],
+      shadowRejectionCodes: [],
+    });
+    expect(acceptedTurn?.selectedOptionId).toBeTruthy();
+    expect(acceptedTurn?.selectedDocumentIds).toHaveLength(1);
+    expect(acceptedTurn?.selectedEvidenceGenerationIds.length).toBeGreaterThan(0);
+    expect(acceptedTurn?.answerEvidenceDocumentCount).toBeGreaterThan(0);
+    expect(acceptedTurn?.answerEvidenceChunkCount).toBeGreaterThan(0);
 
     const greeting = await sendAndWait(page, 'hey');
     await expect(greeting).toContainText(/\b(?:hey|hi|hello|good (?:morning|afternoon|evening))\b/i);

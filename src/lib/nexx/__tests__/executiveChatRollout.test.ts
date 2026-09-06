@@ -36,9 +36,12 @@ describe('executive chat rollout selection', () => {
   it('lets emergency environment controls disable but never force rollout enablement', () => {
     const selected = resolveExecutiveChatRollout({ config: { ...base, cohortPercentage: 100 }, subject: { userId: 'user-3' }, now: 2 });
     expect(featureFlagsForRollout(selected, {}).publicationGateV2).toBe(true);
+    expect(featureFlagsForRollout(selected, {}).semanticArbiter).toBe(true);
     expect(featureFlagsForRollout(selected, { EXEC_CHAT_PUBLICATION_V2: 'off' }).publicationGateV2).toBe(false);
+    expect(featureFlagsForRollout(selected, { EXEC_CHAT_SEMANTIC_ARBITER: 'off' }).semanticArbiter).toBe(false);
     expect(featureFlagsForRollout(selected, { EXEC_CHAT_EMERGENCY_OFF: 'true' }).documentActivationV2).toBe(false);
     const unselected = resolveExecutiveChatRollout({ config: base, subject: { userId: 'user-3' }, now: 2 });
     expect(featureFlagsForRollout(unselected, { EXEC_CHAT_PUBLICATION_V2: 'on' }).publicationGateV2).toBe(false);
+    expect(featureFlagsForRollout(unselected, { EXEC_CHAT_SEMANTIC_ARBITER: 'on' }).semanticArbiter).toBe(false);
   });
 });

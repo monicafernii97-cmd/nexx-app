@@ -1,7 +1,8 @@
 import { hasExplicitNewIssueSignal } from '../legal-engine/legalSignals';
 import { isAwaitingUploadTurn } from './documentActivation';
-import { ORCHESTRATION_POLICY_VERSION, ORCHESTRATION_POLICY_V2_VERSION, clampConfidence } from './policy';
+import { ORCHESTRATION_POLICY_VERSION, ORCHESTRATION_POLICY_V3_VERSION, clampConfidence } from './policy';
 import { resolveReferents } from './referentResolver';
+import { resolveSemanticInteraction } from './semanticInteraction';
 import type { SpeechAct, TurnUnderstanding, TurnUnderstandingInput } from './types';
 
 const CANCEL = /^(?:stop|cancel|never\s*mind|nevermind|forget\s+it|don't|do\s+not)$/i;
@@ -52,9 +53,33 @@ function inferSpeechAct(message: string, input: TurnUnderstandingInput): SpeechA
 export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding {
   const message = normalize(input.message);
   const resolved = resolveReferents({ ...input, message });
+  const interaction = EXPLICIT_SWITCH.test(message) || hasExplicitNewIssueSignal(message)
+    ? undefined
+    : resolveSemanticInteraction({ message, controlState: input.controlState });
   let speechAct = inferSpeechAct(message, input);
 
-  if (speechAct === 'select' && resolved.optionCandidates.length === 0) {
+  if (interaction?.decision === 'execute') {
+    speechAct = interaction.intent === 'select_option' || interaction.intent === 'modify_option'
+      ? 'select'
+      : 'confirm';
+    if (interaction.selectedOptionId && !resolved.referents.some((referent) => referent.resolvedId === interaction.selectedOptionId)) {
+      resolved.referents.unshift({
+        text: message,
+        resolvedType: 'option',
+        resolvedId: interaction.selectedOptionId,
+        confidence: interaction.confidence,
+        reasonCodes: interaction.reasonCodes,
+      });
+    }
+  } else if (interaction?.decision === 'clarify') {
+    speechAct = 'clarify';
+  } else if (interaction?.decision === 'cancel') {
+    speechAct = 'cancel';
+  } else if (interaction?.decision === 'rejected') {
+    speechAct = 'correct';
+  }
+
+  if (speechAct === 'select' && resolved.optionCandidates.length === 0 && interaction?.decision !== 'execute') {
     speechAct = resolved.unresolvedFragment ? 'clarify' : 'answer';
   }
   const hasContext = Boolean(input.controlState?.activeTaskId || input.controlState?.activeDocumentIds.length || input.activeTasks?.length);
@@ -83,10 +108,11 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
   const optionAmbiguous = resolved.optionCandidates.length > 1 &&
     resolved.optionCandidates[0].score - resolved.optionCandidates[1].score < 0.18;
   const taskAmbiguous = Boolean(topTask && secondTask && topTask.score - secondTask.score < 0.18 && topTask.score >= 0.5);
-  const confirmationResolved = speechAct === 'confirm' && Boolean(
+  const confirmationResolved = interaction?.decision === 'execute' || (speechAct === 'confirm' && Boolean(
     input.controlState?.lastAssistantOffer || input.controlState?.pendingOptions.length === 1
-  );
+  ));
   const ambiguityMaterial = !confirmationResolved && (
+    interaction?.decision === 'clarify' ||
     resolved.unresolvedFragment || optionAmbiguous || taskAmbiguous || (speechAct === 'unknown' && hasContext)
   );
 
@@ -98,6 +124,7 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     ...(optionAmbiguous ? ['ambiguous_pending_options'] : []),
     ...(taskAmbiguous ? ['ambiguous_tasks'] : []),
     ...(confirmationResolved ? ['confirmation_resolved_by_pending_offer'] : []),
+    ...(interaction?.reasonCodes ?? []),
   ];
 
   return {
@@ -105,11 +132,15 @@ export function understandTurn(input: TurnUnderstandingInput): TurnUnderstanding
     speechAct,
     continuity,
     requestedOperation: inferRequestedOperation(message, input.foregroundIntentV2),
+    interactionIntent: interaction?.intent,
+    interactionCandidateOptionIds: interaction?.candidateOptionIds,
+    interactionConfidence: interaction?.confidence,
+    interactionReasonCodes: interaction?.reasonCodes,
     referents: resolved.referents,
     candidateTasks: resolved.taskCandidates,
     confidence,
     ambiguityMaterial,
     reasonCodes,
-    resolverVersion: input.foregroundIntentV2 ? ORCHESTRATION_POLICY_V2_VERSION : ORCHESTRATION_POLICY_VERSION,
+    resolverVersion: input.foregroundIntentV2 ? ORCHESTRATION_POLICY_V3_VERSION : ORCHESTRATION_POLICY_VERSION,
   };
 }

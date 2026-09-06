@@ -171,6 +171,8 @@ export const inspectRunUpload = query({
             turnId: turn._id,
             message: turn.message.slice(0, 500),
             status: turn.status,
+            errorCode: turn.errorCode,
+            errorMessage: turn.errorMessage?.slice(0, 500),
             speechAct: understanding?.speechAct,
             interactionIntent: understanding?.interactionIntent,
             interactionDecision: resolution?.decision,

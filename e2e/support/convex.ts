@@ -50,6 +50,8 @@ export async function inspectSyntheticRunUpload(page: Page, runId: string) {
       turnId: string;
       message: string;
       status: string;
+      errorCode?: string;
+      errorMessage?: string;
       speechAct?: string;
       interactionIntent?: string;
       interactionDecision?: string;

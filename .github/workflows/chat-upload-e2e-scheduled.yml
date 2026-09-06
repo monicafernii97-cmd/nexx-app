@@ -14,18 +14,46 @@ on:
         default: daily
         type: choice
         options: [daily, weekly]
+      recovery:
+        description: Deduplicate an automated missing-run recovery
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
-  group: chat-upload-scheduled-${{ inputs.lane || github.event.schedule }}
+  group: chat-upload-scheduled-${{ inputs.lane || (github.event.schedule == '0 4 * * 0' && 'weekly' || 'daily') }}
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
   issues: write
 
 jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      lane: ${{ steps.check.outputs.lane }}
+      should-run: ${{ steps.check.outputs.should-run }}
+      coverage-state: ${{ steps.check.outputs.coverage-state }}
+      covered-run-id: ${{ steps.check.outputs.covered-run-id }}
+    env:
+      E2E_LANE: ${{ inputs.lane || (github.event.schedule == '0 4 * * 0' && 'weekly' || 'daily') }}
+      E2E_DEDUPLICATE: ${{ github.event_name == 'schedule' || inputs.recovery == true }}
+      E2E_TIME_ZONE: America/Chicago
+      E2E_WORKFLOW: chat-upload-e2e-scheduled.yml
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Check same-day lane coverage
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-upload-e2e-coverage.mjs
+
   upload-daily:
-    if: github.event_name == 'workflow_dispatch' && inputs.lane == 'daily' || github.event.schedule == '30 5 * * *'
+    needs: coverage
+    if: needs.coverage.outputs.lane == 'daily' && needs.coverage.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: Production
@@ -81,7 +109,8 @@ jobs:
         run: node scripts/upsert-upload-e2e-github-alert.mjs
 
   upload-weekly:
-    if: github.event_name == 'workflow_dispatch' && inputs.lane == 'weekly' || github.event.schedule == '0 4 * * 0'
+    needs: coverage
+    if: needs.coverage.outputs.lane == 'weekly' && needs.coverage.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: Production

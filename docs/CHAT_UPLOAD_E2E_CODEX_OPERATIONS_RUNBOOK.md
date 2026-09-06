@@ -123,6 +123,31 @@ The automation runs daily at 6:00 AM `America/Chicago`, after the normal GitHub 
 10. Create or update one incident task when action is required.
 11. Stop at `AWAITING_OWNER_APPROVAL` before editing code.
 
+### Missing-run recovery
+
+The monitor is alert-only until the recovery configuration is explicitly
+activated. Once activated, it may recover missing production daily and weekly
+lanes under these rules:
+
+1. Recheck GitHub immediately before every dispatch. If evidence is
+   inaccessible, fail closed and do not dispatch.
+2. Treat any queued, running, or completed same-date lane attempt on the same
+   `main` SHA as coverage. Do not automatically retry a failed attempt.
+3. Dispatch at most once for each
+   `America/Chicago date + lane + main SHA` key, passing `recovery=true`.
+4. On Sundays, recover `daily` first. Wait for completion and confirmed cleanup
+   before considering `weekly`.
+5. Stop the recovery queue on any failure or uncertain cleanup. Update the
+   matching incident instead of dispatching another lane.
+6. Do not automatically recover the monthly resilience lane.
+
+Scheduled events and dispatches marked `recovery=true` share lane-normalized
+concurrency and run a same-date coverage check before entering the Production
+environment. A late event skips its browser journey when a prior lane attempt
+already exists. Ordinary owner-triggered dispatches retain override behavior.
+If the in-workflow coverage lookup is unavailable, it fails open and runs the
+journey so a GitHub API outage cannot silently remove assurance.
+
 ### Idempotency marker
 
 End each report with a machine-readable marker:
@@ -132,6 +157,12 @@ UPLOAD_E2E_CURSOR run_id=<id> attempt=<attempt> lane=<lane> incident=<id-or-none
 ```
 
 Before posting, search recent task history for the same run ID, attempt, and lane. Do not repost unchanged evidence.
+
+When `EXPECTED_SCHEDULED_RUN_MISSING` repeats while an existing scheduler
+incident remains open, pass that incident ID to the reporter with
+`--incident-id`. Reuse the incident even when the reporting date or `main` SHA
+changes; date, lane, and SHA remain part of the recovery key, not the incident
+identity.
 
 ## 7. Daily report format
 
@@ -175,6 +206,10 @@ Incident ID format:
 Deduplicate using:
 
 `environment + lane + first failed phase + failure code + deployment or commit`
+
+For repeated `EXPECTED_SCHEDULED_RUN_MISSING` evidence, deduplicate more broadly
+as `Production + scheduled assurance + schedule event absent`. Update the open
+scheduler incident instead of creating a new date-based incident.
 
 The incident task must contain:
 
@@ -270,6 +305,16 @@ gh workflow run chat-upload-e2e-scheduled.yml --repo monicafernii97-cmd/nexx-app
 gh workflow run chat-upload-e2e-resilience.yml --repo monicafernii97-cmd/nexx-app --ref main
 ```
 
+Automated missing-run recovery uses the explicit deduplication flag:
+
+```text
+gh workflow run chat-upload-e2e-scheduled.yml --repo monicafernii97-cmd/nexx-app --ref main -f lane=daily -f recovery=true
+gh workflow run chat-upload-e2e-scheduled.yml --repo monicafernii97-cmd/nexx-app --ref main -f lane=weekly -f recovery=true
+```
+
+Never issue these recovery commands when GitHub evidence is inaccessible or a
+same-key lane attempt already exists.
+
 ## 14. Production readiness checklist
 
 - Scheduled workflows are enabled on the default branch.
@@ -284,6 +329,9 @@ gh workflow run chat-upload-e2e-resilience.yml --repo monicafernii97-cmd/nexx-ap
 - Heartbeat automation is active and unmuted.
 - A healthy report reaches the daily task.
 - A controlled failure produces exactly one incident task.
+- Missing daily and weekly lanes produce one fail-closed recovery decision per
+  date, lane, and `main` SHA.
+- A late scheduled event cannot repeat a recovered production lane.
 - No tracked-file edit occurs before approval.
 - An approved seeded repair can produce a verified ready-for-review PR.
 - Production deployment and post-deploy release journey pass.

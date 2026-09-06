@@ -45,6 +45,49 @@ function localDateTime(iso, timeZone) {
   }).format(new Date(iso));
 }
 
+export function buildRecoveryDecision(report) {
+  const laneSupported = ["daily", "weekly"].includes(report.lane);
+  const inaccessible =
+    report.operations.failureCode === "GITHUB_EVIDENCE_INACCESSIBLE";
+  const missing =
+    report.operations.failureCode === "EXPECTED_SCHEDULED_RUN_MISSING";
+  const healthyMainMismatch =
+    report.matchesMain === false &&
+    report.operations.operatingState === "OPERATING";
+  const eligible = Boolean(
+    laneSupported &&
+      (missing || healthyMainMismatch) &&
+      report.mainSha &&
+      !inaccessible,
+  );
+  let reason = "attempt_present";
+  if (!laneSupported) reason = "unsupported_lane";
+  else if (inaccessible) reason = "evidence_inaccessible";
+  else if (healthyMainMismatch)
+    reason = eligible ? "main_not_covered" : "main_sha_unavailable";
+  else if (missing)
+    reason = eligible ? "missing_run" : "main_sha_unavailable";
+
+  return {
+    eligible,
+    reason,
+    key: eligible
+      ? `${report.expectedLocalDate}:${report.lane}:${report.mainSha}`
+      : null,
+    dispatch: eligible
+      ? {
+          ref: "main",
+          lane: report.lane,
+          recovery: true,
+        }
+      : null,
+  };
+}
+
+function withRecoveryDecision(report) {
+  return { ...report, recovery: buildRecoveryDecision(report) };
+}
+
 function getRunJobs(repository, runId) {
   return ghJson([
     "run",
@@ -183,6 +226,9 @@ function ownerMarkdown(report) {
   const countLine = counts
     ? `${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped, ${counts.retried} retried`
     : "Detailed counts unavailable";
+  const recoveryLine = report.recovery.eligible
+    ? `eligible (${report.recovery.key})`
+    : `not eligible (${report.recovery.reason})`;
 
   return [
     heading,
@@ -197,14 +243,22 @@ function ownerMarkdown(report) {
     `Confidence: ${report.operations.confidence}`,
     `Failure code: ${report.operations.failureCode ?? "none"}`,
     `GitHub alert: ${report.openIssue?.url ?? "none"}`,
+    `Recovery: ${recoveryLine}`,
     `Approval state: ${["OPERATING", "RUNNING"].includes(status) ? "not required" : "AWAITING_OWNER_APPROVAL"}`,
     "",
     `UPLOAD_E2E_CURSOR run_id=${report.operations.runId ?? "none"} attempt=${report.operations.runAttempt ?? 1} lane=${report.lane} incident=${report.incidentId ?? "none"}`,
   ].join("\n");
 }
 
-export function buildMissingRunReport({ repository, lane, expectedDate, timeZone, mainSha }) {
-  return {
+export function buildMissingRunReport({
+  repository,
+  lane,
+  expectedDate,
+  timeZone,
+  mainSha,
+  incidentId = null,
+}) {
+  return withRecoveryDecision({
     schemaVersion: 1,
     repository,
     lane,
@@ -217,7 +271,7 @@ export function buildMissingRunReport({ repository, lane, expectedDate, timeZone
     mainSha,
     previousSuccess: null,
     openIssue: null,
-    incidentId: `NEXX-UPLOAD-${expectedDate}-01`,
+    incidentId: incidentId ?? `NEXX-UPLOAD-${expectedDate}-01`,
     operations: {
       schemaVersion: 1,
       reportType: lane,
@@ -236,22 +290,29 @@ export function buildMissingRunReport({ repository, lane, expectedDate, timeZone
       failureCode: "EXPECTED_SCHEDULED_RUN_MISSING",
       webhookConfigured: null,
     },
-  };
+  });
 }
 
-export function buildInaccessibleReport({ repository, lane, expectedDate, timeZone }) {
+export function buildInaccessibleReport({
+  repository,
+  lane,
+  expectedDate,
+  timeZone,
+  incidentId = null,
+}) {
   const report = buildMissingRunReport({
     repository,
     lane,
     expectedDate,
     timeZone,
     mainSha: null,
+    incidentId,
   });
   report.operations.operatingState = "INACCESSIBLE";
   report.operations.workflowConclusion = "inaccessible";
   report.operations.failureCode = "GITHUB_EVIDENCE_INACCESSIBLE";
   report.operations.customerImpact = "not_established";
-  return report;
+  return withRecoveryDecision(report);
 }
 
 async function main() {
@@ -262,6 +323,7 @@ async function main() {
   );
   const lane = argument("lane", "daily");
   const requestedRunId = argument("run-id", null);
+  const incidentId = argument("incident-id", null);
   const timeZone = argument("time-zone", "America/Chicago");
   const expectedDate = argument(
     "expected-date",
@@ -310,6 +372,7 @@ async function main() {
       lane,
       expectedDate,
       timeZone,
+      incidentId,
     });
     process.stdout.write(
       format === "markdown"
@@ -344,6 +407,7 @@ async function main() {
       expectedDate,
       timeZone,
       mainSha,
+      incidentId,
     });
   } else {
     const artifact =
@@ -395,7 +459,7 @@ async function main() {
         ],
         { allowFailure: true },
       ) ?? [];
-    report = {
+    report = withRecoveryDecision({
       schemaVersion: 1,
       repository,
       lane,
@@ -411,9 +475,9 @@ async function main() {
       incidentId:
         operations.operatingState === "OPERATING"
           ? null
-          : `NEXX-UPLOAD-${expectedDate}-01`,
+          : incidentId ?? `NEXX-UPLOAD-${expectedDate}-01`,
       operations,
-    };
+    });
   }
 
   process.stdout.write(

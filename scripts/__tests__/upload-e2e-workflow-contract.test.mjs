@@ -28,6 +28,30 @@ test("scheduled browser assurance uses the America/Chicago time zone", () => {
   assert.match(resilience, /timezone:\s*["']America\/Chicago["']/);
 });
 
+test("scheduled assurance deduplicates late daily and weekly lane attempts", () => {
+  const scheduled = fs.readFileSync(
+    path.join(workflowDir, "chat-upload-e2e-scheduled.yml"),
+    "utf8",
+  );
+
+  assert.match(scheduled, /recovery:\s*[\s\S]*type:\s*boolean/);
+  assert.match(scheduled, /actions:\s*read/);
+  assert.match(scheduled, /node scripts\/check-upload-e2e-coverage\.mjs/);
+  assert.match(scheduled, /inputs\.recovery == true/);
+  assert.match(
+    scheduled,
+    /group: chat-upload-scheduled-\$\{\{ inputs\.lane \|\| \(github\.event\.schedule == '0 4 \* \* 0' && 'weekly' \|\| 'daily'\) \}\}/,
+  );
+  assert.match(
+    scheduled,
+    /needs\.coverage\.outputs\.lane == 'daily' && needs\.coverage\.outputs\.should-run == 'true'/,
+  );
+  assert.match(
+    scheduled,
+    /needs\.coverage\.outputs\.lane == 'weekly' && needs\.coverage\.outputs\.should-run == 'true'/,
+  );
+});
+
 test("every browser workflow uploads an owner-facing operations envelope", () => {
   for (const filename of browserWorkflows) {
     const source = fs.readFileSync(path.join(workflowDir, filename), "utf8");

@@ -116,7 +116,7 @@ function explicitOption(message: string, options: PendingOption[]) {
   const ordinal = normalized.match(/\b(first|1|1st|one|second|2|2nd|two|third|3|3rd|three|last)(?:\s+one|\s+option|\s+choice)?\b/);
   if (ordinal) {
     const index = ORDINALS[ordinal[1]];
-    const option = index === -1 ? options.at(-1) : options[index];
+    const option = index === -1 ? options[options.length - 1] : options[index];
     return option ? { option, source: 'ordinal' as const } : undefined;
   }
   const matches = options.filter((option) => [option.label, ...option.aliases]

@@ -4037,10 +4037,20 @@ export const processChatGenerationJob = internalAction({
                 workerStage = 'publishing_review_depth_choices';
                 const content = reviewDepthChoiceMessage();
                 const response = plainTextAssistantResponse(content);
+                const evidenceBinding = await ctx.runMutation(internal.conversationControl.bindTurnEvidenceGenerations, {
+                    turnId: context.turn._id,
+                    documentIds: context.turnExecutionPlan?.selectedDocumentIds ?? [],
+                });
+                if (context.conversationControlState) {
+                    context.conversationControlState.activeEvidenceGenerationIds = evidenceBinding.activeEvidenceGenerationIds;
+                }
+                if (context.turnExecutionPlan) {
+                    context.turnExecutionPlan.selectedEvidenceGenerationIds = evidenceBinding.evidenceGenerationIds;
+                }
                 const pendingInteraction = createReviewDepthPendingInteraction({
                     taskId: context.turnExecutionPlan?.taskId ?? context.conversationControlState?.activeTaskId ?? '',
                     documentIds: (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String),
-                    evidenceGenerationIds: (context.conversationControlState?.activeEvidenceGenerationIds ?? []).map(String),
+                    evidenceGenerationIds: evidenceBinding.evidenceGenerationIds.map(String),
                     focusRevision: context.turnExecutionPlan?.focusRevision ?? context.conversationControlState?.focusRevision ?? 0,
                     sourceTurnId: context.turn._id.toString(),
                     sourcePlanId: context.turnExecutionPlan?.planId,
@@ -4049,6 +4059,7 @@ export const processChatGenerationJob = internalAction({
                         userId: context.turn.userId.toString(),
                         conversationId: context.turn.conversationId.toString(),
                         documentIds: (context.turnExecutionPlan?.selectedDocumentIds ?? []).map(String),
+                        evidenceGenerationIds: evidenceBinding.evidenceGenerationIds.map(String),
                     }),
                 });
                 const choicePublication = await commitVerifiedResponse({

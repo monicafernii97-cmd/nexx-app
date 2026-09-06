@@ -964,6 +964,84 @@ export const applyValidatedPendingState = internalMutation({
   },
 });
 
+/**
+ * Bind evidence generations that became active after the user turn was first
+ * planned (for example, while an upload finished indexing). The server derives
+ * every generation from the currently selected documents and revalidates
+ * ownership/status; callers cannot nominate arbitrary generation IDs.
+ */
+export const bindTurnEvidenceGenerations = internalMutation({
+  args: {
+    turnId: v.id('chatTurns'),
+    documentIds: v.array(v.id('uploadedFiles')),
+  },
+  handler: async (ctx, args) => {
+    const turn = await ctx.db.get(args.turnId);
+    if (!turn) throw new Error('turn_not_found');
+    const [owner, control, plan] = await Promise.all([
+      ctx.db.get(turn.userId),
+      ctx.db.query('conversationControlStates')
+        .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+        .first(),
+      ctx.db.query('turnExecutionPlans')
+        .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+        .first(),
+    ]);
+    if (!owner?.clerkId || !control || !plan || control.userId !== turn.userId || plan.userId !== turn.userId) {
+      throw new Error('evidence_binding_scope_mismatch');
+    }
+    const activeDocumentIds = new Set(control.activeDocumentIds.map(String));
+    const selectedDocumentIds = new Set(plan.selectedDocumentIds.map(String));
+    const requestedDocumentIds = Array.from(new Set(args.documentIds.map(String)));
+    if (requestedDocumentIds.some((id) => !activeDocumentIds.has(id) || !selectedDocumentIds.has(id))) {
+      throw new Error('evidence_binding_document_not_active');
+    }
+    const files = await Promise.all(requestedDocumentIds.map((id) => ctx.db.get(id as Id<'uploadedFiles'>)));
+    if (files.some((file) => !file || file.clerkUserId !== owner.clerkId || file.status === 'quarantined' || file.status === 'deleted')) {
+      throw new Error('evidence_binding_document_not_authorized');
+    }
+    const generationIds = Array.from(new Set(files.flatMap((file) =>
+      file?.activeMemoryGenerationId ? [file.activeMemoryGenerationId.toString()] : []
+    )));
+    const generations = await Promise.all(generationIds.map((id) => ctx.db.get(id as Id<'documentMemoryGenerations'>)));
+    if (generations.some((generation) =>
+      !generation || generation.clerkUserId !== owner.clerkId || generation.status !== 'active' ||
+      !requestedDocumentIds.includes(generation.uploadedFileId.toString())
+    )) {
+      throw new Error('evidence_binding_generation_not_active');
+    }
+    const boundIds = generationIds.map((id) => id as Id<'documentMemoryGenerations'>);
+    const mergedControlIds = Array.from(new Set([
+      ...control.activeEvidenceGenerationIds.map(String),
+      ...generationIds,
+    ])).map((id) => id as Id<'documentMemoryGenerations'>);
+    const mergedPlanIds = Array.from(new Set([
+      ...(plan.selectedEvidenceGenerationIds ?? []).map(String),
+      ...generationIds,
+    ])).map((id) => id as Id<'documentMemoryGenerations'>);
+    const now = Date.now();
+    await ctx.db.patch(control._id, { activeEvidenceGenerationIds: mergedControlIds, updatedAt: now });
+    await ctx.db.patch(plan._id, { selectedEvidenceGenerationIds: mergedPlanIds, updatedAt: now });
+    if (control.activeTaskId) {
+      const task = await ctx.db.query('conversationTasks')
+        .withIndex('by_conversation_task', (q) =>
+          q.eq('conversationId', turn.conversationId).eq('taskId', control.activeTaskId!)
+        )
+        .first();
+      if (task && task.userId === turn.userId) {
+        await ctx.db.patch(task._id, {
+          evidenceGenerationIds: Array.from(new Set([
+            ...task.evidenceGenerationIds.map(String),
+            ...generationIds,
+          ])).map((id) => id as Id<'documentMemoryGenerations'>),
+          updatedAt: now,
+        });
+      }
+    }
+    return { evidenceGenerationIds: boundIds, activeEvidenceGenerationIds: mergedControlIds };
+  },
+});
+
 export type PersistedTurnOrchestration = {
   understanding: TurnUnderstanding;
   plan: TurnExecutionPlan;

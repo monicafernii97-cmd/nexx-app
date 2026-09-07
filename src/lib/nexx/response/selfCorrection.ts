@@ -48,6 +48,15 @@ export type PriorTurnInspectionReceipt = {
     errorCode?: string;
     retryable: boolean;
   };
+  kernel?: {
+    foregroundGoal: string;
+    outcome: string;
+    validationPassed?: boolean;
+    rejectionCodes: string[];
+    evidenceIds: string[];
+    modelAttemptCount: number;
+    toolCallCount: number;
+  };
 };
 
 export type SelfCorrectionPlan = {
@@ -165,6 +174,9 @@ export function correctionInspectionPrompt(
     `A server-side inspection receipt was issued for the challenged response (${receipt.receiptId}).`,
     `Inspection findings: ${findings.join(' ') || 'The prior response and its recorded execution facts were inspected; no specific contradiction was confirmed.'}`,
     `Authorized repair actions: ${plan.actions.join(', ') || 'none'}.`,
+    receipt.kernel
+      ? `The prior turn receipt recorded outcome ${receipt.kernel.outcome}, ${receipt.kernel.evidenceIds.length} evidence reference(s), ${receipt.kernel.toolCallCount} tool call(s), and ${receipt.kernel.modelAttemptCount} model attempt(s).`
+      : 'No Phase 2 turn receipt was available for the prior response; use the compatible publication and capability record.',
     'Base any acknowledgment on those findings. Do not claim to have inspected, retried, refreshed, or repaired anything not recorded above.',
     'Do not expose receipt IDs, internal reason codes, hidden reasoning, or raw diagnostic payloads to the user.',
   ].join('\n');

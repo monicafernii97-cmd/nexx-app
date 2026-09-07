@@ -29,13 +29,14 @@ jobs:
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       VERCEL_DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+      RELEASE_DEPLOYMENT_CREATED_AT: ${{ github.event.deployment.created_at }}
       EXPECTED_RELEASE_GIT_SHA: ${{ github.event.deployment.sha }}
       VERIFICATION_SECRET: ${{ secrets.VERIFICATION_SECRET }}
       RECORD_RELEASE_ASSURANCE: "true"
       RELEASE_ASSURANCE_SUITES: upload-release,executive-chat-critical-matrix
       CONVEX_DEPLOYMENT: ${{ vars.CONVEX_DEPLOYMENT }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ github.event.deployment.ref }}
       - uses: ./.github/actions/setup-node
@@ -51,6 +52,11 @@ jobs:
         run: node scripts/publish-executive-chat-release.mjs pair
       - name: Enforce executive chat hard-stop dashboard
         run: npm run report:executive-chat-health
+      - name: Open or update executive-chat hard-stop alert
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/upsert-executive-chat-github-alert.mjs
       - name: Build owner-facing operations envelope
         if: always()
         env:
@@ -59,12 +65,13 @@ jobs:
         run: node scripts/build-upload-e2e-operations-envelope.mjs
       - name: Upload sanitized browser evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: chat-upload-release-${{ github.run_id }}
           path: |
             playwright-report/upload-e2e-summary.json
             playwright-report/upload-e2e-operations.json
+            playwright-report/executive-chat-health.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Notify on failure

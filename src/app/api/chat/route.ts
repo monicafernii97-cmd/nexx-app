@@ -4,10 +4,19 @@ import { api } from '@convex/_generated/api';
 import type { Id } from '@convex/_generated/dataModel';
 import { resolveTurnRoute } from '@/lib/nexx/router';
 import { getAuthenticatedConvexClient } from '@/lib/convexServer';
-import { getModelForRoute, type SubscriptionTier } from '@/lib/tiers';
+import { PRIMARY_MODEL } from '@/lib/tiers';
 import type { RouteMode } from '@/lib/types';
 import { isDocumentAnalysisMode, type DocumentAnalysisMode } from '@/lib/chat/documentAnalysisMode';
 import { getExecutiveChatFeatureFlags } from '@/lib/nexx/orchestration/featureFlags';
+import {
+  CONVERSATION_KERNEL_VERSION,
+  CONTEXT_BUILDER_VERSION,
+  MODEL_POLICY_VERSION,
+  OUTCOME_VERIFIER_VERSION,
+  TASK_LEDGER_VERSION,
+  TOOL_POLICY_VERSION,
+} from '@/lib/nexx/conversation/contracts';
+import { MODEL_PRICING_VERSION } from '@/lib/nexx/cost/modelPricing';
 
 const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_REQUEST_ID_LENGTH = 256;
@@ -282,12 +291,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const validTiers: SubscriptionTier[] = ['free', 'pro', 'premium', 'executive'];
-  const userTier: SubscriptionTier =
-    userRecord.subscriptionTier && validTiers.includes(userRecord.subscriptionTier as SubscriptionTier)
-      ? (userRecord.subscriptionTier as SubscriptionTier)
-      : 'free';
-
   // The most recently completed conversational route is the admission hint.
   // A remembered document task is available context, not a hard mode lock;
   // current-turn document activation is decided transactionally in Convex.
@@ -318,36 +321,9 @@ export async function POST(req: NextRequest) {
     shadowTaskId: executiveChatFlags.shadowUnderstanding ? conversationControl?.controlState?.activeTaskId : undefined,
     executiveChatControlEnabled: executiveChatFlags.controlState,
   });
-  const routeModeToFeature: Record<
-    string,
-    'economy_chat' | 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
-  > = {
-    adaptive_chat: 'economy_chat',
-    direct_legal_answer: 'chat',
-    local_procedure: 'chat',
-    document_analysis: 'analysis',
-    order_interpretation: 'analysis',
-    possession_access_schedule: 'analysis',
-    party_message_draft: 'chat',
-    supportive_strategy: 'chat',
-    co_parent_response: 'chat',
-    documentation_strategy: 'analysis',
-    deescalation_response: 'chat',
-    packed_case_intake: 'analysis',
-    litigation_navigation: 'analysis',
-    court_response_planning: 'analysis',
-    pro_se_guidance: 'chat',
-    attorney_resource_guidance: 'chat',
-    court_narrative_builder: 'analysis',
-    filing_walkthrough: 'analysis',
-    judge_lens_strategy: 'judge_sim',
-    court_ready_drafting: 'deep_draft',
-    pattern_analysis: 'analysis',
-    support_grounding: 'chat',
-    safety_escalation: 'chat',
-  };
-  const modelFeature = routeModeToFeature[routerResult.mode] ?? 'chat';
-  const model = getModelForRoute(userTier, modelFeature);
+  // Admission uses the standard-tier allowance. The worker's model policy is
+  // authoritative; the diagnostic route must never pin a turn to a model.
+  const model = PRIMARY_MODEL;
 
   try {
     const accepted = await convex.mutation(api.chatTurns.acceptChatTurn, {
@@ -380,6 +356,21 @@ export async function POST(req: NextRequest) {
         fullDocumentReviewStatus: attachment.fullDocumentReviewStatus,
       })),
       persistUserMessage: persistUserMessage !== false,
+      releaseGitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+      runtimeEnvironment: process.env.VERCEL_ENV === 'production'
+        ? 'production'
+        : process.env.VERCEL_ENV === 'preview'
+          ? 'preview'
+          : process.env.NODE_ENV === 'test'
+            ? 'test'
+            : 'development',
+      kernelVersion: CONVERSATION_KERNEL_VERSION,
+      contextBuilderVersion: CONTEXT_BUILDER_VERSION,
+      taskLedgerVersion: TASK_LEDGER_VERSION,
+      toolPolicyVersion: TOOL_POLICY_VERSION,
+      modelPolicyVersion: MODEL_POLICY_VERSION,
+      pricingVersion: MODEL_PRICING_VERSION,
+      outcomeVerifierVersion: OUTCOME_VERIFIER_VERSION,
       retryOfAssistantMessageId: retryOfAssistantMessageId
         ? (retryOfAssistantMessageId as Id<'messages'>)
         : undefined,

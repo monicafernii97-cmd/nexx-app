@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from 'convex/browser';
 import { anyApi } from 'convex/server';
+import fs from 'node:fs';
 
 const secret = process.env.VERIFICATION_SECRET;
 if (!secret) throw new Error('executive_chat_health_secret_missing');
@@ -18,6 +19,8 @@ const health = await client.mutation(anyApi.executiveChatOperations.auditForRele
   secret,
   environment: process.env.EXEC_CHAT_ENVIRONMENT === 'preview' ? 'preview' : 'production',
 });
+fs.mkdirSync('playwright-report', { recursive: true });
+fs.writeFileSync('playwright-report/executive-chat-health.json', `${JSON.stringify(health, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(health, null, 2)}\n`);
 if (health.hardStopCodes.length > 0) process.exitCode = 1;
 if (process.env.FAIL_ON_SOFT_STOP === 'true' && health.softStopCodes.length > 0) process.exitCode = 1;

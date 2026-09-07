@@ -326,6 +326,32 @@ describe('publication quality v2', () => {
     ]));
   });
 
+  it('does not require document evidence for a pending-choice recommendation', () => {
+    const result = verify(
+      [
+        'A focused review looks only at the particular terms or issue you care about.',
+        '',
+        'A full-document review covers the entire current order and is the most complete option.',
+        '',
+        'I recommend the full-document review when you want the complete picture.',
+      ].join('\n'),
+      {
+        publicationDecision: 'ask_clarification',
+        speechAct: 'clarify',
+        unresolvedReferent: true,
+        plan: plan({
+          responseAct: 'answer',
+          selectedDocumentIds: ['signed-order'],
+          evidenceRequirements: ['relevant_source_unit'],
+          questionKind: 'confirmation',
+        }),
+      },
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.errors).not.toContain('RESP_CITATION_MISMATCH');
+  });
+
   it('does not mistake a no-reupload assurance inside a completed analysis for an upload request', () => {
     const readableSnapshot: DocumentCapabilitySnapshot = {
       ...snapshot,
@@ -448,7 +474,8 @@ describe('publication quality v2', () => {
       stage: 'safe_limitation',
       documentContextActive: false,
     });
-    expect(general).toContain('Retry the response');
+    expect(general).toContain('retry this message');
+    expect(general).not.toMatch(/could not verify a complete answer/i);
     expect(general).not.toMatch(/\b(?:document|file|order|upload|attachment)\b/i);
     expect(verify(general, {
       requiresDirectAnswer: true,

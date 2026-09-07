@@ -355,6 +355,28 @@ export default defineSchema({
         rolloutConfigVersion: v.optional(v.number()),
         rolloutModesJson: v.optional(v.string()),
         rolloutSelectionReason: v.optional(v.string()),
+        releaseGitSha: v.optional(v.string()),
+        runtimeEnvironment: v.optional(v.union(v.literal('development'), v.literal('preview'), v.literal('production'), v.literal('test'))),
+        kernelVersion: v.optional(v.string()),
+        contextBuilderVersion: v.optional(v.string()),
+        taskLedgerVersion: v.optional(v.string()),
+        toolPolicyVersion: v.optional(v.string()),
+        modelPolicyVersion: v.optional(v.string()),
+        pricingVersion: v.optional(v.string()),
+        outcomeVerifierVersion: v.optional(v.string()),
+        foregroundGoal: v.optional(v.string()),
+        outcomeType: v.optional(v.union(
+            v.literal('answered'),
+            v.literal('clarified'),
+            v.literal('tool_used'),
+            v.literal('escalated'),
+            v.literal('limited'),
+            v.literal('failed')
+        )),
+        usageProvenance: v.optional(v.union(v.literal('provider_reported'), v.literal('estimated'), v.literal('unavailable'))),
+        usageUnavailableReason: v.optional(v.string()),
+        shadowKernelDecisionJson: v.optional(v.string()),
+        taskTransitionsJson: v.optional(v.string()),
         analysisMode: v.optional(documentAnalysisModeValidator),
         userMessageId: v.optional(v.id('messages')),
         assistantMessageId: v.optional(v.id('messages')),
@@ -442,6 +464,11 @@ export default defineSchema({
             v.literal('failed')
         ),
         model: v.string(),
+        releaseGitSha: v.optional(v.string()),
+        modelPolicyVersion: v.optional(v.string()),
+        pricingVersion: v.optional(v.string()),
+        reasoningEffort: v.optional(v.union(v.literal('none'), v.literal('low'), v.literal('medium'), v.literal('high'))),
+        escalationReasonCode: v.optional(v.string()),
         providerResponseId: v.optional(v.string()),
         inputTokenEstimate: v.number(),
         maxOutputTokens: v.number(),
@@ -458,6 +485,13 @@ export default defineSchema({
         reasoningTokens: v.optional(v.number()),
         totalTokens: v.optional(v.number()),
         estimatedCostMicrousd: v.optional(v.number()),
+        reservedCostMicrousd: v.optional(v.number()),
+        budgetPeriodKey: v.optional(v.string()),
+        usageProvenance: v.optional(v.union(v.literal('provider_reported'), v.literal('estimated'), v.literal('unavailable'))),
+        usageUnavailableReason: v.optional(v.string()),
+        toolCallCount: v.optional(v.number()),
+        firstTokenLatencyMs: v.optional(v.number()),
+        totalLatencyMs: v.optional(v.number()),
         failureCode: v.optional(v.string()),
         failureStage: v.optional(v.string()),
         incompleteReason: v.optional(v.string()),
@@ -468,6 +502,7 @@ export default defineSchema({
     })
         .index('by_job_attempt', ['jobId', 'attemptNumber'])
         .index('by_turn', ['turnId'])
+        .index('by_created', ['createdAt'])
         .index('by_status_created', ['status', 'createdAt'])
         .index('by_conversation_created', ['conversationId', 'createdAt']),
 
@@ -849,11 +884,15 @@ export default defineSchema({
         status: v.union(
             v.literal('provisional'),
             v.literal('active'),
+            v.literal('open'),
             v.literal('waiting_user'),
             v.literal('waiting_system'),
+            v.literal('waiting_tool'),
+            v.literal('suspended'),
             v.literal('completed'),
             v.literal('superseded'),
-            v.literal('abandoned')
+            v.literal('abandoned'),
+            v.literal('cancelled')
         ),
         goal: v.string(),
         normalizedGoal: v.string(),
@@ -863,12 +902,159 @@ export default defineSchema({
         originatingTurnId: v.id('chatTurns'),
         latestTurnId: v.id('chatTurns'),
         resultMessageId: v.optional(v.id('messages')),
+        revision: v.optional(v.number()),
+        pendingDecisionId: v.optional(v.string()),
+        expiresAt: v.optional(v.number()),
+        checkpointJson: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
         .index('by_conversation_status', ['conversationId', 'status'])
         .index('by_conversation_task', ['conversationId', 'taskId'])
         .index('by_user_updated', ['userId', 'updatedAt']),
+
+    conversationTaskCheckpoints: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        taskId: v.string(),
+        taskRevision: v.number(),
+        status: v.union(v.literal('pending'), v.literal('ready'), v.literal('consumed'), v.literal('superseded')),
+        checkpointJson: v.string(),
+        resourceIds: v.array(v.string()),
+        sourceTurnId: v.id('chatTurns'),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_task_revision', ['taskId', 'taskRevision'])
+        .index('by_conversation_status', ['conversationId', 'status']),
+
+    turnReceipts: defineTable({
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        outcome: v.union(
+            v.literal('answered'),
+            v.literal('clarified'),
+            v.literal('tool_used'),
+            v.literal('escalated'),
+            v.literal('limited'),
+            v.literal('failed')
+        ),
+        foregroundGoal: v.string(),
+        resolvedReferentsJson: v.string(),
+        modelAttemptIds: v.array(v.id('chatGenerationAttempts')),
+        toolCallReceiptIds: v.array(v.id('toolCallReceipts')),
+        evidenceIds: v.array(v.string()),
+        taskTransitionsJson: v.string(),
+        validationJson: v.string(),
+        publicationEnvelopeId: v.optional(v.string()),
+        releaseGitSha: v.optional(v.string()),
+        rolloutConfigVersion: v.optional(v.number()),
+        kernelVersion: v.string(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_conversation_created', ['conversationId', 'createdAt'])
+        .index('by_release_created', ['releaseGitSha', 'createdAt']),
+
+    toolCallReceipts: defineTable({
+        toolCallId: v.string(),
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        toolName: v.string(),
+        status: v.union(v.literal('completed'), v.literal('rejected'), v.literal('failed')),
+        authorizationScopeHash: v.string(),
+        resourceIds: v.array(v.string()),
+        evidenceIds: v.array(v.string()),
+        sideEffect: v.union(v.literal('none'), v.literal('reversible'), v.literal('material')),
+        confirmationId: v.optional(v.string()),
+        failureCode: v.optional(v.string()),
+        argsDigest: v.string(),
+        resultDigest: v.optional(v.string()),
+        startedAt: v.number(),
+        completedAt: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_call', ['toolCallId'])
+        .index('by_turn', ['turnId'])
+        .index('by_created', ['createdAt'])
+        .index('by_conversation_created', ['conversationId', 'createdAt']),
+
+    modelEscalationReceipts: defineTable({
+        turnId: v.id('chatTurns'),
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        fromModel: v.string(),
+        requestedModel: v.string(),
+        reasonCode: v.string(),
+        evidenceIds: v.array(v.string()),
+        remainingBudgetMicrousd: v.number(),
+        estimatedCostMicrousd: v.number(),
+        decision: v.union(v.literal('approved'), v.literal('rejected')),
+        rejectionCode: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_turn', ['turnId'])
+        .index('by_created', ['createdAt']),
+
+    conversationReferentBindings: defineTable({
+        conversationId: v.id('conversations'),
+        userId: v.id('users'),
+        turnId: v.id('chatTurns'),
+        phrase: v.string(),
+        kind: v.union(
+            v.literal('topic'),
+            v.literal('task'),
+            v.literal('document'),
+            v.literal('message'),
+            v.literal('result'),
+            v.literal('person')
+        ),
+        targetId: v.string(),
+        sourceMessageId: v.string(),
+        confidence: v.number(),
+        active: v.boolean(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index('by_conversation_active', ['conversationId', 'active'])
+        .index('by_turn', ['turnId']),
+
+    conversationKernelEvaluations: defineTable({
+        caseId: v.string(),
+        runId: v.string(),
+        environment: v.union(v.literal('local'), v.literal('preview'), v.literal('production')),
+        releaseGitSha: v.optional(v.string()),
+        kernelVersion: v.string(),
+        modelPolicyVersion: v.string(),
+        candidateModel: v.string(),
+        baselineModel: v.optional(v.string()),
+        published: v.boolean(),
+        outcome: v.union(v.literal('passed'), v.literal('failed'), v.literal('needs_review')),
+        metricsJson: v.string(),
+        failureCodes: v.array(v.string()),
+        createdAt: v.number(),
+    })
+        .index('by_run_case', ['runId', 'caseId'])
+        .index('by_release_created', ['releaseGitSha', 'createdAt'])
+        .index('by_outcome_created', ['outcome', 'createdAt']),
+
+    chatCostBudgets: defineTable({
+        subjectType: v.union(v.literal('user'), v.literal('tier'), v.literal('feature'), v.literal('system')),
+        subjectId: v.string(),
+        period: v.union(v.literal('turn'), v.literal('day'), v.literal('month')),
+        periodKey: v.string(),
+        ceilingMicrousd: v.number(),
+        spentMicrousd: v.number(),
+        reservedMicrousd: v.number(),
+        version: v.number(),
+        updatedAt: v.number(),
+        createdAt: v.number(),
+    })
+        .index('by_subject_period', ['subjectType', 'subjectId', 'period', 'periodKey'])
+        .index('by_period_updated', ['periodKey', 'updatedAt']),
 
     turnUnderstandings: defineTable({
         turnId: v.id('chatTurns'),
@@ -1315,7 +1501,10 @@ export default defineSchema({
         releaseGitSha: v.optional(v.string()),
         rolloutConfigVersion: v.optional(v.number()),
         metricsJson: v.string(),
+        releaseMetricsJson: v.optional(v.string()),
         segmentsJson: v.string(),
+        rollingHardStopCodes: v.optional(v.array(v.string())),
+        rollingSoftStopCodes: v.optional(v.array(v.string())),
         hardStopCodes: v.array(v.string()),
         softStopCodes: v.array(v.string()),
         healthy: v.boolean(),

@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from './lib/auth';
 import { CURRENT_EXECUTIVE_CHAT_RELEASE_CONTRACT } from '../src/lib/nexx/releaseContract';
 import {
   EXECUTIVE_CHAT_ROLLOUT_FEATURES,
+  compatibleRolloutMode,
   resolveExecutiveChatRollout,
   type ExecutiveChatRolloutConfigSnapshot,
   type ExecutiveChatRolloutFeature,
@@ -20,6 +21,16 @@ const featureModesValidator = v.object({
   self_correction_v1: modeValidator,
   qa_provenance_v1: modeValidator,
   understanding_resume_v2: modeValidator,
+  conversation_kernel_v2: modeValidator,
+  context_builder_v2: modeValidator,
+  task_ledger_v2: modeValidator,
+  tool_broker_v2: modeValidator,
+  outcome_verifier_v2: modeValidator,
+  model_policy_v2: modeValidator,
+  luna_user_facing: modeValidator,
+  sol_escalation: modeValidator,
+  route_mode_diagnostic_only_v2: modeValidator,
+  actual_usage_required: modeValidator,
 });
 
 function requireReleaseSecret(secret: string) {
@@ -62,11 +73,12 @@ function asSnapshot(row: {
   denylistedConversationIds: string[]; cohortSalt: string; activationStartsAt: number;
   expiresAt?: number; emergencyDisabled: boolean;
 }): ExecutiveChatRolloutConfigSnapshot {
-  const parsed = JSON.parse(row.featureModesJson) as Record<ExecutiveChatRolloutFeature, ExecutiveChatRolloutMode>;
-  for (const feature of EXECUTIVE_CHAT_ROLLOUT_FEATURES) {
-    if (!['off', 'shadow', 'enforce'].includes(parsed[feature])) throw new Error('rollout_feature_modes_invalid');
-  }
-  return { ...row, featureModes: parsed };
+  const parsed = JSON.parse(row.featureModesJson) as Partial<Record<ExecutiveChatRolloutFeature, ExecutiveChatRolloutMode>>;
+  const featureModes = Object.fromEntries(EXECUTIVE_CHAT_ROLLOUT_FEATURES.map((feature) => [
+    feature,
+    compatibleRolloutMode(feature, parsed[feature]),
+  ])) as Record<ExecutiveChatRolloutFeature, ExecutiveChatRolloutMode>;
+  return { ...row, featureModes };
 }
 
 export async function resolveRolloutForSubject(

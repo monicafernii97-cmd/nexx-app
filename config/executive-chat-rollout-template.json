@@ -6,7 +6,17 @@
     "publication_v2": "shadow",
     "self_correction_v1": "off",
     "qa_provenance_v1": "enforce",
-    "understanding_resume_v2": "enforce"
+    "understanding_resume_v2": "enforce",
+    "conversation_kernel_v2": "shadow",
+    "context_builder_v2": "shadow",
+    "task_ledger_v2": "shadow",
+    "tool_broker_v2": "shadow",
+    "outcome_verifier_v2": "shadow",
+    "model_policy_v2": "shadow",
+    "luna_user_facing": "off",
+    "sol_escalation": "off",
+    "route_mode_diagnostic_only_v2": "shadow",
+    "actual_usage_required": "enforce"
   },
   "defaultMode": "off",
   "cohortPercentage": 0,

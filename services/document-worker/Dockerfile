@@ -1,16 +1,17 @@
 FROM node:22-bookworm-slim
 
 ARG TIKA_VERSION=3.3.1
+ARG TIKA_DIST_BASE_URL=https://archive.apache.org/dist/tika
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libreoffice-writer default-jre-headless curl ca-certificates dumb-init \
   && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL \
-  "https://downloads.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar" \
+  "${TIKA_DIST_BASE_URL}/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar" \
   -o /opt/tika-server-standard.jar \
   && curl -fsSL \
-  "https://downloads.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar.sha512" \
+  "${TIKA_DIST_BASE_URL}/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar.sha512" \
   -o /opt/tika-server-standard.jar.sha512 \
   && cd /opt \
   && echo "$(cat tika-server-standard.jar.sha512)  tika-server-standard.jar" | sha512sum -c - \

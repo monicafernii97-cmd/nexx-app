@@ -5,10 +5,35 @@ export const EXECUTIVE_CHAT_ROLLOUT_FEATURES = [
   'self_correction_v1',
   'qa_provenance_v1',
   'understanding_resume_v2',
+  'conversation_kernel_v2',
+  'context_builder_v2',
+  'task_ledger_v2',
+  'tool_broker_v2',
+  'outcome_verifier_v2',
+  'model_policy_v2',
+  'luna_user_facing',
+  'sol_escalation',
+  'route_mode_diagnostic_only_v2',
+  'actual_usage_required',
 ] as const;
 
 export type ExecutiveChatRolloutFeature = typeof EXECUTIVE_CHAT_ROLLOUT_FEATURES[number];
 export type ExecutiveChatRolloutMode = 'off' | 'shadow' | 'enforce';
+
+const PHASE_2_FEATURES = new Set<ExecutiveChatRolloutFeature>([
+  'conversation_kernel_v2', 'context_builder_v2', 'task_ledger_v2', 'tool_broker_v2',
+  'outcome_verifier_v2', 'model_policy_v2', 'luna_user_facing', 'sol_escalation',
+  'route_mode_diagnostic_only_v2',
+]);
+
+export function compatibleRolloutMode(
+  feature: ExecutiveChatRolloutFeature,
+  value: unknown,
+): ExecutiveChatRolloutMode {
+  if (value === 'off' || value === 'shadow' || value === 'enforce') return value;
+  if (feature === 'actual_usage_required') return 'enforce';
+  return PHASE_2_FEATURES.has(feature) ? 'shadow' : 'off';
+}
 
 export type ExecutiveChatRolloutConfigSnapshot = {
   version: number;

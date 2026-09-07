@@ -1,23 +1,11 @@
+import { priceForModel } from '../cost/modelPricing';
+
 export type ProviderTokenUsage = {
   inputTokens?: number;
   cachedInputTokens?: number;
   outputTokens?: number;
   reasoningTokens?: number;
   totalTokens?: number;
-};
-
-type ModelPrice = {
-  inputUsdPerMillion: number;
-  cachedInputUsdPerMillion: number;
-  outputUsdPerMillion: number;
-};
-
-const MODEL_PRICES: Record<string, ModelPrice> = {
-  'gpt-5.6-luna': { inputUsdPerMillion: 0.2, cachedInputUsdPerMillion: 0.02, outputUsdPerMillion: 1.2 },
-  'gpt-5.6-terra': { inputUsdPerMillion: 2, cachedInputUsdPerMillion: 0.2, outputUsdPerMillion: 12 },
-  'gpt-5.6-sol': { inputUsdPerMillion: 4, cachedInputUsdPerMillion: 0.4, outputUsdPerMillion: 20 },
-  'gpt-5.4': { inputUsdPerMillion: 2.5, cachedInputUsdPerMillion: 0.25, outputUsdPerMillion: 15 },
-  'gpt-5.4-mini': { inputUsdPerMillion: 0.75, cachedInputUsdPerMillion: 0.075, outputUsdPerMillion: 4.5 },
 };
 
 function finiteTokenCount(value: unknown) {
@@ -48,7 +36,7 @@ export function extractProviderTokenUsage(response: unknown): ProviderTokenUsage
 
 /** Estimate provider cost in integer micro-US-dollars using published list prices. */
 export function estimateProviderCostMicrousd(model: string, usage: ProviderTokenUsage) {
-  const price = MODEL_PRICES[model];
+  const price = priceForModel(model);
   if (!price || usage.inputTokens === undefined || usage.outputTokens === undefined) return undefined;
   const cached = Math.min(usage.inputTokens, usage.cachedInputTokens ?? 0);
   const uncached = Math.max(0, usage.inputTokens - cached);

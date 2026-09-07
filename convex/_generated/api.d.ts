@@ -42,6 +42,7 @@ import type * as documentOperations from "../documentOperations.js";
 import type * as documentReprocessJobs from "../documentReprocessJobs.js";
 import type * as documentUnderstanding from "../documentUnderstanding.js";
 import type * as documents from "../documents.js";
+import type * as durableReviewOperations from "../durableReviewOperations.js";
 import type * as executiveChatOperations from "../executiveChatOperations.js";
 import type * as executiveChatRollout from "../executiveChatRollout.js";
 import type * as exportJobs from "../exportJobs.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   documentReprocessJobs: typeof documentReprocessJobs;
   documentUnderstanding: typeof documentUnderstanding;
   documents: typeof documents;
+  durableReviewOperations: typeof durableReviewOperations;
   executiveChatOperations: typeof executiveChatOperations;
   executiveChatRollout: typeof executiveChatRollout;
   exportJobs: typeof exportJobs;

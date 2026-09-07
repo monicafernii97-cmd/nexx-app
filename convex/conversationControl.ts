@@ -241,6 +241,7 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
   executiveChatFlags?: ExecutiveChatFeatureFlags;
 }) {
   const executiveChatFlags = args.executiveChatFlags ?? getExecutiveChatFeatureFlags();
+  const taskTransitions: Array<{ taskId: string; from: string; to: string; reasonCode: string }> = [];
   const loaded = await loadConversationControlContext(ctx, {
     conversationId: args.conversation._id,
     userId: args.userId,
@@ -308,7 +309,18 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
         .withIndex('by_conversation_task', (q) => q.eq('conversationId', args.conversation._id).eq('taskId', transition.previousTaskId!))
         .first();
       if (previous && previous.userId === args.userId && previous.status === 'active') {
-        await ctx.db.patch(previous._id, { status: 'completed', updatedAt: args.now });
+        await ctx.db.patch(previous._id, {
+          status: executiveChatFlags.taskLedgerMode === 'enforce' ? 'suspended' : 'completed',
+          updatedAt: args.now,
+        });
+        if (executiveChatFlags.taskLedgerMode === 'enforce') {
+          taskTransitions.push({
+            taskId: previous.taskId,
+            from: 'open',
+            to: 'suspended',
+            reasonCode: 'foreground_topic_changed',
+          });
+        }
       }
     }
     await ctx.db.insert('conversationTasks', {
@@ -537,7 +549,7 @@ export async function persistTurnOrchestration(ctx: MutationCtx, args: {
     });
   }
 
-  return { understanding, transition, plan, focusRevision, taskId, understandingId, executionPlanId };
+  return { understanding, transition, plan, focusRevision, taskId, understandingId, executionPlanId, taskTransitions };
 }
 
 export const getForConversation = query({
@@ -970,6 +982,81 @@ export const applyValidatedPendingState = internalMutation({
  * every generation from the currently selected documents and revalidates
  * ownership/status; callers cannot nominate arbitrary generation IDs.
  */
+/** Resume one server-resolved background task without trusting a client task identifier. */
+export const resumeKernelTaskForTurn = internalMutation({
+  args: {
+    turnId: v.id('chatTurns'),
+    targetTaskId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const turn = await ctx.db.get(args.turnId);
+    if (!turn) throw new Error('kernel_resume_turn_missing');
+    const [control, plan, target] = await Promise.all([
+      ctx.db.query('conversationControlStates')
+        .withIndex('by_conversation', (q) => q.eq('conversationId', turn.conversationId))
+        .first(),
+      ctx.db.query('turnExecutionPlans').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).first(),
+      ctx.db.query('conversationTasks')
+        .withIndex('by_conversation_task', (q) => q.eq('conversationId', turn.conversationId).eq('taskId', args.targetTaskId))
+        .first(),
+    ]);
+    if (!control || control.userId !== turn.userId || !plan || plan.userId !== turn.userId || !target || target.userId !== turn.userId) {
+      throw new Error('kernel_resume_scope_mismatch');
+    }
+    if (!['open', 'waiting_user', 'waiting_tool', 'waiting_system', 'suspended'].includes(target.status)) {
+      throw new Error('kernel_resume_task_not_eligible');
+    }
+    const current = control.activeTaskId
+      ? await ctx.db.query('conversationTasks')
+          .withIndex('by_conversation_task', (q) => q.eq('conversationId', turn.conversationId).eq('taskId', control.activeTaskId!))
+          .first()
+      : null;
+    const now = Date.now();
+    const transitions: Array<{ taskId: string; from: string; to: string; reasonCode: string }> = [];
+    if (current && current._id !== target._id && current.userId === turn.userId && current.status === 'active') {
+      await ctx.db.patch(current._id, { status: 'suspended', updatedAt: now });
+      transitions.push({ taskId: current.taskId, from: 'open', to: 'suspended', reasonCode: 'explicit_task_resume' });
+    }
+    transitions.push({
+      taskId: target.taskId,
+      from: target.status === 'active' || target.status === 'provisional' ? 'open' : target.status === 'waiting_system' ? 'waiting_tool' : target.status,
+      to: 'open',
+      reasonCode: 'explicit_task_resume',
+    });
+    await ctx.db.patch(target._id, { status: 'active', latestTurnId: turn._id, revision: (target.revision ?? 0) + 1, updatedAt: now });
+    await ctx.db.patch(control._id, {
+      activeTaskId: target.taskId,
+      activeTaskKind: target.kind,
+      parentTaskId: target.parentTaskId,
+      activeDocumentIds: target.documentIds,
+      activeEvidenceGenerationIds: target.evidenceGenerationIds,
+      focusRevision: control.focusRevision + 1,
+      pendingOptionsJson: JSON.stringify([]),
+      activeRecommendationJson: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.patch(plan._id, {
+      taskId: target.taskId,
+      focusRevision: control.focusRevision + 1,
+      selectedDocumentIds: target.documentIds,
+      selectedEvidenceGenerationIds: target.evidenceGenerationIds,
+      evidenceRequirements: target.documentIds.length > 0
+        ? Array.from(new Set([...plan.evidenceRequirements, 'relevant_source_unit']))
+        : [],
+      updatedAt: now,
+    });
+    let priorTransitions: unknown = [];
+    try { priorTransitions = JSON.parse(turn.taskTransitionsJson ?? '[]'); } catch { priorTransitions = []; }
+    await ctx.db.patch(turn._id, {
+      taskId: target.taskId,
+      focusRevision: control.focusRevision + 1,
+      taskTransitionsJson: JSON.stringify([...(Array.isArray(priorTransitions) ? priorTransitions : []), ...transitions]),
+      updatedAt: now,
+    });
+    return { resumed: true, taskId: target.taskId, focusRevision: control.focusRevision + 1 };
+  },
+});
+
 export const bindTurnEvidenceGenerations = internalMutation({
   args: {
     turnId: v.id('chatTurns'),

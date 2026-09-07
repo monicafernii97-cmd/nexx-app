@@ -38,9 +38,11 @@ const convex = {
   ...contract,
 };
 
-const normalizedWeb = { ...web, deployedAt: Date.now() };
+const deploymentCreatedAt = Date.parse(process.env.RELEASE_DEPLOYMENT_CREATED_AT ?? '');
+const deployedAt = Number.isFinite(deploymentCreatedAt) ? deploymentCreatedAt : Date.now();
+const normalizedWeb = { ...web, deployedAt };
 delete normalizedWeb.convexUrl;
-const normalizedConvex = { ...convex, deployedAt: Date.now() };
+const normalizedConvex = { ...convex, deployedAt };
 const client = new ConvexHttpClient(web.convexUrl);
 const compatibility = await client.mutation(anyApi.releaseManifest.upsertPairFromRelease, {
   secret,

@@ -36,7 +36,13 @@ const PROCEDURE = /\b(?:how\s+do\s+i\s+file|filing\s+procedure|local\s+rule|cour
 const ARTIFACT = /\b(?:draft|prepare|create|write)\b.{0,100}\b(?:motion|petition|declaration|pleading|proposed\s+order|filing|court\s+response)\b/i;
 const CURRENT_AUTHORITY = /\b(?:current|latest|today(?:'s)?|verify|look\s+up)\b.{0,100}\b(?:law|statute|rule|procedure|deadline|court)\b/i;
 const AWAITING_NEW_UPLOAD = /\b(?:i(?:'ll| will| am going to)?|let me|hold on(?: while)?)\s+(?:re-?upload|upload|attach|send)\b/i;
+const DOCUMENT_RECEIPT_ACKNOWLEDGEMENT = /\b(?:confirm|acknowledge)\b.{0,80}\b(?:received|uploaded|attached|got)\b|\b(?:did you|can you)\b.{0,40}\b(?:receive|see|get)\b.{0,40}\b(?:file|document|attachment|upload)\b/i;
 const UNKNOWN_SHORTHAND = /^[A-Z0-9][A-Z0-9._-]{1,7}\??$/;
+
+/** Metadata-only document requests must not load document bodies into ordinary chat. */
+export function isDocumentMetadataOnlyRequest(message: string) {
+  return isDocumentAvailabilityQuestion(message) || DOCUMENT_RECEIPT_ACKNOWLEDGEMENT.test(message);
+}
 
 function riskSignals(args: {
   message: string;
@@ -120,7 +126,7 @@ export function planConversationTurn(args: {
     args.documentReference.referencesDocument ||
     referents.bindings.some((binding) => binding.kind === 'document' || binding.kind === 'task')
   );
-  const metadataOnlyDocumentQuestion = documentRequested && isDocumentAvailabilityQuestion(args.message);
+  const metadataOnlyDocumentQuestion = documentRequested && isDocumentMetadataOnlyRequest(args.message);
   const responseProfile: KernelResponseProfile = ARTIFACT.test(args.message)
     ? 'artifact'
     : documentRequested && !metadataOnlyDocumentQuestion

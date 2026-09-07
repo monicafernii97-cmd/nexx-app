@@ -171,7 +171,11 @@ import {
     parseSemanticClassifierResult,
 } from '../src/lib/nexx/orchestration/semanticClassifier';
 import { featureFlagsForPersistedRollout } from '../src/lib/nexx/orchestration/featureFlags';
-import { planConversationTurn, type ConversationKernelPlan } from '../src/lib/nexx/conversation/kernel';
+import {
+    isDocumentMetadataOnlyRequest,
+    planConversationTurn,
+    type ConversationKernelPlan,
+} from '../src/lib/nexx/conversation/kernel';
 import { validateEscalation } from '../src/lib/nexx/conversation/modelPolicy';
 import { canSpendTurnBudget, remainingTurnBudgetMicrousd } from '../src/lib/nexx/conversation/budgetPolicy';
 import type { ToolCallReceipt } from '../src/lib/nexx/conversation/contracts';
@@ -1788,7 +1792,11 @@ function selectAttachmentContextsForPrompt(
     routerResult: ReturnType<typeof classifyMessage>,
     routeMode: RouteMode
 ) {
-    if (isDocumentAvailabilityQuestion(context.turn.message)) return [];
+    if (
+        isDocumentAvailabilityQuestion(context.turn.message) ||
+        (executiveChatFlagsForContext(context).conversationKernelMode === 'enforce' &&
+            isDocumentMetadataOnlyRequest(context.turn.message))
+    ) return [];
 
     const selected: AttachmentContext[] = [];
     const flags = executiveChatFlagsForContext(context);
@@ -2191,7 +2199,7 @@ function buildInput(
         ? visibleAvailabilityDocuments.filter((document) =>
             requestedAvailabilityTypes.some((type) => documentMetadataMatchesType(document, type)))
         : visibleAvailabilityDocuments;
-    const documentAvailabilityPrompt = isDocumentAvailabilityQuestion(context.turn.message)
+    const documentAvailabilityPrompt = isDocumentMetadataOnlyRequest(context.turn.message)
         ? [
             'The user is asking only whether a document is available in their NEXX case. Answer that question directly in one or two natural sentences. Do not analyze clauses, list order terms, discuss deadlines, or produce a legal warning.',
             matchingAvailabilityDocuments.length > 0

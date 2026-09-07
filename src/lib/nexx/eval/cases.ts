@@ -107,6 +107,13 @@ export const FROZEN_INCIDENT_CASES: ConversationEvalCase[] = [
     recentMessages: mediationDialogue, tasks: [reviewTask], resources: [historicalDocument], currentAttachmentIds: [], selectedDocumentIds: [],
     expected: { responseProfile: 'grounded_document', clarificationRequired: false, requiredEvidence: true, referentKind: 'task', foregroundGoalExact: true },
   },
+  {
+    id: 'incident-upload-receipt-only', category: 'frozen_incident',
+    message: 'Confirm that you received this synthetic test document in one short sentence.',
+    recentMessages: [], tasks: [], resources: [historicalDocument],
+    currentAttachmentIds: ['doc-order'], selectedDocumentIds: ['doc-order'],
+    expected: { responseProfile: 'natural', clarificationRequired: false, requiredEvidence: false, referentKind: 'document', foregroundGoalExact: true },
+  },
 ];
 
 const naturalTopics = [

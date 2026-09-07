@@ -71,6 +71,9 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   if (providerCode === 'provider_output_incomplete') {
     return { code: 'provider_output_incomplete', message: 'The response stopped before all output was returned.', rawMessage, retryable: true, category: 'temporary' };
   }
+  if (providerCode === 'provider_empty_output' || lower.includes('provider returned an empty conversational response')) {
+    return { code: 'provider_empty_output', message: 'The model service returned an empty response.', rawMessage, retryable: true, category: 'temporary' };
+  }
   if (providerCode === 'provider_stream_failed') {
     const retryable = record.retryable === true;
     return {

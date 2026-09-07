@@ -3235,6 +3235,15 @@ async function generateWithFallbacks({
             }
 
             const rawText = structuredBuffer || extractOutputText(lastResponse);
+            if (usePlainText && !rawText.trim()) {
+                // A completed stream with no answer is a retryable provider result,
+                // not a successful attempt and not an unknown terminal failure.
+                // Discard its response ID so recovery uses a fresh compact request.
+                responseId = undefined;
+                const emptyOutputError = new Error('Provider returned an empty conversational response.');
+                Object.assign(emptyOutputError, { code: 'provider_empty_output', retryable: true });
+                throw emptyOutputError;
+            }
             await ctx.runMutation(internal.chatTurns.finishGenerationAttempt, {
                 jobId,
                 leaseOwner,
@@ -3252,9 +3261,6 @@ async function generateWithFallbacks({
             nextStrategy = 'compact';
             let parsedResponse: NexxAssistantResponse;
             if (usePlainText) {
-                if (!rawText.trim()) {
-                    throw new Error('Provider returned an empty conversational response.');
-                }
                 parsedResponse = plainTextAssistantResponse(rawText);
             } else {
                 await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {

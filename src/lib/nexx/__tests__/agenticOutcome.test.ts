@@ -33,6 +33,11 @@ describe('agentic outcome and recovery policy', () => {
   it('classifies bounded transient conditions as retryable', () => {
     expect(normalizeProviderFailure({ status: 429, message: 'Rate limit' }).retryable).toBe(true);
     expect(normalizeProviderFailure({ status: 503, message: 'Unavailable' }).retryable).toBe(true);
+    expect(normalizeProviderFailure(new Error('Provider returned an empty conversational response.'))).toMatchObject({
+      code: 'provider_empty_output',
+      retryable: true,
+      category: 'temporary',
+    });
     expect(normalizeProviderFailure({
       code: 'provider_stream_interrupted',
       message: 'Provider stream ended before a terminal event.',

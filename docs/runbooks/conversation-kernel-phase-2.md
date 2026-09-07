@@ -4,6 +4,8 @@
 
 For each accepted turn, Convex stores the release SHA, rollout version, kernel/context/task/tool/model/verifier versions, the foreground goal, model attempts, tool receipts, evidence IDs, task transitions, publication envelope, and final outcome receipt. `routeMode` is retained only for compatibility analytics when `route_mode_diagnostic_only_v2` is enforced.
 
+`convex/chatWorker.ts` is intentionally only the Convex action-registration boundary. Durable job execution lives in `convex/chatGenerationRuntime.ts`, while conversational decisions remain delegated to the independently tested kernel, context, task, capability/tool, model-budget, outcome-verification, and receipt modules. The architecture contract test prevents provider, routing, or generation logic from moving back into the worker entry point.
+
 Production application errors are retained in Convex operational records rather than inferred from a temporary Vercel log window. The primary records are `chatTurns`, `chatGenerationJobs`, `chatGenerationAttempts`, `turnReceipts`, `toolCallReceipts`, `modelEscalationReceipts`, `responsePublicationAudits`, `conversationRepairAudits`, `chatQualityCanaryRuns`, and `executiveChatOperationalSnapshots`. Vercel runtime logs remain a secondary diagnostic source.
 
 ## Release checks

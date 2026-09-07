@@ -328,7 +328,13 @@ describe('publication quality v2', () => {
 
   it('does not require document evidence for a pending-choice recommendation', () => {
     const result = verify(
-      'A full-document review is the most complete option, so I recommend it when you want the complete picture.',
+      [
+        'A focused review looks only at the particular terms or issue you care about.',
+        '',
+        'A full-document review covers the entire current order and is the most complete option.',
+        '',
+        'I recommend the full-document review when you want the complete picture.',
+      ].join('\n'),
       {
         publicationDecision: 'ask_clarification',
         speechAct: 'clarify',

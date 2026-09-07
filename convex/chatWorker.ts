@@ -4718,6 +4718,14 @@ export const processChatGenerationJob = internalAction({
                     },
                 });
                 if (!recommendationPublication?.committed) {
+                    console.warn('[ChatWorker] Review-depth recommendation publication rejected', {
+                        jobId: args.jobId,
+                        verificationErrors: recommendationPublication?.verification.errors ?? ['publication_result_missing'],
+                        outcomeRejectionCodes: recommendationPublication?.outcomeValidation.rejectionCodes ?? [],
+                        capabilitySupport: recommendationPublication?.capabilityDecision.supportLevel ?? 'unknown',
+                        planResponseAct: recommendationPublication?.plan.responseAct ?? 'missing',
+                        planEvidenceRequirements: recommendationPublication?.plan.evidenceRequirements ?? [],
+                    });
                     await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                         jobId: args.jobId,
                         leaseOwner,

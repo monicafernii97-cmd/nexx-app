@@ -52,6 +52,15 @@ export function decideRepair(args: {
   return { stage: 'safe_limitation', reasonCodes: args.errors, retryBudgetRemaining: remaining };
 }
 
+/** Return whether the evidence selected for generation makes the repair document-scoped. */
+export function hasDocumentContextForPublicationRepair(args: {
+  selectedDocumentIds: readonly string[];
+  selectedAttachmentContexts: readonly unknown[];
+}) {
+  return args.selectedDocumentIds.length > 0 || args.selectedAttachmentContexts.length > 0;
+}
+
+/** Build a bounded, context-appropriate response after publication verification fails. */
 export function buildPublicationRepairContent(args: {
   errors: ClaimVerificationError[];
   questionKind: QuestionKind;

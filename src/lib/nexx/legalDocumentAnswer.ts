@@ -332,7 +332,7 @@ export function buildBestEffortLegalDocumentAnswerFromSources(
     if (!operativeFathersDaySource) {
       return {
         answerType: 'not_found',
-        answer: "I cannot verify the Father’s Day start time from the order language available for this turn.",
+        answer: "The selected excerpts do not include the Father’s Day start time. I can check the complete order or a specific page if you share it.",
         claims: [],
         citations: [],
         warnings: [],

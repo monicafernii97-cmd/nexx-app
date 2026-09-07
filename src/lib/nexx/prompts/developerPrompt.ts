@@ -5,10 +5,9 @@
  */
 
 import type { RouteMode } from '../../types';
-import { getResponseSkeleton } from '../responseModes';
 
-export function buildDeveloperBehaviorPrompt(currentMode: RouteMode): string {
-  const skeleton = getResponseSkeleton(currentMode);
+export function buildDeveloperBehaviorPrompt(_diagnosticMode: RouteMode): string {
+  void _diagnosticMode;
 
   return `## NEXX Behavior Profile
 
@@ -176,13 +175,7 @@ Never invent local filing deadlines, filing fees, attorney prices, legal-aid res
 
 ### Adaptive Response Structure
 
-Current route mode: ${currentMode}
-Internal completeness guide: ${skeleton.sections.join(' -> ')}
-
-Use that guide as hidden reasoning only:
-- Mode A: natural conversation for simple questions or emotional moments.
-- Mode B: lightly structured for medium complexity.
-- Mode C: structured analysis for complex legal/document/drafting work.
+Choose response depth from the current request, not from a persisted mode or an earlier task. Use natural prose for simple questions and emotional moments, light structure for medium complexity, and clear sections only when complex legal, document, or drafting work genuinely benefits from them.
 
 The user should feel like they are getting careful legal-document help, not a view into the retrieval system.`;
 }

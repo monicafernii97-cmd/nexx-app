@@ -37,6 +37,7 @@ import {
     type DocumentMemorySource,
 } from '../src/lib/nexx/documentAccess';
 import {
+    DAILY_CHAT_COST_CEILINGS_MICROUSD,
     getDailyLimit,
     PRIMARY_MODEL,
 } from '../src/lib/tiers';
@@ -84,6 +85,15 @@ import {
     takeEvidenceWithinBudget,
 } from '../src/lib/nexx/documentEvidenceBudget';
 import type { DocumentAnalysisMode } from '../src/lib/chat/documentAnalysisMode';
+import {
+    CONVERSATION_KERNEL_VERSION,
+    CONTEXT_BUILDER_VERSION,
+    MODEL_POLICY_VERSION,
+    OUTCOME_VERIFIER_VERSION,
+    TASK_LEDGER_VERSION,
+    TOOL_POLICY_VERSION,
+} from '../src/lib/nexx/conversation/contracts';
+import { MODEL_PRICING_VERSION } from '../src/lib/nexx/cost/modelPricing';
 
 const TURN_LOCK_TTL_MS = 3 * 60 * 1000;
 const JOB_LEASE_TTL_MS = 2 * 60 * 1000;
@@ -1094,6 +1104,15 @@ export const acceptChatTurn = mutation({
         temperature: v.optional(v.number()),
         userContextJson: v.optional(v.string()),
         persistUserMessage: v.optional(v.boolean()),
+        releaseGitSha: v.optional(v.string()),
+        runtimeEnvironment: v.optional(v.union(v.literal('development'), v.literal('preview'), v.literal('production'), v.literal('test'))),
+        kernelVersion: v.optional(v.string()),
+        contextBuilderVersion: v.optional(v.string()),
+        taskLedgerVersion: v.optional(v.string()),
+        toolPolicyVersion: v.optional(v.string()),
+        modelPolicyVersion: v.optional(v.string()),
+        pricingVersion: v.optional(v.string()),
+        outcomeVerifierVersion: v.optional(v.string()),
         retryOfAssistantMessageId: v.optional(v.id('messages')),
         editOfUserMessageId: v.optional(v.id('messages')),
         attachments: v.optional(v.array(attachmentRefValidator)),
@@ -1110,6 +1129,15 @@ export const acceptChatTurn = mutation({
         });
         const executiveChatFlags = featureFlagsForRollout(rolloutDecision);
         const now = Date.now();
+        let trustedReleaseGitSha: string | undefined;
+        if (args.releaseGitSha && args.runtimeEnvironment && (args.runtimeEnvironment === 'preview' || args.runtimeEnvironment === 'production')) {
+            const manifests = await ctx.db.query('releaseManifests')
+                .withIndex('by_environment_active', (q) => q.eq('environment', args.runtimeEnvironment as 'preview' | 'production').eq('active', true))
+                .collect();
+            if (manifests.some((manifest) => manifest.runtime === 'web' && manifest.gitSha === args.releaseGitSha)) {
+                trustedReleaseGitSha = args.releaseGitSha;
+            }
+        }
         const attachments = args.attachments ?? [];
         const validatedAttachments = [];
 
@@ -1418,6 +1446,16 @@ export const acceptChatTurn = mutation({
             rolloutConfigVersion: rolloutDecision.configVersion,
             rolloutModesJson: JSON.stringify(rolloutDecision.modes),
             rolloutSelectionReason: rolloutDecision.selectionReason,
+            releaseGitSha: trustedReleaseGitSha,
+            runtimeEnvironment: args.runtimeEnvironment,
+            kernelVersion: args.kernelVersion ?? CONVERSATION_KERNEL_VERSION,
+            contextBuilderVersion: args.contextBuilderVersion ?? CONTEXT_BUILDER_VERSION,
+            taskLedgerVersion: args.taskLedgerVersion ?? TASK_LEDGER_VERSION,
+            toolPolicyVersion: args.toolPolicyVersion ?? TOOL_POLICY_VERSION,
+            modelPolicyVersion: args.modelPolicyVersion ?? MODEL_POLICY_VERSION,
+            pricingVersion: args.pricingVersion ?? MODEL_PRICING_VERSION,
+            outcomeVerifierVersion: args.outcomeVerifierVersion ?? OUTCOME_VERIFIER_VERSION,
+            foregroundGoal: effectiveMessage.slice(0, 2_000),
             createdAt: now,
             updatedAt: now,
         });
@@ -1449,6 +1487,9 @@ export const acceptChatTurn = mutation({
             focusRevision: orchestration.focusRevision,
             understandingId: orchestration.understandingId,
             executionPlanId: orchestration.executionPlanId,
+            taskTransitionsJson: orchestration.taskTransitions.length > 0
+                ? JSON.stringify(orchestration.taskTransitions)
+                : undefined,
             analysisMode: orchestration.plan.analysisMode ?? analysisMode,
             status: 'understanding_saved',
             updatedAt: now,
@@ -1737,17 +1778,60 @@ export const beginGenerationAttempt = internalMutation({
         sourceDocumentCount: v.number(),
         sourcePacketCount: v.number(),
         sourceCharacterCount: v.number(),
+        reasoningEffort: v.optional(v.union(v.literal('none'), v.literal('low'), v.literal('medium'), v.literal('high'))),
+        escalationReasonCode: v.optional(v.string()),
+        toolCallCount: v.optional(v.number()),
+        reservedCostMicrousd: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const job = await ctx.db.get(args.jobId);
         if (!job || job.leaseOwner !== args.leaseOwner || job.status !== 'running') {
             throw new Error('generation_attempt_lease_lost');
         }
+        const turn = await ctx.db.get(job.turnId);
+        if (!turn) throw new Error('generation_attempt_turn_missing');
+        const user = await ctx.db.get(job.userId);
+        if (!user) throw new Error('generation_attempt_user_missing');
         const attempts = await ctx.db.query('chatGenerationAttempts')
             .withIndex('by_job_attempt', (q) => q.eq('jobId', args.jobId))
             .collect();
         const attemptNumber = attempts.reduce((max, attempt) => Math.max(max, attempt.attemptNumber), 0) + 1;
         const now = Date.now();
+        const periodKey = new Date(now).toISOString().slice(0, 10);
+        const subjectId = job.userId.toString();
+        const tier = userSubscriptionTier(user);
+        const ceilingMicrousd = DAILY_CHAT_COST_CEILINGS_MICROUSD[tier];
+        const requestedReservation = Math.max(0, Math.floor(args.reservedCostMicrousd ?? 0));
+        const existingBudget = await ctx.db.query('chatCostBudgets')
+            .withIndex('by_subject_period', (q) => q
+                .eq('subjectType', 'user')
+                .eq('subjectId', subjectId)
+                .eq('period', 'day')
+                .eq('periodKey', periodKey))
+            .unique();
+        if (existingBudget && existingBudget.spentMicrousd + existingBudget.reservedMicrousd + requestedReservation > existingBudget.ceilingMicrousd) {
+            throw new Error('daily_cost_budget_exhausted');
+        }
+        if (!existingBudget && requestedReservation > ceilingMicrousd) throw new Error('daily_cost_budget_exhausted');
+        if (existingBudget) {
+            await ctx.db.patch(existingBudget._id, {
+                reservedMicrousd: existingBudget.reservedMicrousd + requestedReservation,
+                updatedAt: now,
+            });
+        } else {
+            await ctx.db.insert('chatCostBudgets', {
+                subjectType: 'user',
+                subjectId,
+                period: 'day',
+                periodKey,
+                ceilingMicrousd,
+                spentMicrousd: 0,
+                reservedMicrousd: requestedReservation,
+                version: 1,
+                createdAt: now,
+                updatedAt: now,
+            });
+        }
         const attemptId = await ctx.db.insert('chatGenerationAttempts', {
             jobId: args.jobId,
             turnId: job.turnId,
@@ -1757,11 +1841,19 @@ export const beginGenerationAttempt = internalMutation({
             strategy: args.strategy,
             status: 'started',
             model: args.model,
+            releaseGitSha: turn.releaseGitSha,
+            modelPolicyVersion: turn.modelPolicyVersion ?? MODEL_POLICY_VERSION,
+            pricingVersion: turn.pricingVersion ?? MODEL_PRICING_VERSION,
+            reasoningEffort: args.reasoningEffort,
+            escalationReasonCode: args.escalationReasonCode,
             inputTokenEstimate: Math.max(0, Math.floor(args.inputTokenEstimate)),
             maxOutputTokens: Math.max(1, Math.floor(args.maxOutputTokens)),
             sourceDocumentCount: Math.max(0, Math.floor(args.sourceDocumentCount)),
             sourcePacketCount: Math.max(0, Math.floor(args.sourcePacketCount)),
             sourceCharacterCount: Math.max(0, Math.floor(args.sourceCharacterCount)),
+            toolCallCount: Math.max(0, Math.floor(args.toolCallCount ?? 0)),
+            reservedCostMicrousd: requestedReservation,
+            budgetPeriodKey: periodKey,
             partialOutputCharacters: 0,
             startedAt: now,
             createdAt: now,
@@ -1789,6 +1881,7 @@ export const finishGenerationAttempt = internalMutation({
         reasoningTokens: v.optional(v.number()),
         totalTokens: v.optional(v.number()),
         estimatedCostMicrousd: v.optional(v.number()),
+        usageUnavailableReason: v.optional(v.string()),
         failureCode: v.optional(v.string()),
         failureStage: v.optional(v.string()),
         incompleteReason: v.optional(v.string()),
@@ -1801,7 +1894,26 @@ export const finishGenerationAttempt = internalMutation({
         if (!job || job.leaseOwner !== args.leaseOwner || !attempt || attempt.jobId !== args.jobId) {
             throw new Error('generation_attempt_lease_lost');
         }
+        if (attempt.completedAt !== undefined) return true;
         const now = Date.now();
+        const periodKey = attempt.budgetPeriodKey ?? new Date(attempt.startedAt).toISOString().slice(0, 10);
+        const existingBudget = await ctx.db.query('chatCostBudgets')
+            .withIndex('by_subject_period', (q) => q
+                .eq('subjectType', 'user')
+                .eq('subjectId', attempt.userId.toString())
+                .eq('period', 'day')
+                .eq('periodKey', periodKey))
+            .unique();
+        if (existingBudget) {
+            const reserved = Math.max(0, Math.floor(attempt.reservedCostMicrousd ?? 0));
+            const charged = Math.max(0, Math.floor(args.estimatedCostMicrousd ?? reserved));
+            await ctx.db.patch(existingBudget._id, {
+                reservedMicrousd: Math.max(0, existingBudget.reservedMicrousd - reserved),
+                spentMicrousd: existingBudget.spentMicrousd + charged,
+                version: existingBudget.version + 1,
+                updatedAt: now,
+            });
+        }
         await ctx.db.patch(args.attemptId, {
             status: args.status,
             providerResponseId: args.providerResponseId,
@@ -1815,6 +1927,14 @@ export const finishGenerationAttempt = internalMutation({
             reasoningTokens: args.reasoningTokens,
             totalTokens: args.totalTokens,
             estimatedCostMicrousd: args.estimatedCostMicrousd,
+            usageProvenance: args.totalTokens !== undefined ? 'provider_reported' : 'unavailable',
+            usageUnavailableReason: args.totalTokens === undefined
+                ? args.usageUnavailableReason ?? args.failureCode ?? 'provider_usage_not_returned'
+                : undefined,
+            firstTokenLatencyMs: args.firstEventAt !== undefined
+                ? Math.max(0, args.firstEventAt - attempt.startedAt)
+                : undefined,
+            totalLatencyMs: Math.max(0, now - attempt.startedAt),
             failureCode: args.failureCode,
             failureStage: args.failureStage,
             incompleteReason: args.incompleteReason,
@@ -1822,6 +1942,225 @@ export const finishGenerationAttempt = internalMutation({
             updatedAt: now,
         });
         return true;
+    },
+});
+
+async function settleAbandonedGenerationAttempts(
+    ctx: MutationCtx,
+    jobId: Id<'chatGenerationJobs'>,
+    now: number,
+) {
+    const attempts = await ctx.db.query('chatGenerationAttempts')
+        .withIndex('by_job_attempt', (q) => q.eq('jobId', jobId))
+        .collect();
+    let settled = 0;
+    for (const attempt of attempts) {
+        if (attempt.status !== 'started' || attempt.completedAt !== undefined) continue;
+        const reserved = Math.max(0, Math.floor(attempt.reservedCostMicrousd ?? 0));
+        const periodKey = attempt.budgetPeriodKey ?? new Date(attempt.startedAt).toISOString().slice(0, 10);
+        const budget = await ctx.db.query('chatCostBudgets')
+            .withIndex('by_subject_period', (q) => q
+                .eq('subjectType', 'user')
+                .eq('subjectId', attempt.userId.toString())
+                .eq('period', 'day')
+                .eq('periodKey', periodKey))
+            .unique();
+        if (budget) {
+            await ctx.db.patch(budget._id, {
+                reservedMicrousd: Math.max(0, budget.reservedMicrousd - reserved),
+                // A crashed provider call may still be billable. Charge the reservation
+                // conservatively instead of making an unverified zero-cost assumption.
+                spentMicrousd: budget.spentMicrousd + reserved,
+                version: budget.version + 1,
+                updatedAt: now,
+            });
+        }
+        await ctx.db.patch(attempt._id, {
+            status: 'failed',
+            estimatedCostMicrousd: reserved,
+            usageProvenance: 'unavailable',
+            usageUnavailableReason: 'worker_lease_expired_before_provider_usage',
+            failureCode: 'job_lease_expired',
+            failureStage: 'provider_generation',
+            totalLatencyMs: Math.max(0, now - attempt.startedAt),
+            completedAt: now,
+            updatedAt: now,
+        });
+        settled++;
+    }
+    return settled;
+}
+
+/** Persist the kernel's current-goal decision and referents without trusting model-proposed identifiers. */
+export const recordConversationKernelPlan = internalMutation({
+    args: {
+        turnId: v.id('chatTurns'),
+        foregroundGoal: v.string(),
+        planJson: v.string(),
+        contextReceiptJson: v.string(),
+        referents: v.array(v.object({
+            phrase: v.string(),
+            kind: v.union(
+                v.literal('topic'), v.literal('task'), v.literal('document'),
+                v.literal('message'), v.literal('result'), v.literal('person'),
+            ),
+            targetId: v.string(),
+            sourceMessageId: v.string(),
+            confidence: v.number(),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return null;
+        JSON.parse(args.planJson);
+        JSON.parse(args.contextReceiptJson);
+        const now = Date.now();
+        await ctx.db.patch(turn._id, {
+            foregroundGoal: args.foregroundGoal.trim().slice(0, 2_000),
+            shadowKernelDecisionJson: args.planJson,
+            updatedAt: now,
+        });
+        const existing = await ctx.db.query('conversationReferentBindings')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .collect();
+        if (existing.length === 0) {
+            for (const referent of args.referents.slice(0, 20)) {
+                await ctx.db.insert('conversationReferentBindings', {
+                    conversationId: turn.conversationId,
+                    userId: turn.userId,
+                    turnId: turn._id,
+                    phrase: referent.phrase.slice(0, 500),
+                    kind: referent.kind,
+                    targetId: referent.targetId.slice(0, 500),
+                    sourceMessageId: referent.sourceMessageId.slice(0, 500),
+                    confidence: Math.max(0, Math.min(1, referent.confidence)),
+                    active: true,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            }
+        }
+        return { recorded: true, contextReceiptJson: args.contextReceiptJson };
+    },
+});
+
+/** Record one idempotent, server-authorized tool execution receipt. */
+export const recordToolCallReceipt = internalMutation({
+    args: {
+        turnId: v.id('chatTurns'),
+        toolCallId: v.string(),
+        toolName: v.string(),
+        status: v.union(v.literal('completed'), v.literal('rejected'), v.literal('failed')),
+        authorizationScopeHash: v.string(),
+        resourceIds: v.array(v.string()),
+        evidenceIds: v.array(v.string()),
+        sideEffect: v.union(v.literal('none'), v.literal('reversible'), v.literal('material')),
+        confirmationId: v.optional(v.string()),
+        failureCode: v.optional(v.string()),
+        argsDigest: v.string(),
+        resultDigest: v.optional(v.string()),
+        startedAt: v.number(),
+        completedAt: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return null;
+        const existing = await ctx.db.query('toolCallReceipts')
+            .withIndex('by_call', (q) => q.eq('toolCallId', args.toolCallId))
+            .first();
+        if (existing) {
+            if (existing.turnId !== turn._id || existing.argsDigest !== args.argsDigest) throw new Error('tool_receipt_idempotency_conflict');
+            return existing._id;
+        }
+        const [plan, attachmentRows] = await Promise.all([
+            turn.executionPlanId ? ctx.db.get(turn.executionPlanId) : Promise.resolve(null),
+            ctx.db.query('messageAttachments').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+        ]);
+        const authorizedDocumentIds = new Set([
+            ...attachmentRows.map((row) => row.uploadedFileId.toString()),
+            ...(plan?.userId === turn.userId ? plan.selectedDocumentIds.map(String) : []),
+        ]);
+        if (args.resourceIds.some((id) => !authorizedDocumentIds.has(id))) throw new Error('tool_receipt_resource_not_authorized');
+        if (args.sideEffect === 'material' && !args.confirmationId) throw new Error('tool_receipt_confirmation_missing');
+        return ctx.db.insert('toolCallReceipts', {
+            toolCallId: args.toolCallId,
+            turnId: turn._id,
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            toolName: args.toolName,
+            status: args.status,
+            authorizationScopeHash: args.authorizationScopeHash,
+            resourceIds: Array.from(new Set(args.resourceIds)),
+            evidenceIds: Array.from(new Set(args.evidenceIds)),
+            sideEffect: args.sideEffect,
+            confirmationId: args.confirmationId,
+            failureCode: args.failureCode,
+            argsDigest: args.argsDigest,
+            resultDigest: args.resultDigest,
+            startedAt: args.startedAt,
+            completedAt: args.completedAt,
+            createdAt: Date.now(),
+        });
+    },
+});
+
+export const getTurnToolCallReceipts = internalQuery({
+    args: { turnId: v.id('chatTurns') },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return [];
+        return ctx.db.query('toolCallReceipts')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .collect();
+    },
+});
+
+export const getTurnGenerationSpend = internalQuery({
+    args: { turnId: v.id('chatTurns') },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return { spentMicrousd: 0, attemptCount: 0 };
+        const attempts = await ctx.db.query('chatGenerationAttempts')
+            .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
+            .collect();
+        return {
+            spentMicrousd: attempts.reduce((sum, attempt) =>
+                sum + Math.max(0, attempt.estimatedCostMicrousd ?? attempt.reservedCostMicrousd ?? 0), 0),
+            attemptCount: attempts.length,
+        };
+    },
+});
+
+/** Record a typed model escalation decision against the turn's server-selected policy. */
+export const recordModelEscalation = internalMutation({
+    args: {
+        turnId: v.id('chatTurns'),
+        fromModel: v.string(),
+        requestedModel: v.string(),
+        reasonCode: v.string(),
+        evidenceIds: v.array(v.string()),
+        remainingBudgetMicrousd: v.number(),
+        estimatedCostMicrousd: v.number(),
+        decision: v.union(v.literal('approved'), v.literal('rejected')),
+        rejectionCode: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const turn = await ctx.db.get(args.turnId);
+        if (!turn) return null;
+        return ctx.db.insert('modelEscalationReceipts', {
+            turnId: turn._id,
+            conversationId: turn.conversationId,
+            userId: turn.userId,
+            fromModel: args.fromModel,
+            requestedModel: args.requestedModel,
+            reasonCode: args.reasonCode,
+            evidenceIds: Array.from(new Set(args.evidenceIds)),
+            remainingBudgetMicrousd: Math.max(0, Math.floor(args.remainingBudgetMicrousd)),
+            estimatedCostMicrousd: Math.max(0, Math.floor(args.estimatedCostMicrousd)),
+            decision: args.decision,
+            rejectionCode: args.rejectionCode,
+            createdAt: Date.now(),
+        });
     },
 });
 
@@ -1843,6 +2182,8 @@ export const getGenerationContext = internalQuery({
             conversationControlState,
             turnUnderstanding,
             turnExecutionPlan,
+            conversationTasks,
+            referentBindings,
         ] = await Promise.all([
             ctx.db.get(turn.conversationId),
             ctx.db.get(turn.userId),
@@ -1875,6 +2216,14 @@ export const getGenerationContext = internalQuery({
                 .query('turnExecutionPlans')
                 .withIndex('by_turn', (q) => q.eq('turnId', turn._id))
                 .first(),
+            ctx.db
+                .query('conversationTasks')
+                .withIndex('by_conversation_task', (q) => q.eq('conversationId', turn.conversationId))
+                .collect(),
+            ctx.db
+                .query('conversationReferentBindings')
+                .withIndex('by_conversation_active', (q) => q.eq('conversationId', turn.conversationId).eq('active', true))
+                .collect(),
         ]);
 
         if (!conversation || !user?.clerkId) return null;
@@ -2229,6 +2578,8 @@ export const getGenerationContext = internalQuery({
             conversationControlState,
             turnUnderstanding,
             turnExecutionPlan,
+            conversationTasks,
+            referentBindings,
             documentAmbiguity,
             attachmentContexts,
             availableDocumentContexts,
@@ -3083,6 +3434,11 @@ type AssistantCompletionCoreArgs = {
     errorMessage?: string;
     errorRetryable?: boolean;
     metadataJson?: string;
+    outcomeType?: 'answered' | 'clarified' | 'tool_used' | 'escalated' | 'limited' | 'failed';
+    outcomeValidationJson?: string;
+    resolvedReferentsJson?: string;
+    publicationEnvelopeId?: string;
+    evidenceIds?: string[];
 };
 
 async function completeAssistantCore(ctx: MutationCtx, args: AssistantCompletionCoreArgs) {
@@ -3156,6 +3512,7 @@ async function completeAssistantCore(ctx: MutationCtx, args: AssistantCompletion
             errorCode: args.errorCode,
             errorMessage: args.errorMessage,
             errorRetryable: args.degraded ? (args.errorRetryable ?? false) : undefined,
+            outcomeType: args.outcomeType ?? (args.degraded ? 'failed' : 'answered'),
             completedAt: now,
             updatedAt: now,
         });
@@ -3206,6 +3563,56 @@ async function completeAssistantCore(ctx: MutationCtx, args: AssistantCompletion
                 });
             }
         }
+
+        const [modelAttempts, toolCallRows, escalationRows, existingTurnReceipt] = await Promise.all([
+            ctx.db.query('chatGenerationAttempts').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+            ctx.db.query('toolCallReceipts').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+            ctx.db.query('modelEscalationReceipts').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).collect(),
+            ctx.db.query('turnReceipts').withIndex('by_turn', (q) => q.eq('turnId', turn._id)).first(),
+        ]);
+        const usageProvenance = modelAttempts.length > 0 && modelAttempts.every((attempt) => attempt.usageProvenance === 'provider_reported')
+            ? 'provider_reported' as const
+            : modelAttempts.some((attempt) => attempt.usageProvenance === 'estimated')
+                ? 'estimated' as const
+                : 'unavailable' as const;
+        const baseOutcomeType = args.outcomeType ?? (args.degraded ? 'failed' : 'answered');
+        const outcomeType = baseOutcomeType === 'answered' && escalationRows.some((receipt) => receipt.decision === 'approved')
+            ? 'escalated' as const
+            : baseOutcomeType === 'answered' && toolCallRows.some((receipt) => receipt.status === 'completed')
+                ? 'tool_used' as const
+                : baseOutcomeType;
+        const turnReceiptValue = {
+            outcome: outcomeType,
+            foregroundGoal: (turn.foregroundGoal ?? turn.message).slice(0, 2_000),
+            resolvedReferentsJson: args.resolvedReferentsJson ?? '[]',
+            modelAttemptIds: modelAttempts.map((attempt) => attempt._id),
+            toolCallReceiptIds: toolCallRows.map((receipt) => receipt._id),
+            evidenceIds: Array.from(new Set(args.evidenceIds ?? [])),
+            taskTransitionsJson: turn.taskTransitionsJson ?? '[]',
+            validationJson: args.outcomeValidationJson ?? JSON.stringify({
+                passed: !args.degraded,
+                verifierVersion: turn.outcomeVerifierVersion ?? OUTCOME_VERIFIER_VERSION,
+                rejectionCodes: args.degraded && args.errorCode ? [args.errorCode] : [],
+                requiresSemanticReview: false,
+            }),
+            publicationEnvelopeId: args.publicationEnvelopeId,
+            releaseGitSha: turn.releaseGitSha,
+            rolloutConfigVersion: turn.rolloutConfigVersion,
+            kernelVersion: turn.kernelVersion ?? CONVERSATION_KERNEL_VERSION,
+            updatedAt: now,
+        };
+        if (existingTurnReceipt) {
+            await ctx.db.patch(existingTurnReceipt._id, turnReceiptValue);
+        } else {
+            await ctx.db.insert('turnReceipts', {
+                turnId: turn._id,
+                conversationId: turn.conversationId,
+                userId: turn.userId,
+                ...turnReceiptValue,
+                createdAt: now,
+            });
+        }
+        await ctx.db.patch(turn._id, { usageProvenance, outcomeType, updatedAt: now });
 
         const outcome = agenticOutcomeFromMetadata(metadata);
         const correction = outcome && outcome.correction && typeof outcome.correction === 'object' && !Array.isArray(outcome.correction)
@@ -3327,6 +3734,18 @@ export const commitValidatedAssistant = internalMutation({
         metadataJson: v.optional(v.string()),
         repairHistoryJson: v.optional(v.string()),
         shadowRejectionCodes: v.optional(v.array(v.string())),
+        outcomeType: v.optional(v.union(
+            v.literal('answered'),
+            v.literal('clarified'),
+            v.literal('tool_used'),
+            v.literal('escalated'),
+            v.literal('limited'),
+            v.literal('failed'),
+        )),
+        outcomeValidationJson: v.optional(v.string()),
+        resolvedReferentsJson: v.optional(v.string()),
+        publicationEnvelopeId: v.optional(v.string()),
+        evidenceIds: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
         const now = Date.now();
@@ -3446,6 +3865,11 @@ export const commitValidatedAssistant = internalMutation({
             providerResponseId: args.providerResponseId,
             degraded: false,
             metadataJson: JSON.stringify(publicationMetadata),
+            outcomeType: args.outcomeType,
+            outcomeValidationJson: args.outcomeValidationJson,
+            resolvedReferentsJson: args.resolvedReferentsJson,
+            publicationEnvelopeId: args.publicationEnvelopeId ?? envelope.envelopeId,
+            evidenceIds: args.evidenceIds,
         });
 
         if (
@@ -3663,6 +4087,8 @@ export const recoverStaleJobs = internalMutation({
             if (!job.leaseExpiresAt || job.leaseExpiresAt > now) continue;
             const turn = await ctx.db.get(job.turnId);
             if (!turn) continue;
+
+            await settleAbandonedGenerationAttempts(ctx, job._id, now);
 
             if (job.attempt + 1 < job.maxAttempts) {
                 await ctx.db.patch(job._id, {

@@ -5,10 +5,15 @@
 
 ## Current response-integrity work
 
-- [Production Reconciliation — 2026-09-01](./14_production_reconciliation_2026-09-01.md) — verifies current `origin/main`, the successful production web release, and live Convex application definitions are aligned.
-- [Executive Chat Hardening — Full Implementation Specification](./15_executive_chat_hardening_full_spec.md) — authoritative P0 specification for durable task focus, referent resolution, capability truth, response verification, recovery, adversarial sequence testing, and release controls.
-- [Executive Chat Production Incident Remediation](./16_executive_chat_production_incident_remediation_spec.md) — P0 follow-up specification for the live owner-canary failure: cross-conversation state repair, interrupted-stream recovery, audited fallbacks, document prompt budgets, and verified 46-page review recovery.
-- [Executive Chat Semantic Acceptance and Recommendation Execution](./17_semantic_acceptance_and_recommendation_execution_spec.md) — P0 production specification for understanding natural acceptance by intent, grounding it to an explicit recommendation, preserving executable document/evidence bindings, and preventing wording-only QA false positives.
+Plans 14–18 form one release history. Earlier plans remain as incident evidence; Plan 18 is the current architecture and acceptance contract.
+
+| Plan | Role | Status |
+|---|---|---|
+| [14 — Production reconciliation](./14_production_reconciliation_2026-09-01.md) | Establishes the reconciled production baseline | Complete; retained as evidence |
+| [15 — Executive chat hardening](./15_executive_chat_hardening_full_spec.md) | Durable focus, capability truth, publication, and release controls | Phase 1 complete; superseded architecturally by Plan 18 |
+| [16 — Incident remediation](./16_executive_chat_production_incident_remediation_spec.md) | Interrupted streams, saved evidence, recovery, and large-document handling | Complete; frozen regression source |
+| [17 — Semantic acceptance](./17_semantic_acceptance_and_recommendation_execution_spec.md) | Natural recommendation acceptance and durable execution | Complete; preserved compatibility boundary |
+| [18 — Conversational kernel Phase 2](./18_nexx_conversational_kernel_phase_2_hardening_spec.md) | Conversation-first kernel, task ledger, authorized tools, outcome verification, model/cost policy, and cohort rollout | Active release contract |
 
 ---
 

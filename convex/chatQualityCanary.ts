@@ -8,6 +8,8 @@ import { decideDocumentActivation } from '../src/lib/nexx/orchestration/document
 import { detectDocumentReference } from '../src/lib/nexx/documentReferenceDetection';
 import { assessGenericAnswer } from '../src/lib/nexx/legal-engine/genericAnswerPolicy';
 import type { ConversationControlSnapshot } from '../src/lib/nexx/orchestration/types';
+import { planConversationTurn } from '../src/lib/nexx/conversation/kernel';
+import { verifyConversationOutcome } from '../src/lib/nexx/response/outcomeVerifier';
 
 const REQUIRED_INVARIANTS = [
   'INV-FOCUS-001',
@@ -16,9 +18,13 @@ const REQUIRED_INVARIANTS = [
   'INV-CAP-002',
   'INV-PUB-001',
   'INV-PUB-002',
+  'INV-KERNEL-001',
+  'INV-KERNEL-002',
+  'INV-KERNEL-003',
+  'INV-KERNEL-004',
 ] as const;
 
-const SCENARIO_ID = 'executive-chat-critical-matrix-v2';
+const SCENARIO_ID = 'executive-chat-critical-matrix-v3';
 
 export const runExecutiveChatCanary = internalMutation({
   args: {},
@@ -124,6 +130,44 @@ export const runExecutiveChatCanary = internalMutation({
       if (!focused.prohibitedClaims.includes('file_unreadable')) failed.push('INV-CAP-002');
       const generic = assessGenericAnswer('This order contains the following relevant provisions. Here are some relevant details.');
       if (!generic.isGeneric || generic.sentenceCount < 2) failed.push('INV-PUB-001', 'INV-PUB-002');
+
+      const kernelPlan = planConversationTurn({
+        turnId: 'synthetic-follow-up-turn',
+        conversationId: 'synthetic-conversation',
+        userId: 'synthetic-user',
+        tenantId: 'system:executive-chat-canary',
+        tier: 'premium',
+        message: 'What does it look like?',
+        recentMessages: [
+          { id: 'mediation-question', role: 'user', content: 'What is mediation?', createdAt: startedAt - 2 },
+          { id: 'mediation-answer', role: 'assistant', content: 'Mediation is a structured discussion led by a neutral mediator.', createdAt: startedAt - 1 },
+        ],
+        tasks: [{
+          taskId: 'synthetic-document-review', goal: 'Review the signed order', status: 'suspended',
+          resourceIds: ['synthetic-signed-order'], lastTouchedAt: startedAt - 10,
+        }],
+        resources: [{
+          resourceId: 'synthetic-signed-order', kind: 'document', label: 'Signed Order.pdf', state: 'available',
+          authorizationScopeHash: snapshot.snapshotHash,
+        }],
+        currentAttachmentIds: [],
+        selectedDocumentIds: [],
+        documentReference: detectDocumentReference('What does it look like?'),
+        availableTools: [],
+        rollout: {
+          configVersion: 2, kernelMode: 'enforce', contextBuilderMode: 'enforce', taskLedgerMode: 'enforce',
+          toolBrokerMode: 'enforce', outcomeVerifierMode: 'enforce', modelPolicyMode: 'enforce', routeModeAuthority: 'off',
+        },
+      });
+      if (kernelPlan.foregroundGoal !== 'What does it look like?' || kernelPlan.responseProfile !== 'natural') failed.push('INV-KERNEL-001');
+      if (kernelPlan.requiredEvidence || kernelPlan.authorizedDocumentIds.length > 0) failed.push('INV-KERNEL-002');
+      if (!kernelPlan.resolvedReferents.some((binding) => binding.kind === 'result' && binding.targetId === 'mediation-answer')) failed.push('INV-KERNEL-003');
+      const prohibitedFallback = verifyConversationOutcome({
+        latestUserGoal: kernelPlan.foregroundGoal,
+        decision: { kind: 'answer', answer: 'I cannot verify a complete answer from the order language available for this turn.' },
+        toolReceipts: [], requiredEvidence: false, evidenceIds: [], authorizedEvidenceIds: new Set(),
+      });
+      if (prohibitedFallback.passed || !prohibitedFallback.rejectionCodes.includes('known_irrelevant_fallback')) failed.push('INV-KERNEL-004');
 
       const uniqueFailed = Array.from(new Set(failed));
       const finishedAt = Date.now();

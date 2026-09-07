@@ -20,6 +20,14 @@ export type SubscriptionTier = 'free' | 'pro' | 'premium' | 'executive';
 export type PaidSubscriptionTier = Exclude<SubscriptionTier, 'free'>;
 export const PAID_TIERS: PaidSubscriptionTier[] = ['pro', 'premium', 'executive'];
 
+/** Conservative provider-spend guardrails; message quotas remain a separate control. */
+export const DAILY_CHAT_COST_CEILINGS_MICROUSD: Record<SubscriptionTier, number> = {
+    free: 500_000,
+    pro: 5_000_000,
+    premium: 15_000_000,
+    executive: 50_000_000,
+};
+
 /** Check if a tier string is a valid paid tier. */
 export function isPaidTier(tier: string): tier is PaidSubscriptionTier {
     return PAID_TIERS.includes(tier as PaidSubscriptionTier);

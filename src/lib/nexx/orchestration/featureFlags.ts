@@ -11,6 +11,16 @@ export type ExecutiveChatFeatureFlags = {
   publicationGateV2: boolean;
   selfCorrectionV2: boolean;
   understandingResumeV2: boolean;
+  conversationKernelMode: ExecutiveChatRolloutMode;
+  contextBuilderMode: ExecutiveChatRolloutMode;
+  taskLedgerMode: ExecutiveChatRolloutMode;
+  toolBrokerMode: ExecutiveChatRolloutMode;
+  outcomeVerifierMode: ExecutiveChatRolloutMode;
+  modelPolicyMode: ExecutiveChatRolloutMode;
+  lunaUserFacing: boolean;
+  solEscalation: boolean;
+  routeModeDiagnosticOnly: boolean;
+  actualUsageRequired: boolean;
 };
 
 function enabled(value: string | undefined, fallback: boolean) {
@@ -36,6 +46,16 @@ export function getExecutiveChatFeatureFlags(
     publicationGateV2: enabled(env.EXEC_CHAT_PUBLICATION_V2, false),
     selfCorrectionV2: enabled(env.EXEC_CHAT_SELF_CORRECTION_V2, false),
     understandingResumeV2: enabled(env.EXEC_CHAT_UNDERSTANDING_RESUME_V2, true),
+    conversationKernelMode: enabled(env.EXEC_CHAT_KERNEL_V2, false) ? 'enforce' : 'shadow',
+    contextBuilderMode: enabled(env.EXEC_CHAT_CONTEXT_BUILDER_V2, false) ? 'enforce' : 'shadow',
+    taskLedgerMode: enabled(env.EXEC_CHAT_TASK_LEDGER_V2, false) ? 'enforce' : 'shadow',
+    toolBrokerMode: enabled(env.EXEC_CHAT_TOOL_BROKER_V2, false) ? 'enforce' : 'shadow',
+    outcomeVerifierMode: enabled(env.EXEC_CHAT_OUTCOME_VERIFIER_V2, false) ? 'enforce' : 'shadow',
+    modelPolicyMode: enabled(env.EXEC_CHAT_MODEL_POLICY_V2, false) ? 'enforce' : 'shadow',
+    lunaUserFacing: enabled(env.EXEC_CHAT_LUNA_USER_FACING, false),
+    solEscalation: enabled(env.EXEC_CHAT_SOL_ESCALATION, false),
+    routeModeDiagnosticOnly: enabled(env.EXEC_CHAT_ROUTE_MODE_DIAGNOSTIC_ONLY, false),
+    actualUsageRequired: enabled(env.EXEC_CHAT_ACTUAL_USAGE_REQUIRED, true),
   };
 }
 
@@ -63,6 +83,16 @@ export function featureFlagsForRollout(
     publicationGateV2: enforce('publication_v2') && !explicitlyDisabled(env.EXEC_CHAT_PUBLICATION_V2),
     selfCorrectionV2: enforce('self_correction_v1') && !explicitlyDisabled(env.EXEC_CHAT_SELF_CORRECTION_V2),
     understandingResumeV2: enforce('understanding_resume_v2') && !explicitlyDisabled(env.EXEC_CHAT_UNDERSTANDING_RESUME_V2),
+    conversationKernelMode: emergencyOff ? 'off' : decision.modes.conversation_kernel_v2,
+    contextBuilderMode: emergencyOff ? 'off' : decision.modes.context_builder_v2,
+    taskLedgerMode: emergencyOff ? 'off' : decision.modes.task_ledger_v2,
+    toolBrokerMode: emergencyOff ? 'off' : decision.modes.tool_broker_v2,
+    outcomeVerifierMode: emergencyOff ? 'off' : decision.modes.outcome_verifier_v2,
+    modelPolicyMode: emergencyOff ? 'off' : decision.modes.model_policy_v2,
+    lunaUserFacing: enforce('luna_user_facing'),
+    solEscalation: enforce('sol_escalation'),
+    routeModeDiagnosticOnly: enforce('route_mode_diagnostic_only_v2'),
+    actualUsageRequired: enforce('actual_usage_required'),
   };
 }
 
@@ -72,10 +102,17 @@ export function featureFlagsForPersistedRollout(
 ) {
   if (!persisted.rolloutModesJson) return getExecutiveChatFeatureFlags(env);
   try {
-    const modes = JSON.parse(persisted.rolloutModesJson) as Record<string, ExecutiveChatRolloutMode>;
-    if (!EXECUTIVE_CHAT_ROLLOUT_FEATURES.every((feature) => ['off', 'shadow', 'enforce'].includes(modes[feature]))) {
-      return getExecutiveChatFeatureFlags(env);
-    }
+    const parsed = JSON.parse(persisted.rolloutModesJson) as Record<string, ExecutiveChatRolloutMode>;
+    const modes = Object.fromEntries(EXECUTIVE_CHAT_ROLLOUT_FEATURES.map((feature) => [
+      feature,
+      parsed[feature] === 'off' || parsed[feature] === 'shadow' || parsed[feature] === 'enforce'
+        ? parsed[feature]
+        : feature === 'actual_usage_required'
+          ? 'enforce'
+          : feature.endsWith('_v2') || feature === 'luna_user_facing' || feature === 'sol_escalation'
+            ? 'shadow'
+            : 'off',
+    ])) as ExecutiveChatRolloutDecision['modes'];
     return featureFlagsForRollout({
       configVersion: persisted.rolloutConfigVersion ?? 0,
       modes: modes as ExecutiveChatRolloutDecision['modes'],

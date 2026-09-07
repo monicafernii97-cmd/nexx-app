@@ -25,14 +25,16 @@ describe('recovery publication', () => {
 
   it('publishes a contextual saved-evidence recovery for an order request', () => {
     const result = build({ latestUserMessage: 'Analyze the signed order', documentContextActive: true });
-    expect(result.content).toContain('retrieved the order');
-    expect(result.content).toContain('saved evidence');
+    expect(result.content).toContain('retrieved the document');
+    expect(result.content).toContain('saved document');
+    expect(result.content).not.toMatch(/could not verify a complete answer/i);
     expect(result.assessment.passed).toBe(true);
   });
 
   it('keeps an authorized terse continuation on the document task', () => {
     const result = build({ latestUserMessage: 'please do so', speechAct: 'confirm', documentContextActive: true });
-    expect(result.content).toContain('saved evidence');
+    expect(result.content).toContain('saved document');
+    expect(result.content).not.toMatch(/could not verify a complete answer/i);
     expect(result.assessment).toMatchObject({ passed: true, contextKind: 'document' });
   });
 

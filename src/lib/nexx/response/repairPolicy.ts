@@ -110,8 +110,9 @@ export function buildPublicationRepairContent(args: {
     .filter((value): value is string => Boolean(value?.trim()))
     .join('\n\n');
   if (grounded) return grounded;
+  const latest = (args.userMessage ?? 'your request').replace(/\s+/g, ' ').trim().slice(0, 140);
   if (args.documentContextActive) {
-    return 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.';
+    return `I wasn't able to finish checking the saved document for “${latest}.” Please retry this message; the document and conversation are still saved.`;
   }
-  return 'I could not verify a complete answer for this request. Retry the response and I will reassess it from the saved conversation state.';
+  return `I wasn't able to finish the response to “${latest}.” Please retry this message; the conversation is still saved.`;
 }

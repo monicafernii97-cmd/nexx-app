@@ -448,7 +448,8 @@ describe('publication quality v2', () => {
       stage: 'safe_limitation',
       documentContextActive: false,
     });
-    expect(general).toContain('Retry the response');
+    expect(general).toContain('retry this message');
+    expect(general).not.toMatch(/could not verify a complete answer/i);
     expect(general).not.toMatch(/\b(?:document|file|order|upload|attachment)\b/i);
     expect(verify(general, {
       requiresDirectAnswer: true,

@@ -27,4 +27,11 @@ describe('provider usage accounting', () => {
     const usage = { inputTokens: 100, outputTokens: 50 };
     expect(estimateProviderCostMicrousd('future-model', usage)).toBeUndefined();
   });
+
+  it('keeps the ordinary Luna cost target at least 50% below the GPT-5.4 baseline', () => {
+    const ordinaryUsage = { inputTokens: 2_000, cachedInputTokens: 1_000, outputTokens: 500 };
+    const luna = estimateProviderCostMicrousd('gpt-5.6-luna', ordinaryUsage)!;
+    const baseline = estimateProviderCostMicrousd('gpt-5.4', ordinaryUsage)!;
+    expect(luna).toBeLessThanOrEqual(baseline * 0.5);
+  });
 });

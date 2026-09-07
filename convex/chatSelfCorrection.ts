@@ -242,7 +242,7 @@ export const inspectPriorResponseAndPlan = internalMutation({
     ) {
       throw new Error('self_correction_target_turn_scope_mismatch');
     }
-    const [priorUnderstanding, priorPlan, priorAudit, priorJob, currentUnderstanding, currentPlan, control] = await Promise.all([
+    const [priorUnderstanding, priorPlan, priorAudit, priorJob, priorTurnReceipt, priorModelAttempts, priorToolCalls, currentUnderstanding, currentPlan, control] = await Promise.all([
       targetTurn.understandingId ? ctx.db.get(targetTurn.understandingId) : Promise.resolve(null),
       targetTurn.executionPlanId ? ctx.db.get(targetTurn.executionPlanId) : Promise.resolve(null),
       ctx.db.query('responsePublicationAudits')
@@ -250,6 +250,9 @@ export const inspectPriorResponseAndPlan = internalMutation({
         .order('desc')
         .first(),
       ctx.db.query('chatGenerationJobs').withIndex('by_turn', (q) => q.eq('turnId', targetTurn._id)).first(),
+      ctx.db.query('turnReceipts').withIndex('by_turn', (q) => q.eq('turnId', targetTurn._id)).first(),
+      ctx.db.query('chatGenerationAttempts').withIndex('by_turn', (q) => q.eq('turnId', targetTurn._id)).collect(),
+      ctx.db.query('toolCallReceipts').withIndex('by_turn', (q) => q.eq('turnId', targetTurn._id)).collect(),
       currentTurn.understandingId ? ctx.db.get(currentTurn.understandingId) : Promise.resolve(null),
       currentTurn.executionPlanId ? ctx.db.get(currentTurn.executionPlanId) : Promise.resolve(null),
       ctx.db.query('conversationControlStates')
@@ -306,6 +309,25 @@ export const inspectPriorResponseAndPlan = internalMutation({
         errorCode: priorJob?.errorCode,
         retryable: priorJob?.status === 'failed_retryable' || priorJob?.status === 'failed_recoverable',
       },
+      kernel: priorTurnReceipt
+        ? {
+            foregroundGoal: priorTurnReceipt.foregroundGoal,
+            outcome: priorTurnReceipt.outcome,
+            validationPassed: (() => {
+              try { return (JSON.parse(priorTurnReceipt.validationJson) as { passed?: boolean }).passed; }
+              catch { return undefined; }
+            })(),
+            rejectionCodes: (() => {
+              try {
+                const codes = (JSON.parse(priorTurnReceipt.validationJson) as { rejectionCodes?: unknown }).rejectionCodes;
+                return Array.isArray(codes) ? codes.filter((code): code is string => typeof code === 'string') : [];
+              } catch { return []; }
+            })(),
+            evidenceIds: priorTurnReceipt.evidenceIds,
+            modelAttemptCount: priorModelAttempts.length,
+            toolCallCount: priorToolCalls.length,
+          }
+        : undefined,
     };
     const priorRepairs = await ctx.db.query('conversationRepairAudits')
       .withIndex('by_target_message', (q) => q.eq('targetMessageId', targetMessage._id))

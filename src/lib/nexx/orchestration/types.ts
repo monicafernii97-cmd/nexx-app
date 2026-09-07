@@ -126,7 +126,18 @@ export type ConversationTaskSnapshot = {
   taskId: string;
   parentTaskId?: string;
   kind: ConversationTaskKind;
-  status: 'provisional' | 'active' | 'waiting_user' | 'waiting_system' | 'completed' | 'superseded' | 'abandoned';
+  status:
+    | 'provisional'
+    | 'active'
+    | 'open'
+    | 'waiting_user'
+    | 'waiting_system'
+    | 'waiting_tool'
+    | 'suspended'
+    | 'completed'
+    | 'cancelled'
+    | 'superseded'
+    | 'abandoned';
   goal: string;
   normalizedGoal: string;
   issueKey?: string;

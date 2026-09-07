@@ -36,17 +36,17 @@ export function buildContextualRecoveryContent(args: {
   }
   if (kind === 'document') {
     if (args.recoveryCode === 'validation_exhausted') {
-      return 'I retrieved the order, but I could not verify a complete answer. The saved evidence is intact, so you can retry this response without uploading the file again.';
+      return 'I retrieved the document, but the answer did not pass the final source check. Please retry this response; the saved document is intact and does not need to be uploaded again.';
     }
     if (args.recoveryCode === 'context_unavailable') {
       return 'I could not safely reload the order context for this turn. The file is still saved, so retry this response; you do not need to upload it again.';
     }
-    return 'I retrieved the order, but the analysis was interrupted before I could verify the answer. The saved evidence is intact, so retry this response; you do not need to upload it again.';
+    return 'I retrieved the document, but the response was interrupted before it finished. Please retry this response; the saved document is intact and does not need to be uploaded again.';
   }
   if (args.recoveryCode === 'validation_exhausted') {
-    return 'I completed a draft response, but I could not verify it well enough to publish. Retry this response and I’ll reassess it from the saved conversation state.';
+    return 'The draft did not pass the final response check. Please retry this response; I’ll rebuild it from the saved conversation.';
   }
-  return 'I saved your message, but the response was interrupted before I could verify it. Retry this response and I’ll continue from the saved conversation state.';
+  return 'I saved your message, but the response was interrupted before it finished. Please retry this response and I’ll continue from the saved conversation.';
 }
 
 export function assessRecoveryPublication(args: {

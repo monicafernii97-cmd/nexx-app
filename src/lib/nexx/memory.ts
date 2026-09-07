@@ -10,6 +10,7 @@ import { openai } from '../openaiConversation';
 import { CONVERSATION_SUMMARY_SCHEMA, CASE_GRAPH_UPDATE_SCHEMA } from './schemas';
 import type { ConversationSummary } from '../types';
 import type { CaseGraph } from './caseGraph';
+import { ECONOMY_MODEL } from '../tiers';
 
 /** Trigger compaction every N turns */
 const COMPACTION_INTERVAL = 6;
@@ -36,7 +37,7 @@ export async function summarizeConversation(args: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
-    model: 'gpt-5.4-mini',
+    model: ECONOMY_MODEL,
     input: [
       {
         role: 'developer',
@@ -94,7 +95,7 @@ export async function updateCaseGraph(args: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
-    model: 'gpt-5.4-mini',
+    model: ECONOMY_MODEL,
     input: [
       {
         role: 'developer',

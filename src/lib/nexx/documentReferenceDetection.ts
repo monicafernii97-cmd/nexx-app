@@ -50,8 +50,12 @@ const DOCUMENT_HINT_PATTERNS = [
 ];
 
 const IMPLICIT_FOLLOW_UP_PATTERNS = [
-  /\b(?:what|when|where|who|does|did|can|should|must|shall).{0,80}\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf))\b/i,
+  // A pronoun alone is not a document reference. Phrases such as “what does
+  // it look like?” normally refer to the immediately preceding idea, not to
+  // an old file that happens to remain in conversation memory.
+  /\b(?:what|when|where|who|does|did|can|should|must|shall).{0,80}\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf))\b.{0,40}\b(?:say|state|require|mean|allow|prohibit|mention|include|provide|list|show)\b/i,
   /\b(?:it|that|(?:the|my|our)\s+(?:order|document|file|pdf)).{0,80}\b(?:say|state|require|mean|allow|prohibit|mention|include)\b/i,
+  /\b(?:what|which)\b.{0,40}\b(?:deadlines?|terms?|dates?|pages?|clauses?|provisions?)\b.{0,40}\b(?:in|on|from)\s+(?:it|that)\b/i,
 ];
 
 const DEADLINE_TERMS = [

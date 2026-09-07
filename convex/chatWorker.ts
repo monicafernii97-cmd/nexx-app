@@ -98,9 +98,9 @@ import {
     explicitlyRequestsStoredDocumentForTurn,
     isTargetedDocumentRequest,
     responseLifecyclePolicy,
+    responseOutputTokenBudget,
     shouldApplyDeterministicLegalEnrichment,
     shouldApplyDeterministicLitigationRenderer,
-    shouldApplyRenderedLegalVerifier,
     shouldForceStoredDocumentGrounding,
 } from '../src/lib/nexx/responseLifecycle';
 import { verifyPlainTextDocumentGrounding } from '../src/lib/nexx/plainTextGrounding';
@@ -109,6 +109,7 @@ import { canonicalConversationMemoryPage } from '../src/lib/nexx/conversationMem
 import { createDocumentQueryEmbedding } from '../src/lib/nexx/documentEmbeddings';
 import type { StoredDocumentAmbiguity } from '../src/lib/nexx/documentSelection';
 import type { NexxAssistantResponse, RouteMode } from '../src/lib/types';
+import { ECONOMY_MODEL, LEGACY_PRIMARY_MODEL, PRIMARY_MODEL } from '../src/lib/tiers';
 import { understandingSourceIndex, type DocumentUnderstandingPayload } from '../src/lib/nexx/documentUnderstanding';
 import { isOutputTokenIncompleteReason, resumeTokenLimitedResponse, type ResponseContinuationEvent } from '../src/lib/nexx/responseContinuation';
 import {
@@ -124,6 +125,7 @@ import {
     type ProviderStreamLifecycleError,
     type ProviderStreamStrategy,
 } from '../src/lib/nexx/provider/streamLifecycle';
+import { estimateProviderCostMicrousd, extractProviderTokenUsage } from '../src/lib/nexx/provider/usageAccounting';
 import {
     buildReassessmentPrompt,
     buildSavedWorkFailureMessage,
@@ -177,8 +179,7 @@ import {
 const DEGRADED_MESSAGE =
     'Your message is saved. I could not finish the answer right now. Try this response again; I will reuse the work already completed.';
 const PROVIDER_TIMEOUT_MS = 80_000;
-const STANDARD_MAX_OUTPUT_TOKENS = 16_000;
-const COMPLEX_MAX_OUTPUT_TOKENS = 24_000;
+const CONTINUATION_MAX_OUTPUT_TOKENS = 4_000;
 
 function isReviewDepthRecommendationQuestion(message: string) {
     return /^(?:which|which one|which is (?:better|best)|what do you recommend|which do you recommend|what(?:'s| is) the difference)[?!. ]*$/i.test(message.trim());
@@ -233,7 +234,7 @@ async function classifyPendingInteraction(context: GenerationContext) {
     const options = pendingOptionsFromContext(context);
     const recommendation = activeRecommendationFromContext(context);
     const response = await getOpenAIClient().responses.create({
-        model: 'gpt-5.4-mini',
+        model: ECONOMY_MODEL,
         reasoning: { effort: 'low' },
         max_output_tokens: 500,
         input: [
@@ -1800,7 +1801,7 @@ async function continueIncompletePlainTextResponse(args: {
             model: args.model,
             previous_response_id: previousResponseId,
             input: 'Continue the answer exactly where it stopped. Do not repeat prior text. Finish every remaining requested section and do not add backend metadata.',
-            max_output_tokens: STANDARD_MAX_OUTPUT_TOKENS,
+            max_output_tokens: CONTINUATION_MAX_OUTPUT_TOKENS,
             text: { format: { type: 'text' }, verbosity: args.lifecyclePolicy.verbosity },
             stream: true,
         }, { timeout: args.timeoutMs, maxRetries: 0 }) as AsyncIterable<ResponseContinuationEvent>,
@@ -2544,10 +2545,10 @@ function deterministicRenderedFallback(
     const interpretationPlan = response.legalInterpretation
         ? responsePlanFromLegalInterpretation(response.legalInterpretation, userMessage)
         : null;
-    const candidateDirectAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || '';
+    const candidateDirectAnswer = interpretationPlan?.directAnswer || response.documentAnswer?.answer || response.message || '';
     const directAnswer = isCompleteUserFacingLegalText(candidateDirectAnswer) && !isGenericCanonicalLegalAnswer(candidateDirectAnswer)
         ? candidateDirectAnswer
-        : 'I cannot verify a complete answer from the order language available for this turn.';
+        : 'I could not confirm that from the evidence selected for this question. Tell me which document or provision you want checked, and I can narrow the answer to it.';
     const candidateExplanation = interpretationPlan?.explanationSteps[0]?.point || '';
     const explanation = isCompleteUserFacingLegalText(candidateExplanation) ? candidateExplanation : '';
     const practical = interpretationPlan?.practicalOutcome &&
@@ -2608,10 +2609,10 @@ function verifyAndRepairRenderedResponse(
     sourcePackets: LegalDocumentSourcePacket[] = [],
     groundingUserMessage = userMessage
 ) {
-    const candidateCanonicalDirectAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || null;
+    const candidateCanonicalDirectAnswer = response.legalInterpretation?.directAnswer || response.documentAnswer?.answer || response.message || null;
     const canonicalDirectAnswer = candidateCanonicalDirectAnswer && isCompleteUserFacingLegalText(candidateCanonicalDirectAnswer)
         ? candidateCanonicalDirectAnswer
-        : 'I cannot verify a complete answer from the order language available for this turn.';
+        : 'I could not confirm that from the evidence selected for this question.';
     const draftRequired = userAskedForDraft(userMessage);
     const traceEvidence = (renderedMessage = response.message) => {
         const answer = response.legalInterpretation;
@@ -2928,7 +2929,7 @@ async function generateWithFallbacks({
         attachmentCount: context.attachmentContexts?.length ?? 0,
         availableDocumentCount: context.availableDocumentContexts?.length ?? 0,
     });
-    const model = context.turn.model ?? 'gpt-5.4';
+    const model = context.turn.model ?? PRIMARY_MODEL;
     const temperature = context.turn.temperature ?? routerResult.temperature;
 
     const contextPacket = buildUserContext(context.turn.userContextJson);
@@ -3032,9 +3033,16 @@ async function generateWithFallbacks({
             tools: fileSearchOnlyTools,
         });
     }
-    if (!isHighStakesSubstantiveLegalRoute(routeMode)) {
+    if (!isHighStakesSubstantiveLegalRoute(routeMode) && model !== ECONOMY_MODEL) {
         steps.push({
-            model: 'gpt-5.4-mini',
+            model: ECONOMY_MODEL,
+            input: promptBundle.input,
+            tools: fileSearchOnlyTools,
+        });
+    }
+    if (!steps.some((step) => step.model === LEGACY_PRIMARY_MODEL)) {
+        steps.push({
+            model: LEGACY_PRIMARY_MODEL,
             input: promptBundle.input,
             tools: fileSearchOnlyTools,
         });
@@ -3058,7 +3066,9 @@ async function generateWithFallbacks({
             : strategy === 'compact'
                 ? compactEvidenceRecoveryInput(promptBundle)
                 : step.input;
-        const maxOutputTokens = highComplexityTurn ? COMPLEX_MAX_OUTPUT_TOKENS : STANDARD_MAX_OUTPUT_TOKENS;
+        const maxOutputTokens = responseOutputTokenBudget(routeMode, {
+            highComplexity: highComplexityTurn,
+        });
         const attemptPackets = strategy === 'continue'
             ? []
             : strategy === 'compact'
@@ -3122,6 +3132,7 @@ async function generateWithFallbacks({
                         }),
                     },
                     input: requestInput,
+                    prompt_cache_key: 'nexx-chat-v4',
                     ...(strategy === 'continue' && savedProviderResponseId
                         ? { previous_response_id: savedProviderResponseId }
                         : {}),
@@ -3250,6 +3261,7 @@ async function generateWithFallbacks({
                 Object.assign(emptyOutputError, { code: 'provider_empty_output', retryable: true });
                 throw emptyOutputError;
             }
+            const providerUsage = extractProviderTokenUsage(lastResponse);
             await ctx.runMutation(internal.chatTurns.finishGenerationAttempt, {
                 jobId,
                 leaseOwner,
@@ -3261,6 +3273,12 @@ async function generateWithFallbacks({
                 lastEventType,
                 partialOutputCharacters: rawText.length,
                 incompleteReason,
+                inputTokens: providerUsage.inputTokens,
+                cachedInputTokens: providerUsage.cachedInputTokens,
+                outputTokens: providerUsage.outputTokens,
+                reasoningTokens: providerUsage.reasoningTokens,
+                totalTokens: providerUsage.totalTokens,
+                estimatedCostMicrousd: estimateProviderCostMicrousd(step.model, providerUsage),
             });
             attemptClosed = true;
             savedProviderResponseId = undefined;
@@ -3528,8 +3546,8 @@ async function generateWithFallbacks({
                 context.turn.message
             );
             const courtFilingExtraction = (
-                shouldApplyDeterministicLitigationRenderer(routeMode) ||
-                shouldApplyDeterministicLegalEnrichment(routeMode)
+                lifecyclePolicy.applyDeterministicLitigationRenderer ||
+                lifecyclePolicy.applyDeterministicLegalEnrichment
             )
                 ? extractCourtFilingFromSources(promptBundle.documentSourcePackets)
                 : null;
@@ -3542,7 +3560,7 @@ async function generateWithFallbacks({
                 courtFilingExtraction,
                 sourcePackets: promptBundle.documentSourcePackets,
             });
-            if (shouldApplyDeterministicLegalEnrichment(routeMode)) {
+            if (lifecyclePolicy.applyDeterministicLegalEnrichment) {
                 parsedResponse = enrichDeterministicLegalFields({
                     response: parsedResponse,
                     routeMode,
@@ -3553,7 +3571,7 @@ async function generateWithFallbacks({
                 });
             }
             parsedResponse.message = polishLegalResponse(parsedResponse.message);
-            if (shouldApplyRenderedLegalVerifier(routeMode)) {
+            if (lifecyclePolicy.applyRenderedLegalVerifier) {
                 parsedResponse = verifyAndRepairRenderedResponse(
                     parsedResponse,
                     routeMode,

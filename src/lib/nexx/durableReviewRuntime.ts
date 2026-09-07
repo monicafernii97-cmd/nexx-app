@@ -1,5 +1,7 @@
+import { PRIMARY_MODEL } from '../tiers';
+
 export const DURABLE_REVIEW_VERSION = 'dur_v2';
-export const DURABLE_REVIEW_MODEL = 'gpt-5.4';
+export const DURABLE_REVIEW_MODEL = PRIMARY_MODEL;
 export const DURABLE_REVIEW_MAP_BATCH_SIZE = 6;
 export const DURABLE_REVIEW_REDUCE_BATCH_SIZE = 6;
 

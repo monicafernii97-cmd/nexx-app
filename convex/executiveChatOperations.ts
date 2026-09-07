@@ -17,7 +17,7 @@ function rate(numerator: number, denominator: number) {
 async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview' | 'production') {
   const now = Date.now();
   const since = now - WINDOW_MS;
-  const [turns, publications, repairs, reviewRuns, retrievals, canaries, manifests, configs, interactionResolutions] = await Promise.all([
+  const [turns, publications, repairs, reviewRuns, retrievals, canaries, manifests, configs, interactionResolutions, generationAttempts] = await Promise.all([
     ctx.db.query('chatTurns').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
     ctx.db.query('responsePublicationAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
     ctx.db.query('conversationRepairAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
@@ -27,6 +27,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ctx.db.query('releaseManifests').withIndex('by_environment_active', (q) => q.eq('environment', environment).eq('active', true)).collect(),
     ctx.db.query('executiveChatRolloutConfigs').withIndex('by_environment_status', (q) => q.eq('environment', environment).eq('status', 'active')).order('desc').take(1),
     ctx.db.query('interactionResolutionAudits').withIndex('by_created', (q) => q.gte('createdAt', since)).order('desc').take(MAX_ROWS),
+    ctx.db.query('chatGenerationAttempts').withIndex('by_status_created', (q) => q.eq('status', 'completed').gte('createdAt', since)).order('desc').take(MAX_ROWS),
   ]);
 
   const recentTurns = turns.slice(0, 250);
@@ -105,6 +106,14 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     resumedReviewRuns,
     canaryStatus: canaries[0]?.status ?? 'missing',
     canaryStale,
+    generationAttempts: generationAttempts.length,
+    attemptsWithActualUsage: generationAttempts.filter((attempt) => attempt.totalTokens !== undefined).length,
+    inputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
+    cachedInputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.cachedInputTokens ?? 0), 0),
+    outputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
+    reasoningTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.reasoningTokens ?? 0), 0),
+    estimatedCostUsd: Number((generationAttempts.reduce((sum, attempt) =>
+      sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
   };
   const hardStopCodes = [
     ...(releaseMismatch ? ['release_manifest_identity_mismatch'] : []),
@@ -130,6 +139,16 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     version,
     turns.filter((turn) => String(turn.rolloutConfigVersion ?? 0) === version).length,
   ]));
+  const models = Object.fromEntries(Array.from(new Set(generationAttempts.map((attempt) => attempt.model))).map((model) => [
+    model,
+    {
+      attempts: generationAttempts.filter((attempt) => attempt.model === model).length,
+      inputTokens: generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
+      outputTokens: generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
+      estimatedCostUsd: Number((generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) =>
+        sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
+    },
+  ]));
   return {
     environment,
     windowStartedAt: since,
@@ -137,7 +156,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     releaseGitSha: web?.gitSha,
     rolloutConfigVersion: configs[0]?.version,
     metrics,
-    segments: { speechActs, rolloutVersions },
+    segments: { speechActs, rolloutVersions, models },
     hardStopCodes,
     softStopCodes,
     healthy: hardStopCodes.length === 0 && softStopCodes.length === 0,

@@ -5,6 +5,7 @@ import {
   isNaturalRelationalRoute,
   isTargetedDocumentRequest,
   responseLifecyclePolicy,
+  responseOutputTokenBudget,
   responseReasoningEffort,
   responseVerbosity,
   shouldApplyDeterministicLegalEnrichment,
@@ -25,6 +26,8 @@ describe('response lifecycle policy', () => {
   });
 
   it.each<RouteMode>([
+    'direct_legal_answer',
+    'local_procedure',
     'co_parent_response',
     'supportive_strategy',
     'pattern_analysis',
@@ -73,8 +76,8 @@ describe('response lifecycle policy', () => {
     }
   });
 
-  it('never blanket-downgrades conversational reasoning to low effort', () => {
-    expect(responseReasoningEffort('adaptive_chat')).toBe('medium');
+  it('uses low effort only for ordinary adaptive chat and raises effort with task complexity', () => {
+    expect(responseReasoningEffort('adaptive_chat')).toBe('low');
     expect(responseReasoningEffort('co_parent_response')).toBe('medium');
     expect(responseReasoningEffort('supportive_strategy')).toBe('medium');
     expect(responseReasoningEffort('pattern_analysis')).toBe('high');
@@ -85,6 +88,13 @@ describe('response lifecycle policy', () => {
     expect(responseVerbosity('co_parent_response')).toBe('medium');
     expect(responseVerbosity('pattern_analysis')).toBe('high');
     expect(responseVerbosity('supportive_strategy', { highComplexity: true })).toBe('high');
+  });
+
+  it('keeps simple answers bounded while retaining room for document work', () => {
+    expect(responseOutputTokenBudget('adaptive_chat')).toBe(1_800);
+    expect(responseOutputTokenBudget('direct_legal_answer')).toBe(3_500);
+    expect(responseOutputTokenBudget('document_analysis')).toBe(8_000);
+    expect(responseOutputTokenBudget('adaptive_chat', { highComplexity: true })).toBe(10_000);
   });
 
   it.each<RouteMode>([

@@ -12,6 +12,20 @@ function route(message: string, activeMode?: RouteMode, hasDocument = true) {
 }
 
 describe('user-supplied relational chat benchmark', () => {
+  it('flows from a mediation definition into a natural descriptive follow-up despite remembered documents', () => {
+    const definitionMode = route('What is mediation?', 'document_analysis');
+    expect(definitionMode).toBe('adaptive_chat');
+    expect(responseLifecyclePolicy(definitionMode).preserveProviderProse).toBe(true);
+
+    const descriptionMode = route('What does it look like?', definitionMode);
+    expect(descriptionMode).toBe('adaptive_chat');
+    expect(responseLifecyclePolicy(descriptionMode).preserveProviderProse).toBe(true);
+
+    const rephrasedMode = route('Can you explain it another way?', definitionMode);
+    expect(rephrasedMode).toBe('adaptive_chat');
+    expect(responseLifecyclePolicy(rephrasedMode).preserveProviderProse).toBe(true);
+  });
+
   it('keeps the long review and its short follow-ups in relational reasoning', () => {
     const review = `
       Can you do the same review and analysis of this full AppClose conversation and give me feedback?

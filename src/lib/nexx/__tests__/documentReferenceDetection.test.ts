@@ -13,6 +13,18 @@ describe('detectDocumentReference', () => {
     });
   });
 
+  it.each([
+    'What does it look like?',
+    'How does it work?',
+    'What does that feel like?',
+    'Can you explain it another way?',
+  ])('keeps ordinary conceptual pronoun follow-ups out of document retrieval: %s', (message) => {
+    expect(detectDocumentReference(message)).toMatchObject({
+      referencesDocument: false,
+      referenceType: 'none',
+    });
+  });
+
   it('detects exact terminology checks', () => {
     expect(detectDocumentReference('Does it say shall or may?')).toMatchObject({
       referencesDocument: true,

@@ -58,6 +58,25 @@ describe('foreground document activation', () => {
     });
   });
 
+  it('does not activate a remembered order for a normal conceptual follow-up', () => {
+    expect(decision('What does it look like?')).toMatchObject({
+      active: false,
+      source: 'none',
+      referenceStrength: 'none',
+      reasonCodes: expect.arrayContaining(['no_meaningful_document_reference']),
+    });
+
+    expect(resolveTurnRoute({
+      message: 'What does it look like?',
+      activeMode: 'adaptive_chat',
+      hasActiveDocumentContext: true,
+      foregroundIntentV2: true,
+    })).toMatchObject({
+      mode: 'adaptive_chat',
+      requiresDocumentRetrieval: undefined,
+    });
+  });
+
   it.each([
     'I will reupload the signed order.',
     "I'll upload a clean copy next.",

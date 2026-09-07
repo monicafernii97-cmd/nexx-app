@@ -1,7 +1,7 @@
 import type { RouteMode } from '../types';
 import type { DocumentReferenceDetection } from './documentReferenceDetection';
 
-export type ResponseReasoningEffort = 'medium' | 'high';
+export type ResponseReasoningEffort = 'low' | 'medium' | 'high';
 export type ResponseVerbosity = 'medium' | 'high';
 
 export type ResponseLifecyclePolicy = {
@@ -16,6 +16,8 @@ export type ResponseLifecyclePolicy = {
 
 const NATURAL_RELATIONAL_ROUTES = new Set<RouteMode>([
   'adaptive_chat',
+  'direct_legal_answer',
+  'local_procedure',
   'party_message_draft',
   'supportive_strategy',
   'co_parent_response',
@@ -202,7 +204,25 @@ export function responseReasoningEffort(
   if (options.highComplexity || INHERENTLY_HIGH_COMPLEXITY_ROUTES.has(routeMode)) {
     return 'high';
   }
+  if (routeMode === 'adaptive_chat') return 'low';
   return 'medium';
+}
+
+/**
+ * Bound the answer budget to the work being performed. The former blanket
+ * 16k/24k allowance increased latency and made simple conversation prone to
+ * over-processing. These are ceilings, not requested answer lengths.
+ */
+export function responseOutputTokenBudget(
+  routeMode: RouteMode,
+  options: { highComplexity?: boolean } = {},
+) {
+  if (options.highComplexity) return 10_000;
+  if (routeMode === 'document_analysis' || routeMode === 'court_ready_drafting') return 8_000;
+  if (INHERENTLY_HIGH_COMPLEXITY_ROUTES.has(routeMode)) return 6_000;
+  if (routeMode === 'adaptive_chat') return 1_800;
+  if (NATURAL_RELATIONAL_ROUTES.has(routeMode)) return 3_500;
+  return 4_000;
 }
 
 /** Select a response-detail level without flattening nuanced or document-heavy work. */
@@ -261,11 +281,11 @@ export function responseLifecyclePolicy(
     preserveProviderProse,
     usePlainTextTransport: preserveProviderProse,
     applyDeterministicLitigationRenderer:
-      shouldApplyDeterministicLitigationRenderer(routeMode),
+      !preserveProviderProse && shouldApplyDeterministicLitigationRenderer(routeMode),
     applyDeterministicLegalEnrichment:
-      shouldApplyDeterministicLegalEnrichment(routeMode),
+      !preserveProviderProse && shouldApplyDeterministicLegalEnrichment(routeMode),
     applyRenderedLegalVerifier:
-      shouldApplyRenderedLegalVerifier(routeMode),
+      !preserveProviderProse && shouldApplyRenderedLegalVerifier(routeMode),
     reasoningEffort: responseReasoningEffort(routeMode, options),
     verbosity: responseVerbosity(routeMode, options),
   };

@@ -53,6 +53,23 @@ describe('agentic outcome and recovery policy', () => {
     })).toMatchObject({ code: 'provider_stream_failed', retryable: true, category: 'temporary' });
   });
 
+  it('does not burn retries when the provider account has no credits', () => {
+    expect(normalizeProviderFailure(new Error(
+      '429 You have no credits remaining. Add credits to continue using the API.',
+    ))).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+      category: 'unsupported',
+    });
+    expect(normalizeProviderFailure({
+      code: 'insufficient_quota',
+      message: 'Billing quota exhausted.',
+    })).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+    });
+  });
+
   it('locks correction metadata to the actual challenged message', () => {
     const outcome = finalizeAgenticOutcome({
       status: 'corrected', completed: ['Rechecked'], missing: [], blockedReason: null, retryable: false,

@@ -3193,11 +3193,15 @@ async function generateWithFallbacks({
                     incompleteReason = streamEvent.response?.incomplete_details?.reason;
                     break;
                 } else if (streamEvent.type === 'error') {
-                    throw new Error(
+                    const streamError = new Error(
                         streamEvent.error?.message ??
                         streamEvent.message ??
                         'Provider stream emitted an error event',
                     );
+                    Object.assign(streamError, {
+                        code: streamEvent.error?.code,
+                    });
+                    throw streamError;
                 }
             }
 

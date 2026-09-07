@@ -85,6 +85,22 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
     };
   }
 
+  if (
+    providerCode?.includes('insufficient_quota') ||
+    providerCode?.includes('billing') ||
+    lower.includes('no credits remaining') ||
+    lower.includes('insufficient quota') ||
+    lower.includes('billing limit')
+  ) {
+    return {
+      code: 'provider_quota_exhausted',
+      message: 'NEXXproof’s model service account requires billing attention.',
+      rawMessage,
+      retryable: false,
+      category: 'unsupported',
+    };
+  }
+
   if (status === 429 || lower.includes('rate limit') || providerCode?.includes('rate_limit')) {
     return { code: 'provider_rate_limit', message: 'The model service was temporarily busy.', rawMessage, retryable: true, category: 'temporary' };
   }

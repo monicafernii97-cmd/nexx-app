@@ -76,6 +76,15 @@ test('critical executive-chat sequence matrix preserves focus without unwanted d
     await expect(switchedTopic).toContainText(/mediat/i);
     await expect(switchedTopic).not.toContainText(/(?:the|your|this|that) (?:order|document|file|pdf) (?:says|states|contains|requires|provides|shows|means)/i);
 
+    const naturalDefinition = await sendAndWait(page, 'What is mediation?');
+    await expect(naturalDefinition).toContainText(/mediat/i);
+    await expectNoHistoricalDocumentWork(naturalDefinition);
+
+    const naturalFollowUp = await sendAndWait(page, 'What does it look like?');
+    await expect(naturalFollowUp).toContainText(/(?:mediator|neutral|session|meeting|discussion|both parties)/i);
+    await expect(naturalFollowUp).not.toContainText(/cannot verify a complete answer|order language available for this turn/i);
+    await expectNoHistoricalDocumentWork(naturalFollowUp);
+
     const conciseAnswer = await sendAndWait(page, 'What is 9 + 6? Answer with only the number.');
     await expect(conciseAnswer).toHaveText(/^15(?:\.0+)?[.!]?$/);
     await expectNoHistoricalDocumentWork(conciseAnswer);

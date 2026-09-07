@@ -117,7 +117,9 @@ import {
     PROVIDER_MINIMUM_ATTEMPT_BUDGET_MS,
     classifyProviderStreamTerminal,
     decideProviderStreamRetry,
+    inferInterruptedProviderStream,
     providerAttemptTimeoutMs,
+    selectProviderContinuationResponseId,
     streamTerminalError,
     type ProviderStreamLifecycleError,
     type ProviderStreamStrategy,
@@ -3081,6 +3083,7 @@ async function generateWithFallbacks({
         let firstEventAt: number | undefined;
         let lastEventAt: number | undefined;
         let lastEventType: string | undefined;
+        let terminalEvent: 'completed' | 'incomplete' | 'failed' | undefined;
         let incompleteReason: string | undefined;
         let attemptClosed = false;
         try {
@@ -3139,7 +3142,6 @@ async function generateWithFallbacks({
             let safeDraftWritten = false;
             let lastDraftSavedAt = 0;
             let completedCleanly = false;
-            let terminalEvent: 'completed' | 'incomplete' | 'failed' | undefined;
             let providerCode: string | undefined;
             let providerMessageSafe: string | undefined;
 
@@ -3191,11 +3193,15 @@ async function generateWithFallbacks({
                     incompleteReason = streamEvent.response?.incomplete_details?.reason;
                     break;
                 } else if (streamEvent.type === 'error') {
-                    throw new Error(
+                    const streamError = new Error(
                         streamEvent.error?.message ??
                         streamEvent.message ??
                         'Provider stream emitted an error event',
                     );
+                    Object.assign(streamError, {
+                        code: streamEvent.error?.code,
+                    });
+                    throw streamError;
                 }
             }
 
@@ -3235,6 +3241,15 @@ async function generateWithFallbacks({
             }
 
             const rawText = structuredBuffer || extractOutputText(lastResponse);
+            if (usePlainText && !rawText.trim()) {
+                // A completed stream with no answer is a retryable provider result,
+                // not a successful attempt and not an unknown terminal failure.
+                // Discard its response ID so recovery uses a fresh compact request.
+                responseId = undefined;
+                const emptyOutputError = new Error('Provider returned an empty conversational response.');
+                Object.assign(emptyOutputError, { code: 'provider_empty_output', retryable: true });
+                throw emptyOutputError;
+            }
             await ctx.runMutation(internal.chatTurns.finishGenerationAttempt, {
                 jobId,
                 leaseOwner,
@@ -3252,9 +3267,6 @@ async function generateWithFallbacks({
             nextStrategy = 'compact';
             let parsedResponse: NexxAssistantResponse;
             if (usePlainText) {
-                if (!rawText.trim()) {
-                    throw new Error('Provider returned an empty conversational response.');
-                }
                 parsedResponse = plainTextAssistantResponse(rawText);
             } else {
                 await saveDraft(ctx, jobId, leaseOwner, SAFE_ANALYSIS_DRAFT_MESSAGE, {
@@ -3588,14 +3600,28 @@ async function generateWithFallbacks({
                 routeMode,
             };
         } catch (error) {
-            const normalized = normalizeProviderError(error);
-            const lifecycleError = error as Partial<ProviderStreamLifecycleError>;
+            const initialFailure = normalizeProviderError(error);
+            const inferredInterruption = inferInterruptedProviderStream({
+                normalizedFailureCode: initialFailure.code,
+                responseId,
+                lastEventType,
+                terminalEvent,
+                elapsedMs: Date.now() - attemptStartedAt,
+            });
+            const effectiveError = inferredInterruption ?? error;
+            const normalized = inferredInterruption
+                ? normalizeProviderError(inferredInterruption)
+                : initialFailure;
+            const lifecycleError = effectiveError as Partial<ProviderStreamLifecycleError>;
             const lifecycleResponseId = lifecycleError.code === 'provider_stream_interrupted' ||
                 lifecycleError.code === 'provider_stream_timeout' ||
                 lifecycleError.code === 'provider_output_incomplete'
                 ? lifecycleError.responseId
                 : undefined;
-            const reusableResponseId = lifecycleResponseId ?? (normalized.retryable ? responseId : undefined);
+            const reusableResponseId = selectProviderContinuationResponseId({
+                responseId: lifecycleResponseId ?? (normalized.retryable ? responseId : undefined),
+                partialOutputCharacters: structuredBuffer.length,
+            });
             const remainingBudgetMs = PROVIDER_GENERATION_BUDGET_MS - (Date.now() - generationStartedAt);
             const retryStrategy = decideProviderStreamRetry({
                 attemptNumber: attemptIndex + 1,
@@ -3615,7 +3641,7 @@ async function generateWithFallbacks({
                     lastEventType,
                     partialOutputCharacters: structuredBuffer.length,
                     failureCode: normalized.code,
-                    failureStage: safeFailureStage(error),
+                    failureStage: inferredInterruption?.code ?? safeFailureStage(error),
                     incompleteReason: lifecycleError.incompleteReason ?? incompleteReason,
                 });
                 attemptClosed = true;
@@ -3624,12 +3650,12 @@ async function generateWithFallbacks({
                 model: step.model,
                 errorCode: normalized.code,
                 errorMessage: normalized.message,
-                errorName: error instanceof Error ? error.name : typeof error,
-                failureStage: safeFailureStage(error),
+                errorName: effectiveError instanceof Error ? effectiveError.name : typeof effectiveError,
+                failureStage: inferredInterruption?.code ?? safeFailureStage(error),
                 retryStrategy,
                 providerResponseId: Boolean(responseId ?? reusableResponseId),
             });
-            lastError = error;
+            lastError = effectiveError;
             if (retryStrategy === 'stop') break;
             nextStrategy = retryStrategy;
             savedProviderResponseId = retryStrategy === 'continue' ? reusableResponseId : undefined;

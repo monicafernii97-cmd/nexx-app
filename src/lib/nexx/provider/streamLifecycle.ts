@@ -68,6 +68,18 @@ export function decideProviderStreamRetry(args: {
 }
 
 /**
+ * A provider response is only useful for continuation after it emitted usable
+ * output. Continuing a response that stopped at `response.in_progress` with
+ * zero output can strand every recovery attempt on the same dead stream.
+ */
+export function selectProviderContinuationResponseId(args: {
+  responseId?: string;
+  partialOutputCharacters: number;
+}) {
+  return args.partialOutputCharacters > 0 ? args.responseId : undefined;
+}
+
+/**
  * Convert stream state into one exhaustive terminal result. An iterator that
  * stops without a provider terminal event is explicitly interrupted; callers
  * must never reinterpret it as an unknown, non-retryable exception.
@@ -138,6 +150,29 @@ export class ProviderStreamLifecycleError extends Error {
     this.elapsedMs = args.elapsedMs;
     this.incompleteReason = args.incompleteReason;
   }
+}
+
+/** Recover lifecycle meaning when the provider iterator throws after a stream starts. */
+export function inferInterruptedProviderStream(args: {
+  normalizedFailureCode: string;
+  responseId?: string;
+  lastEventType?: string;
+  terminalEvent?: 'completed' | 'incomplete' | 'failed';
+  elapsedMs: number;
+}) {
+  if (
+    args.normalizedFailureCode !== 'provider_unknown_failure' ||
+    !args.responseId ||
+    args.terminalEvent
+  ) return null;
+
+  return new ProviderStreamLifecycleError({
+    code: 'provider_stream_interrupted',
+    message: 'Provider stream threw before a terminal event.',
+    responseId: args.responseId,
+    lastEventType: args.lastEventType,
+    elapsedMs: args.elapsedMs,
+  });
 }
 
 export function streamTerminalError(terminal: ProviderStreamTerminal) {

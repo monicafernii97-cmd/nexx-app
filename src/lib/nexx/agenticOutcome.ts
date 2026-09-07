@@ -61,6 +61,9 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   const providerCode = [record.code, nested.code, record.type, nested.type]
     .find((value): value is string => typeof value === 'string')
     ?.toLowerCase();
+  const upstreamProviderCode = [record.providerCode, nested.providerCode]
+    .find((value): value is string => typeof value === 'string')
+    ?.toLowerCase();
 
   if (providerCode === 'provider_stream_interrupted' || lower.includes('stream ended before a terminal event')) {
     return { code: 'provider_stream_interrupted', message: 'The response stream was interrupted before completion.', rawMessage, retryable: true, category: 'temporary' };
@@ -70,6 +73,26 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   }
   if (providerCode === 'provider_output_incomplete') {
     return { code: 'provider_output_incomplete', message: 'The response stopped before all output was returned.', rawMessage, retryable: true, category: 'temporary' };
+  }
+  if (providerCode === 'provider_empty_output' || lower.includes('provider returned an empty conversational response')) {
+    return { code: 'provider_empty_output', message: 'The model service returned an empty response.', rawMessage, retryable: true, category: 'temporary' };
+  }
+  if (
+    upstreamProviderCode?.includes('insufficient_quota') ||
+    upstreamProviderCode?.includes('billing') ||
+    providerCode?.includes('insufficient_quota') ||
+    providerCode?.includes('billing') ||
+    lower.includes('no credits remaining') ||
+    lower.includes('insufficient quota') ||
+    lower.includes('billing limit')
+  ) {
+    return {
+      code: 'provider_quota_exhausted',
+      message: 'NEXXproof’s model service account requires billing attention.',
+      rawMessage,
+      retryable: false,
+      category: 'unsupported',
+    };
   }
   if (providerCode === 'provider_stream_failed') {
     const retryable = record.retryable === true;

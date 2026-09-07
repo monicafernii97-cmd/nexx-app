@@ -5,6 +5,7 @@ import {
   isReassessmentRequest,
   normalizeProviderFailure,
 } from '../agenticOutcome';
+import { ProviderStreamLifecycleError } from '../provider/streamLifecycle';
 
 describe('agentic outcome and recovery policy', () => {
   it.each([
@@ -33,6 +34,11 @@ describe('agentic outcome and recovery policy', () => {
   it('classifies bounded transient conditions as retryable', () => {
     expect(normalizeProviderFailure({ status: 429, message: 'Rate limit' }).retryable).toBe(true);
     expect(normalizeProviderFailure({ status: 503, message: 'Unavailable' }).retryable).toBe(true);
+    expect(normalizeProviderFailure(new Error('Provider returned an empty conversational response.'))).toMatchObject({
+      code: 'provider_empty_output',
+      retryable: true,
+      category: 'temporary',
+    });
     expect(normalizeProviderFailure({
       code: 'provider_stream_interrupted',
       message: 'Provider stream ended before a terminal event.',
@@ -46,6 +52,33 @@ describe('agentic outcome and recovery policy', () => {
       message: 'temporarily unavailable',
       retryable: true,
     })).toMatchObject({ code: 'provider_stream_failed', retryable: true, category: 'temporary' });
+  });
+
+  it('does not burn retries when the provider account has no credits', () => {
+    expect(normalizeProviderFailure(new Error(
+      '429 You have no credits remaining. Add credits to continue using the API.',
+    ))).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+      category: 'unsupported',
+    });
+    expect(normalizeProviderFailure({
+      code: 'insufficient_quota',
+      message: 'Billing quota exhausted.',
+    })).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+    });
+    expect(normalizeProviderFailure(new ProviderStreamLifecycleError({
+      code: 'provider_stream_failed',
+      message: 'The provider stream failed.',
+      retryable: false,
+      providerCode: 'insufficient_quota',
+    }))).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+      category: 'unsupported',
+    });
   });
 
   it('locks correction metadata to the actual challenged message', () => {

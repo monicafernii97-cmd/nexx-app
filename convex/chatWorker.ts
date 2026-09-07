@@ -119,6 +119,7 @@ import {
     decideProviderStreamRetry,
     inferInterruptedProviderStream,
     providerAttemptTimeoutMs,
+    selectProviderContinuationResponseId,
     streamTerminalError,
     type ProviderStreamLifecycleError,
     type ProviderStreamStrategy,
@@ -3613,7 +3614,10 @@ async function generateWithFallbacks({
                 lifecycleError.code === 'provider_output_incomplete'
                 ? lifecycleError.responseId
                 : undefined;
-            const reusableResponseId = lifecycleResponseId ?? (normalized.retryable ? responseId : undefined);
+            const reusableResponseId = selectProviderContinuationResponseId({
+                responseId: lifecycleResponseId ?? (normalized.retryable ? responseId : undefined),
+                partialOutputCharacters: structuredBuffer.length,
+            });
             const remainingBudgetMs = PROVIDER_GENERATION_BUDGET_MS - (Date.now() - generationStartedAt);
             const retryStrategy = decideProviderStreamRetry({
                 attemptNumber: attemptIndex + 1,
@@ -3647,7 +3651,7 @@ async function generateWithFallbacks({
                 retryStrategy,
                 providerResponseId: Boolean(responseId ?? reusableResponseId),
             });
-            lastError = error;
+            lastError = effectiveError;
             if (retryStrategy === 'stop') break;
             nextStrategy = retryStrategy;
             savedProviderResponseId = retryStrategy === 'continue' ? reusableResponseId : undefined;

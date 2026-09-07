@@ -68,6 +68,18 @@ export function decideProviderStreamRetry(args: {
 }
 
 /**
+ * A provider response is only useful for continuation after it emitted usable
+ * output. Continuing a response that stopped at `response.in_progress` with
+ * zero output can strand every recovery attempt on the same dead stream.
+ */
+export function selectProviderContinuationResponseId(args: {
+  responseId?: string;
+  partialOutputCharacters: number;
+}) {
+  return args.partialOutputCharacters > 0 ? args.responseId : undefined;
+}
+
+/**
  * Convert stream state into one exhaustive terminal result. An iterator that
  * stops without a provider terminal event is explicitly interrupted; callers
  * must never reinterpret it as an unknown, non-retryable exception.

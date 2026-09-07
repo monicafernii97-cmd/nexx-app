@@ -5,6 +5,7 @@ import {
   decideProviderStreamRetry,
   inferInterruptedProviderStream,
   providerAttemptTimeoutMs,
+  selectProviderContinuationResponseId,
   streamTerminalError,
 } from '../provider/streamLifecycle';
 
@@ -121,6 +122,17 @@ describe('provider stream lifecycle', () => {
       responseId: 'resp_saved',
       remainingBudgetMs: 40_000,
     })).toBe('stop');
+  });
+
+  it('restarts cleanly when a saved response emitted no usable output', () => {
+    expect(selectProviderContinuationResponseId({
+      responseId: 'resp_in_progress_only',
+      partialOutputCharacters: 0,
+    })).toBeUndefined();
+    expect(selectProviderContinuationResponseId({
+      responseId: 'resp_with_output',
+      partialOutputCharacters: 12,
+    })).toBe('resp_with_output');
   });
 
   it('retries provider-declared transient stream failures', () => {

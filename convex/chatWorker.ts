@@ -4721,7 +4721,7 @@ export const processChatGenerationJob = internalAction({
                     console.warn('[ChatWorker] Review-depth recommendation publication rejected', {
                         jobId: args.jobId,
                         verificationErrors: recommendationPublication?.verification.errors ?? ['publication_result_missing'],
-                        outcomeRejectionCodes: recommendationPublication?.outcomeValidation.rejectionCodes ?? [],
+                        outcomeRejectionCodes: recommendationPublication?.outcomeValidation?.rejectionCodes ?? [],
                         capabilitySupport: recommendationPublication?.capabilityDecision.supportLevel ?? 'unknown',
                         planResponseAct: recommendationPublication?.plan.responseAct ?? 'missing',
                         planEvidenceRequirements: recommendationPublication?.plan.evidenceRequirements ?? [],

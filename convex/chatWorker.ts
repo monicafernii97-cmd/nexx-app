@@ -4521,6 +4521,8 @@ export const processChatGenerationJob = internalAction({
                         speechAct: context.turnUnderstanding?.speechAct,
                         requestedOperation: context.turnUnderstanding?.requestedOperation,
                         userMessage: context.turn.message,
+                        documentContextActive: (publication?.plan.selectedDocumentIds.length ?? 0) > 0 ||
+                            (context.attachmentContexts?.length ?? 0) > 0,
                     });
                     const repairedResponse = plainTextAssistantResponse(repairedContent);
                     repairedResponse.artifacts = result.response.artifacts;

@@ -121,7 +121,10 @@ export function verifyResponseClaims(args: {
     document.authorized && document.coverageStatus === 'complete' && document.fullDocumentReviewStatus === 'ready');
   const publishingLimitation = args.publicationDecision === 'publish_limitation';
 
-  if (args.requiresDirectAnswer && args.speechAct !== 'social' && content.length < 20) {
+  // A direct answer can legitimately be a single number, date, name, or yes/no.
+  // Length is not evidence that the answer is missing; the generic-answer and
+  // evidence checks below validate whether non-empty content is publishable.
+  if (args.requiresDirectAnswer && args.speechAct !== 'social' && content.length === 0) {
     errors.push('RESP_MISSING_DIRECT_ANSWER');
   }
   const genericAssessment = assessGenericAnswer(content);

@@ -107,6 +107,20 @@ describe('publication quality v2', () => {
       .toContain('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE');
   });
 
+  it('accepts concise direct answers without imposing a prose-length minimum', () => {
+    for (const content of ['15', 'No.', 'September 8.']) {
+      expect(verify(content, {
+        requiresDirectAnswer: true,
+        documentContextAllowed: false,
+      })).toMatchObject({ passed: true, errors: [] });
+    }
+  });
+
+  it('still rejects a genuinely empty direct answer', () => {
+    expect(verify('   ', { requiresDirectAnswer: true }).errors)
+      .toContain('RESP_MISSING_DIRECT_ANSWER');
+  });
+
   it('does not reject a generic lead-in followed by a concrete answer', () => {
     const content = 'Here are the key provisions in the order. Weekend possession begins Friday at 6:00 p.m.';
     expect(assessGenericAnswer(content).isGeneric).toBe(false);
@@ -419,6 +433,30 @@ describe('publication quality v2', () => {
       speechAct: 'unknown',
       userMessage: 'ZQX?',
     })).toBe('What do you mean by “ZQX”?');
+  });
+
+  it('keeps safe fallbacks scoped to the active conversation context', () => {
+    const general = buildPublicationRepairContent({
+      errors: ['RESP_MISSING_DIRECT_ANSWER'],
+      questionKind: 'other',
+      stage: 'safe_limitation',
+      documentContextActive: false,
+    });
+    expect(general).toContain('Retry the response');
+    expect(general).not.toMatch(/\b(?:document|file|order|upload|attachment)\b/i);
+    expect(verify(general, {
+      requiresDirectAnswer: true,
+      documentContextAllowed: false,
+      publicationDecision: 'publish_scoped',
+    })).toMatchObject({ passed: true, errors: [] });
+
+    const document = buildPublicationRepairContent({
+      errors: ['RESP_MISSING_DIRECT_ANSWER'],
+      questionKind: 'other',
+      stage: 'safe_limitation',
+      documentContextActive: true,
+    });
+    expect(document).toContain('saved document');
   });
 
   it('allows one v2 regeneration for a non-narrow generic failure and then stops retrying', () => {

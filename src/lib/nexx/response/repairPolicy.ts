@@ -61,6 +61,7 @@ export function buildPublicationRepairContent(args: {
   speechAct?: string;
   requestedOperation?: string;
   userMessage?: string;
+  documentContextActive?: boolean;
 }) {
   if (args.requestedOperation === 'await_upload' || args.errors.some((error) => [
     'RESP_AWAITED_INPUT_NOT_ACKNOWLEDGED',
@@ -100,5 +101,8 @@ export function buildPublicationRepairContent(args: {
     .filter((value): value is string => Boolean(value?.trim()))
     .join('\n\n');
   if (grounded) return grounded;
-  return 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.';
+  if (args.documentContextActive) {
+    return 'I could not verify a complete answer from the available evidence. Your saved document and conversation remain available.';
+  }
+  return 'I could not verify a complete answer for this request. Retry the response and I will reassess it from the saved conversation state.';
 }

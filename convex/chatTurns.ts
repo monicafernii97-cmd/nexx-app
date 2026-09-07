@@ -1357,7 +1357,12 @@ export const acceptChatTurn = mutation({
             : null;
         const activeTaskIsDocument = preliminaryControl?.activeTaskKind === 'document_review' ||
             preliminaryControl?.activeTaskKind === 'document_question';
-        const activeMode = activeTaskIsDocument
+        // Document task state is durable context, not a rigid conversational
+        // mode. It may influence routing only when this turn actually activates
+        // document work; otherwise continue from the latest conversation route.
+        const activeMode = activeTaskIsDocument && (
+            !executiveChatFlags.documentActivationV2 || preliminaryDocumentActivation?.active
+        )
             ? ('document_analysis' as const)
             : conversation.routeMode as RouteMode | undefined;
         const contextualRoute = resolveTurnRoute({
@@ -1420,6 +1425,8 @@ export const acceptChatTurn = mutation({
         const activeDocumentIds = Array.from(new Set([
             ...validatedAttachments.map((attachment) => attachment.uploadedFileId),
             ...(existingDocumentState?.activeUploadedFileId ? [existingDocumentState.activeUploadedFileId] : []),
+            ...(existingControlContext.controlState?.activeDocumentIds ?? [])
+                .map((id) => id as Id<'uploadedFiles'>),
         ]));
         const orchestration = await persistTurnOrchestration(ctx, {
             conversation,
@@ -1776,6 +1783,12 @@ export const finishGenerationAttempt = internalMutation({
         lastEventAt: v.optional(v.number()),
         lastEventType: v.optional(v.string()),
         partialOutputCharacters: v.number(),
+        inputTokens: v.optional(v.number()),
+        cachedInputTokens: v.optional(v.number()),
+        outputTokens: v.optional(v.number()),
+        reasoningTokens: v.optional(v.number()),
+        totalTokens: v.optional(v.number()),
+        estimatedCostMicrousd: v.optional(v.number()),
         failureCode: v.optional(v.string()),
         failureStage: v.optional(v.string()),
         incompleteReason: v.optional(v.string()),
@@ -1796,6 +1809,12 @@ export const finishGenerationAttempt = internalMutation({
             lastEventAt: args.lastEventAt,
             lastEventType: args.lastEventType,
             partialOutputCharacters: Math.max(0, Math.floor(args.partialOutputCharacters)),
+            inputTokens: args.inputTokens,
+            cachedInputTokens: args.cachedInputTokens,
+            outputTokens: args.outputTokens,
+            reasoningTokens: args.reasoningTokens,
+            totalTokens: args.totalTokens,
+            estimatedCostMicrousd: args.estimatedCostMicrousd,
             failureCode: args.failureCode,
             failureStage: args.failureStage,
             incompleteReason: args.incompleteReason,

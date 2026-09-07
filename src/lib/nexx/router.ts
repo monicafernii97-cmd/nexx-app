@@ -80,6 +80,9 @@ const CONVERSATION_REVIEW_PATTERNS = [
   /\b(?:reading|read)\s+this\b.{0,80}\b(?:not\s+as\s+a\s+judge|as\s+a\s+human|from\s+both\s+sides)\b/i,
 ];
 
+const STANDALONE_EXPLANATION_PATTERN =
+  /^\s*what\s+(?:is|are)\b/i;
+
 const SINGLE_MESSAGE_REPLY_DRAFT_PATTERN =
   /\b(?:(?:review|analy[sz]e)\b.{0,60}\b(?:this|one|the)\s+message\b.{0,80}\b(?:draft|write|reply|respond)|draft\s+(?:a\s+)?reply|write\s+(?:a\s+)?response)\b/i;
 
@@ -131,6 +134,8 @@ const EXPLANATION_CONTINUATION_PATTERN =
 
 const NON_DOCUMENT_CONTINUATION_MODES: RouteMode[] = [
   'adaptive_chat',
+  'direct_legal_answer',
+  'local_procedure',
   'party_message_draft',
   'supportive_strategy',
   'co_parent_response',
@@ -375,6 +380,17 @@ export function classifyMessage(
   // even when the pasted exchange mentions orders, filings, or many dates.
   if (matchesAny(text, CONVERSATION_REVIEW_PATTERNS)) {
     return buildResult('pattern_analysis', documentReference, legalIntent, multiIntent);
+  }
+
+  // A self-contained explanation question starts from its own subject. Old
+  // document/task state may remain available, but it cannot redefine “it” or
+  // force a concept such as mediation through the document-analysis pipeline.
+  if (
+    STANDALONE_EXPLANATION_PATTERN.test(message) &&
+    !documentReference.referencesDocument &&
+    legalIntent === 'general_summary'
+  ) {
+    return buildResult('adaptive_chat', undefined, legalIntent);
   }
 
   if (

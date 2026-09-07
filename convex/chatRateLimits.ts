@@ -2,6 +2,7 @@ import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 import { getAuthenticatedUser } from './lib/auth';
 import {
+    ECONOMY_MODEL,
     getDailyLimit,
     PRIMARY_MODEL,
     PRO_MODEL,
@@ -9,15 +10,20 @@ import {
 import { CHAT_RATE_LIMIT_WINDOW_MS, fixedWindowStartMs, userSubscriptionTier } from './lib/chatRateLimitPolicy';
 
 const CHAT_RATE_LIMIT_KEY_VALIDATOR = v.union(
+    v.literal('chat_message_5_6_luna'),
+    v.literal('chat_message_5_6_terra'),
+    v.literal('chat_message_5_6_sol'),
     v.literal('chat_message_5_4'),
     v.literal('chat_message_5_4_pro'),
 );
 
 function rateLimitPolicyForKey(user: { subscriptionTier?: string }, key: string) {
-    const model = key === 'chat_message_5_4_pro'
+    const model = key === 'chat_message_5_6_sol' || key === 'chat_message_5_4_pro'
         ? PRO_MODEL
-        : key === 'chat_message_5_4'
+        : key === 'chat_message_5_6_terra' || key === 'chat_message_5_4'
             ? PRIMARY_MODEL
+            : key === 'chat_message_5_6_luna'
+                ? ECONOMY_MODEL
             : null;
     if (!model) throw new Error('Unknown rate-limit key');
     return {

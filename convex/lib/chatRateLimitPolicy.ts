@@ -1,4 +1,5 @@
 import {
+  ECONOMY_MODEL,
   FALLBACK_MODEL,
   FALLBACK_MODEL_54,
   PREMIUM_MODEL,
@@ -29,9 +30,9 @@ export function userSubscriptionTier(user: { subscriptionTier?: string }): Subsc
 }
 
 export function chatRateLimitKeyForModel(model: string) {
-  if (model === PRIMARY_MODEL) return 'chat_message:gpt_5_4';
-  if (model === PRO_MODEL) return 'chat_message:gpt_5_4_pro';
-  if (model === FALLBACK_MODEL || model === FALLBACK_MODEL_54) return 'chat_message:gpt_5_4_mini';
+  if (model === PRIMARY_MODEL) return 'chat_message:gpt_5_6_terra';
+  if (model === PRO_MODEL) return 'chat_message:gpt_5_6_sol';
+  if (model === ECONOMY_MODEL || model === FALLBACK_MODEL || model === FALLBACK_MODEL_54) return 'chat_message:gpt_5_6_luna';
   if (model === PREMIUM_MODEL) return 'chat_message:gpt_4o';
   return `chat_message:${model.replace(/[^a-zA-Z0-9_.-]/g, '_')}`;
 }

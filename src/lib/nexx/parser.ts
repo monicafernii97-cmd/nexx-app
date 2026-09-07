@@ -11,6 +11,7 @@
 import { openai } from '../openaiConversation';
 import { PARSED_LEGAL_DOCUMENT_SCHEMA } from './schemas';
 import type { ParsedLegalDocument } from '../types';
+import { ECONOMY_MODEL } from '../tiers';
 
 const MAX_PARSE_INPUT_CHARS = 8000;
 
@@ -34,7 +35,7 @@ export async function parseLegalDocument(args: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
-    model: 'gpt-5.4-mini',
+    model: ECONOMY_MODEL,
     input: [
       {
         role: 'developer',

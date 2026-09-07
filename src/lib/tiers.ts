@@ -5,9 +5,9 @@
  * and helpers to determine which model to use based on tier and feature.
  * 
  * Model hierarchy (Responses API era):
- * - gpt-5.4: Primary model for all chat + analysis
- * - gpt-5.4-mini: Fallback, memory compaction, confidence assessment
- * - gpt-5.4-pro: Premium workflows (judge sim, opposition sim, deep drafting)
+ * - gpt-5.6-terra: Primary model for legal chat and analysis
+ * - gpt-5.6-luna: Low-risk conversational turns, compaction, and classification
+ * - gpt-5.6-sol: Premium simulations and deep drafting
  * - gpt-4o: Legacy routes still in transition
  * - gpt-4o-mini: Legacy fallback
  */
@@ -82,10 +82,14 @@ export const PREMIUM_MODEL = 'gpt-4o' as const;
 /** @deprecated Use FALLBACK_MODEL_54 for new routes */
 export const FALLBACK_MODEL = 'gpt-4o-mini' as const;
 
-/** NEW: Responses API era model constants */
-export const PRIMARY_MODEL = 'gpt-5.4' as const;
-export const FALLBACK_MODEL_54 = 'gpt-5.4-mini' as const;
-export const PRO_MODEL = 'gpt-5.4-pro' as const;
+/** Current Responses API model policy. */
+export const PRIMARY_MODEL = 'gpt-5.6-terra' as const;
+export const ECONOMY_MODEL = 'gpt-5.6-luna' as const;
+export const PRO_MODEL = 'gpt-5.6-sol' as const;
+/** Compatibility export for callers that still use the previous constant name. */
+export const FALLBACK_MODEL_54 = ECONOMY_MODEL;
+/** Emergency compatibility target used only if a 5.6 model is unavailable. */
+export const LEGACY_PRIMARY_MODEL = 'gpt-5.4' as const;
 
 // ── Model Routing ──
 
@@ -105,11 +109,11 @@ export function getModelForMode(): typeof PREMIUM_MODEL {
  */
 export function getModelForRoute(
     tier: SubscriptionTier,
-    feature: 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
+    feature: 'economy_chat' | 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
 ): string {
-    // Memory compaction and confidence always use mini (cost efficiency)
-    if (feature === 'memory' || feature === 'confidence') {
-        return FALLBACK_MODEL_54;
+    // Low-risk conversational work and support classifiers use Luna.
+    if (feature === 'economy_chat' || feature === 'memory' || feature === 'confidence') {
+        return ECONOMY_MODEL;
     }
 
     // Premium features require pro model + tier access
@@ -142,7 +146,7 @@ export function getDailyLimit(tier: SubscriptionTier, model: string): number {
     if (model === PRIMARY_MODEL) return config.gpt54DailyLimit;
     if (model === PRO_MODEL) return config.gpt54ProDailyLimit;
     if (model === PREMIUM_MODEL) return config.gpt4oDailyLimit;
-    if (model === FALLBACK_MODEL || model === FALLBACK_MODEL_54) return config.gpt4oMiniDailyLimit;
+    if (model === FALLBACK_MODEL || model === FALLBACK_MODEL_54 || model === ECONOMY_MODEL) return config.gpt4oMiniDailyLimit;
     console.warn('[Tiers] getDailyLimit called with unknown model:', model);
     return 0;
 }

@@ -8,12 +8,14 @@ import {
 describe('chat response transport policy', () => {
   it('uses plain text for natural conversation and structured output for legal document work', () => {
     expect(usesPlainTextResponse('adaptive_chat')).toBe(true);
+    expect(usesPlainTextResponse('direct_legal_answer')).toBe(true);
+    expect(usesPlainTextResponse('local_procedure')).toBe(true);
     expect(usesPlainTextResponse('party_message_draft')).toBe(true);
     expect(usesPlainTextResponse('order_interpretation')).toBe(false);
   });
 
-  it('uses at least medium reasoning for chat and high effort for complex relational work', () => {
-    expect(reasoningEffortForRoute('adaptive_chat')).toBe('medium');
+  it('uses low effort for ordinary chat and high effort for complex work', () => {
+    expect(reasoningEffortForRoute('adaptive_chat')).toBe('low');
     expect(reasoningEffortForRoute('pattern_analysis')).toBe('high');
     expect(reasoningEffortForRoute('document_analysis')).toBe('high');
   });

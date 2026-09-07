@@ -5,6 +5,7 @@
 import { openai } from '../openaiConversation';
 import { EVIDENCE_PACKET_SCHEMA } from './schemas';
 import type { EvidencePacket, LocalCourtSource } from '../types';
+import { ECONOMY_MODEL } from '../tiers';
 
 /**
  * Re-rank and compress retrieved sources into an EvidencePacket.
@@ -25,7 +26,7 @@ export async function rankAndCompress(args: {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await (openai.responses as any).create({
-      model: 'gpt-5.4-mini',
+      model: ECONOMY_MODEL,
       input: [
         {
           role: 'developer',

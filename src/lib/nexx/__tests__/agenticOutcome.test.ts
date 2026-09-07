@@ -52,6 +52,10 @@ describe('agentic outcome and recovery policy', () => {
       message: 'temporarily unavailable',
       retryable: true,
     })).toMatchObject({ code: 'provider_stream_failed', retryable: true, category: 'temporary' });
+    expect(normalizeProviderFailure({
+      status: 404,
+      message: 'The model gpt-5.6-terra does not exist or you do not have access to it.',
+    })).toMatchObject({ code: 'provider_model_unavailable', retryable: true, category: 'temporary' });
   });
 
   it('does not burn retries when the provider account has no credits', () => {

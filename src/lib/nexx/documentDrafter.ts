@@ -8,6 +8,7 @@
 import { openai } from '../openaiConversation';
 import { TEMPLATE_DRAFT_PLAN_SCHEMA, DOCUMENT_DRAFT_SCHEMA } from './schemas';
 import type { TemplateDraftPlan } from '../types';
+import { PRIMARY_MODEL } from '../tiers';
 
 
 /**
@@ -30,7 +31,7 @@ export async function generateDraftPlan(args: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const response = await (openai.responses as any).create({
-    model: 'gpt-5.4',
+    model: PRIMARY_MODEL,
     input: [
       {
         role: 'developer',
@@ -92,7 +93,7 @@ export async function generateDraftContent(args: {
   if (args.courtRules) contextParts.push(`Court rules:\n${JSON.stringify(args.courtRules, null, 2)}`);
 
   const requestOptions: Record<string, unknown> = {
-    model: 'gpt-5.4',
+    model: PRIMARY_MODEL,
     input: [
       {
         role: 'developer',

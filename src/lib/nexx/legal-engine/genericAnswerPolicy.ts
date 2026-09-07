@@ -1,4 +1,5 @@
 const LEGACY_GENERIC_CANONICAL_PATTERNS = [
+  /^i (?:cannot|could not) verify a complete answer from the order language available for this turn\.?$/i,
   /^here are the key provisions in the order\.?$/i,
   /^here is what the visible order language supports\.?$/i,
   /^the provision written specifically for this event applies/i,
@@ -8,6 +9,7 @@ const LEGACY_GENERIC_CANONICAL_PATTERNS = [
 ];
 
 const GENERIC_SENTENCE_PATTERNS = [
+  /^i (?:cannot|could not) verify a complete answer from the order language available for this turn$/i,
   /^here are the key provisions in the order$/i,
   /^here is what the visible order language supports$/i,
   /^the provision written specifically for this event applies(?: here)?$/i,
@@ -29,6 +31,7 @@ const GENERIC_PADDING_PATTERNS = [
 ];
 
 const GENERIC_LIMITATION_PATTERNS = [
+  /^i (?:cannot|could not) verify a complete answer from the order language available for this turn$/i,
   /^(?:the )?(?:full|exhaustive|complete)(?:-document)? review (?:is|was) not (?:ready|available|complete),? but i can still (?:use|review|analy[sz]e) (?:the )?(?:available|extracted|visible) (?:text|pages?|content)(?: for focused work)?$/i,
   /^i (?:cannot|can't|could not|couldn't) verify (?:a )?complete answer,? but i can (?:still )?(?:help|provide|review) (?:the )?(?:available|visible|extracted) (?:information|text|content)$/i,
   /^the available (?:text|content|evidence) may be incomplete$/i,

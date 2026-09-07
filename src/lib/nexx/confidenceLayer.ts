@@ -1,7 +1,7 @@
 /**
  * Confidence Layer — post-generation response confidence assessment.
  * 
- * Uses gpt-5.4-mini for fast assessment.
+ * Uses the economy model for fast assessment.
  * Result is attached to response metadata and surfaced in MessageBubble.
  */
 
@@ -9,6 +9,7 @@ import { openai } from '../openaiConversation';
 import { LEGAL_CONFIDENCE_SCHEMA } from './schemas';
 import type { NexxAssistantResponse, LegalConfidence, LocalCourtSource } from '../types';
 import type { CaseGraph } from './caseGraph';
+import { ECONOMY_MODEL } from '../tiers';
 
 /**
  * Assess the confidence of a response based on:
@@ -44,7 +45,7 @@ export async function assessConfidence(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (openai.responses as any).create({
-      model: 'gpt-5.4-mini',
+      model: ECONOMY_MODEL,
       input: [
         {
           role: 'developer',

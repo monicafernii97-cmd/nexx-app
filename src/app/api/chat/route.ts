@@ -288,12 +288,10 @@ export async function POST(req: NextRequest) {
       ? (userRecord.subscriptionTier as SubscriptionTier)
       : 'free';
 
-  const activeTaskKind = authoritativeControl?.controlState?.activeTaskKind;
-  const activeRouteMode = activeTaskKind === 'document_review' || activeTaskKind === 'document_question'
-    ? 'document_analysis' as RouteMode
-    : authoritativeControl?.controlState
-      ? undefined
-      : conversation.routeMode as RouteMode | undefined;
+  // The most recently completed conversational route is the admission hint.
+  // A remembered document task is available context, not a hard mode lock;
+  // current-turn document activation is decided transactionally in Convex.
+  const activeRouteMode = conversation.routeMode as RouteMode | undefined;
   const hasActiveDocumentContext =
     sanitizedAttachments.length > 0 ||
     Boolean(conversation.activeUploadedFileId) ||
@@ -322,9 +320,9 @@ export async function POST(req: NextRequest) {
   });
   const routeModeToFeature: Record<
     string,
-    'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
+    'economy_chat' | 'chat' | 'analysis' | 'judge_sim' | 'opposition_sim' | 'deep_draft' | 'memory' | 'confidence'
   > = {
-    adaptive_chat: 'chat',
+    adaptive_chat: 'economy_chat',
     direct_legal_answer: 'chat',
     local_procedure: 'chat',
     document_analysis: 'analysis',

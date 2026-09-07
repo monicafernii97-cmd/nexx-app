@@ -78,6 +78,12 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
     return { code: 'provider_empty_output', message: 'The model service returned an empty response.', rawMessage, retryable: true, category: 'temporary' };
   }
   if (
+    /\bmodel\b/.test(lower) &&
+    /(?:not found|does not exist|unsupported|not available|do not have access|don't have access|not permitted)/.test(lower)
+  ) {
+    return { code: 'provider_model_unavailable', message: 'The selected model is not available for this request.', rawMessage, retryable: true, category: 'temporary' };
+  }
+  if (
     upstreamProviderCode?.includes('insufficient_quota') ||
     upstreamProviderCode?.includes('billing') ||
     providerCode?.includes('insufficient_quota') ||

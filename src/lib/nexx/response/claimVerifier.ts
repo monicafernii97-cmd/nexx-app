@@ -127,6 +127,7 @@ export function verifyResponseClaims(args: {
   const exhaustiveReady = args.capabilitySnapshot.documents.length > 0 && args.capabilitySnapshot.documents.every((document) =>
     document.authorized && document.coverageStatus === 'complete' && document.fullDocumentReviewStatus === 'ready');
   const publishingLimitation = args.publicationDecision === 'publish_limitation';
+  const publishingInteraction = args.publicationDecision === 'ask_clarification' || args.plan.responseAct === 'clarify';
 
   // A direct answer can legitimately be a single number, date, name, or yes/no;
   // reject actual non-answers rather than using response length as a proxy.
@@ -153,7 +154,7 @@ export function verifyResponseClaims(args: {
     errors.push('RESP_REUPLOAD_UNNECESSARY');
   }
   if (EXHAUSTIVE_CLAIM.test(content) && !exhaustiveReady) errors.push('RESP_FALSE_EXHAUSTIVE_CLAIM');
-  if (!publishingLimitation && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
+  if (!publishingLimitation && !publishingInteraction && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0 && args.capabilityDecision.allowed) errors.push('RESP_CITATION_MISMATCH');
   if (args.publicationV2 && args.citationVerificationPassed === false) {
     errors.push('RESP_CITATION_MISMATCH');
   }
@@ -169,7 +170,7 @@ export function verifyResponseClaims(args: {
   if (args.publicationV2 && ACTION_COMPLETION_CLAIM.test(content) && !args.plan.requestedOperation && !args.plan.analysisMode) {
     errors.push('RESP_EXECUTION_WITHOUT_OPERATION');
   }
-  if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
+  if (args.publicationV2 && !publishingLimitation && !publishingInteraction && args.plan.selectedOptionId && args.plan.evidenceRequirements.includes('relevant_source_unit') && args.evidenceIds.length === 0) {
     errors.push('RESP_EXECUTION_WITHOUT_EVIDENCE', 'RESP_ACCEPTED_ACTION_NOT_EXECUTED');
   }
   if (args.publicationV2 && !publishingLimitation && args.plan.selectedOptionId && PROMISE_ONLY.test(content) && args.evidenceIds.length === 0) {

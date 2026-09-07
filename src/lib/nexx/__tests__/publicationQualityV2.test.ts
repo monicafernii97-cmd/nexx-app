@@ -326,6 +326,25 @@ describe('publication quality v2', () => {
     ]));
   });
 
+  it('does not require document evidence for a pending-choice recommendation', () => {
+    const result = verify(
+      'A full-document review is the most complete option, so I recommend it when you want the complete picture.',
+      {
+        publicationDecision: 'ask_clarification',
+        speechAct: 'clarify',
+        plan: plan({
+          responseAct: 'clarify',
+          selectedDocumentIds: ['signed-order'],
+          evidenceRequirements: ['relevant_source_unit'],
+          questionKind: 'confirmation',
+        }),
+      },
+    );
+
+    expect(result.passed).toBe(true);
+    expect(result.errors).not.toContain('RESP_CITATION_MISMATCH');
+  });
+
   it('does not mistake a no-reupload assurance inside a completed analysis for an upload request', () => {
     const readableSnapshot: DocumentCapabilitySnapshot = {
       ...snapshot,

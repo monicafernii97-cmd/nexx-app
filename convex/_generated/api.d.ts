@@ -14,6 +14,7 @@ import type * as caseMemory from "../caseMemory.js";
 import type * as casePins from "../casePins.js";
 import type * as caseScopeMaintenance from "../caseScopeMaintenance.js";
 import type * as cases from "../cases.js";
+import type * as chatGenerationRuntime from "../chatGenerationRuntime.js";
 import type * as chatPublication from "../chatPublication.js";
 import type * as chatQualityCanary from "../chatQualityCanary.js";
 import type * as chatRateLimits from "../chatRateLimits.js";
@@ -91,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   casePins: typeof casePins;
   caseScopeMaintenance: typeof caseScopeMaintenance;
   cases: typeof cases;
+  chatGenerationRuntime: typeof chatGenerationRuntime;
   chatPublication: typeof chatPublication;
   chatQualityCanary: typeof chatQualityCanary;
   chatRateLimits: typeof chatRateLimits;

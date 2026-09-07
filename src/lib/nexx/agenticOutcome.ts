@@ -61,6 +61,9 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   const providerCode = [record.code, nested.code, record.type, nested.type]
     .find((value): value is string => typeof value === 'string')
     ?.toLowerCase();
+  const upstreamProviderCode = [record.providerCode, nested.providerCode]
+    .find((value): value is string => typeof value === 'string')
+    ?.toLowerCase();
 
   if (providerCode === 'provider_stream_interrupted' || lower.includes('stream ended before a terminal event')) {
     return { code: 'provider_stream_interrupted', message: 'The response stream was interrupted before completion.', rawMessage, retryable: true, category: 'temporary' };
@@ -74,18 +77,9 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
   if (providerCode === 'provider_empty_output' || lower.includes('provider returned an empty conversational response')) {
     return { code: 'provider_empty_output', message: 'The model service returned an empty response.', rawMessage, retryable: true, category: 'temporary' };
   }
-  if (providerCode === 'provider_stream_failed') {
-    const retryable = record.retryable === true;
-    return {
-      code: 'provider_stream_failed',
-      message: retryable ? 'The response stream failed temporarily.' : 'The response stream could not be completed.',
-      rawMessage,
-      retryable,
-      category: retryable ? 'temporary' : 'unknown',
-    };
-  }
-
   if (
+    upstreamProviderCode?.includes('insufficient_quota') ||
+    upstreamProviderCode?.includes('billing') ||
     providerCode?.includes('insufficient_quota') ||
     providerCode?.includes('billing') ||
     lower.includes('no credits remaining') ||
@@ -98,6 +92,16 @@ export function normalizeProviderFailure(error: unknown): NormalizedProviderFail
       rawMessage,
       retryable: false,
       category: 'unsupported',
+    };
+  }
+  if (providerCode === 'provider_stream_failed') {
+    const retryable = record.retryable === true;
+    return {
+      code: 'provider_stream_failed',
+      message: retryable ? 'The response stream failed temporarily.' : 'The response stream could not be completed.',
+      rawMessage,
+      retryable,
+      category: retryable ? 'temporary' : 'unknown',
     };
   }
 

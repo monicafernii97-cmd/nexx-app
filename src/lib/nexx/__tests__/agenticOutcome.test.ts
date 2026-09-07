@@ -5,6 +5,7 @@ import {
   isReassessmentRequest,
   normalizeProviderFailure,
 } from '../agenticOutcome';
+import { ProviderStreamLifecycleError } from '../provider/streamLifecycle';
 
 describe('agentic outcome and recovery policy', () => {
   it.each([
@@ -67,6 +68,16 @@ describe('agentic outcome and recovery policy', () => {
     })).toMatchObject({
       code: 'provider_quota_exhausted',
       retryable: false,
+    });
+    expect(normalizeProviderFailure(new ProviderStreamLifecycleError({
+      code: 'provider_stream_failed',
+      message: 'The provider stream failed.',
+      retryable: false,
+      providerCode: 'insufficient_quota',
+    }))).toMatchObject({
+      code: 'provider_quota_exhausted',
+      retryable: false,
+      category: 'unsupported',
     });
   });
 

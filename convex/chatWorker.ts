@@ -117,6 +117,7 @@ import {
     PROVIDER_MINIMUM_ATTEMPT_BUDGET_MS,
     classifyProviderStreamTerminal,
     decideProviderStreamRetry,
+    inferInterruptedProviderStream,
     providerAttemptTimeoutMs,
     streamTerminalError,
     type ProviderStreamLifecycleError,
@@ -3081,6 +3082,7 @@ async function generateWithFallbacks({
         let firstEventAt: number | undefined;
         let lastEventAt: number | undefined;
         let lastEventType: string | undefined;
+        let terminalEvent: 'completed' | 'incomplete' | 'failed' | undefined;
         let incompleteReason: string | undefined;
         let attemptClosed = false;
         try {
@@ -3139,7 +3141,6 @@ async function generateWithFallbacks({
             let safeDraftWritten = false;
             let lastDraftSavedAt = 0;
             let completedCleanly = false;
-            let terminalEvent: 'completed' | 'incomplete' | 'failed' | undefined;
             let providerCode: string | undefined;
             let providerMessageSafe: string | undefined;
 
@@ -3594,8 +3595,19 @@ async function generateWithFallbacks({
                 routeMode,
             };
         } catch (error) {
-            const normalized = normalizeProviderError(error);
-            const lifecycleError = error as Partial<ProviderStreamLifecycleError>;
+            const initialFailure = normalizeProviderError(error);
+            const inferredInterruption = inferInterruptedProviderStream({
+                normalizedFailureCode: initialFailure.code,
+                responseId,
+                lastEventType,
+                terminalEvent,
+                elapsedMs: Date.now() - attemptStartedAt,
+            });
+            const effectiveError = inferredInterruption ?? error;
+            const normalized = inferredInterruption
+                ? normalizeProviderError(inferredInterruption)
+                : initialFailure;
+            const lifecycleError = effectiveError as Partial<ProviderStreamLifecycleError>;
             const lifecycleResponseId = lifecycleError.code === 'provider_stream_interrupted' ||
                 lifecycleError.code === 'provider_stream_timeout' ||
                 lifecycleError.code === 'provider_output_incomplete'
@@ -3621,7 +3633,7 @@ async function generateWithFallbacks({
                     lastEventType,
                     partialOutputCharacters: structuredBuffer.length,
                     failureCode: normalized.code,
-                    failureStage: safeFailureStage(error),
+                    failureStage: inferredInterruption?.code ?? safeFailureStage(error),
                     incompleteReason: lifecycleError.incompleteReason ?? incompleteReason,
                 });
                 attemptClosed = true;
@@ -3630,8 +3642,8 @@ async function generateWithFallbacks({
                 model: step.model,
                 errorCode: normalized.code,
                 errorMessage: normalized.message,
-                errorName: error instanceof Error ? error.name : typeof error,
-                failureStage: safeFailureStage(error),
+                errorName: effectiveError instanceof Error ? effectiveError.name : typeof effectiveError,
+                failureStage: inferredInterruption?.code ?? safeFailureStage(error),
                 retryStrategy,
                 providerResponseId: Boolean(responseId ?? reusableResponseId),
             });

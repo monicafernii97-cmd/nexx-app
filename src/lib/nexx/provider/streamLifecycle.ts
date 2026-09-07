@@ -140,6 +140,29 @@ export class ProviderStreamLifecycleError extends Error {
   }
 }
 
+/** Recover lifecycle meaning when the provider iterator throws after a stream starts. */
+export function inferInterruptedProviderStream(args: {
+  normalizedFailureCode: string;
+  responseId?: string;
+  lastEventType?: string;
+  terminalEvent?: 'completed' | 'incomplete' | 'failed';
+  elapsedMs: number;
+}) {
+  if (
+    args.normalizedFailureCode !== 'provider_unknown_failure' ||
+    !args.responseId ||
+    args.terminalEvent
+  ) return null;
+
+  return new ProviderStreamLifecycleError({
+    code: 'provider_stream_interrupted',
+    message: 'Provider stream threw before a terminal event.',
+    responseId: args.responseId,
+    lastEventType: args.lastEventType,
+    elapsedMs: args.elapsedMs,
+  });
+}
+
 export function streamTerminalError(terminal: ProviderStreamTerminal) {
   if (terminal.kind === 'completed') {
     throw new Error('A completed provider stream cannot be converted to a failure.');

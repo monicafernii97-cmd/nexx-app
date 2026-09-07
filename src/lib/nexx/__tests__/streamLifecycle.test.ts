@@ -3,6 +3,7 @@ import {
   ProviderStreamLifecycleError,
   classifyProviderStreamTerminal,
   decideProviderStreamRetry,
+  inferInterruptedProviderStream,
   providerAttemptTimeoutMs,
   streamTerminalError,
 } from '../provider/streamLifecycle';
@@ -26,6 +27,38 @@ describe('provider stream lifecycle', () => {
     const error = streamTerminalError(terminal);
     expect(error).toBeInstanceOf(ProviderStreamLifecycleError);
     expect(error).toMatchObject({ code: 'provider_stream_interrupted', retryable: true });
+  });
+
+  it('infers interruption when an unknown iterator error follows a started nonterminal stream', () => {
+    expect(inferInterruptedProviderStream({
+      normalizedFailureCode: 'provider_unknown_failure',
+      responseId: 'resp_started',
+      lastEventType: 'response.in_progress',
+      elapsedMs: 700,
+    })).toMatchObject({
+      code: 'provider_stream_interrupted',
+      retryable: true,
+      responseId: 'resp_started',
+      lastEventType: 'response.in_progress',
+    });
+  });
+
+  it('does not reinterpret pre-stream, known, or post-terminal failures', () => {
+    expect(inferInterruptedProviderStream({
+      normalizedFailureCode: 'provider_unknown_failure',
+      elapsedMs: 700,
+    })).toBeNull();
+    expect(inferInterruptedProviderStream({
+      normalizedFailureCode: 'provider_invalid_request',
+      responseId: 'resp_started',
+      elapsedMs: 700,
+    })).toBeNull();
+    expect(inferInterruptedProviderStream({
+      normalizedFailureCode: 'provider_unknown_failure',
+      responseId: 'resp_done',
+      terminalEvent: 'completed',
+      elapsedMs: 700,
+    })).toBeNull();
   });
 
   it('retains a response id captured before completion', () => {

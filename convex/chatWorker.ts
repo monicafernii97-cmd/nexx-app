@@ -4549,7 +4549,10 @@ export const processChatGenerationJob = internalAction({
             });
             if (executiveChatFlags.toolBrokerMode !== 'off' && kernelPlan.requiredEvidence && fullReviewAttachments.length > 0) {
                 const resourceIds = Array.from(new Set(fullReviewAttachments.map((attachment) => attachment.uploadedFileId.toString())));
-                const evidenceIds = uniqueDocumentChunkIds(fullReviewAttachments).map(String);
+                const evidenceIds = Array.from(new Set(fullReviewAttachments.flatMap((attachment) => [
+                    ...(attachment.documentChunks ?? []).map((chunk) => chunk.chunkId.toString()),
+                    ...(attachment.fullDocumentReviewSourceChunkIds ?? []).map(String),
+                ])));
                 const startedAt = Date.now();
                 await ctx.runMutation(internal.chatTurns.recordToolCallReceipt, {
                     turnId: context.turn._id,
@@ -4857,6 +4860,12 @@ export const processChatGenerationJob = internalAction({
                     },
                 });
                 if (!reviewCommit?.committed) {
+                    console.warn('[ChatWorker] Full-review publication rejected', {
+                        jobId: args.jobId,
+                        verificationErrors: reviewCommit?.verification.errors ?? ['publication_result_missing'],
+                        outcomeRejectionCodes: reviewCommit?.outcomeValidation?.rejectionCodes ?? [],
+                        receiptEvidenceCount: reviewCitations.length,
+                    });
                     await ctx.runMutation(internal.chatTurns.commitSystemRecoveryNotice, {
                         jobId: args.jobId, leaseOwner, recoveryCode: 'validation_exhausted',
                         errorCode: 'full_review_publication_failed',

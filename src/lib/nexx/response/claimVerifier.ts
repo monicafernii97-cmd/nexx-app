@@ -74,6 +74,7 @@ const NEGATED_UPLOAD_REQUEST = /\b(?:no need|need(?:s)? not|needn't|do not need|
 const PROMISE_ONLY = /\b(?:i can|i will|i'll|once you|after you|next step)\b.{0,140}\b(?:review|analy[sz]e|read|start)\b/i;
 const REPEATED_CHOICE = /\b(?:which|choose|select)\b.{0,100}\b(?:focused|full[- ]document|full review|option)\b/i;
 const CONTEXTUAL_LIMITATION = /\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b.{0,180}\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b|\b(?:pending|preparing|building|continuing|retry|interrupted|not ready|not complete|still finishing|in progress|unavailable)\b.{0,180}\b(?:retrieved|received|saved|stored|extracted|verified|verification|coverage|review|analysis|synthesis|evidence|processing)\b/i;
+const DIRECT_ANSWER_REFUSAL = /^(?:i\s+(?:do not|don't|cannot|can't|could not|couldn't)\s+(?:know|answer|determine|tell|say)(?:\s+(?:that|this|the answer|the result))?|i(?:'m| am)\s+(?:not sure|unsure)|(?:unknown|unclear|not sure|unsure|no idea|n\/a))[.!?]*$/i;
 
 function requestsUploadFromUser(content: string): boolean {
   return content
@@ -91,6 +92,12 @@ function requestsUploadFromUser(content: string): boolean {
     });
 }
 
+function isMissingDirectAnswer(content: string): boolean {
+  const normalized = content.replace(/’/g, "'").trim();
+  return !/[\p{L}\p{N}]/u.test(normalized) || DIRECT_ANSWER_REFUSAL.test(normalized);
+}
+
+/** Verify that a candidate assistant response is publishable for the current turn contract. */
 export function verifyResponseClaims(args: {
   content: string;
   plan: TurnExecutionPlan;
@@ -121,7 +128,9 @@ export function verifyResponseClaims(args: {
     document.authorized && document.coverageStatus === 'complete' && document.fullDocumentReviewStatus === 'ready');
   const publishingLimitation = args.publicationDecision === 'publish_limitation';
 
-  if (args.requiresDirectAnswer && args.speechAct !== 'social' && content.length < 20) {
+  // A direct answer can legitimately be a single number, date, name, or yes/no;
+  // reject actual non-answers rather than using response length as a proxy.
+  if (args.requiresDirectAnswer && args.speechAct !== 'social' && isMissingDirectAnswer(content)) {
     errors.push('RESP_MISSING_DIRECT_ANSWER');
   }
   const genericAssessment = assessGenericAnswer(content);

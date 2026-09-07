@@ -146,7 +146,11 @@ import {
     mintPublicationEnvelope,
     serializePublicationEnvelope,
 } from '../src/lib/nexx/response/publicationContract';
-import { buildPublicationRepairContent, decideRepair } from '../src/lib/nexx/response/repairPolicy';
+import {
+    buildPublicationRepairContent,
+    decideRepair,
+    hasDocumentContextForPublicationRepair,
+} from '../src/lib/nexx/response/repairPolicy';
 import {
     correctionInspectionPrompt,
     selfCorrectionTerminalMessage,
@@ -4521,6 +4525,10 @@ export const processChatGenerationJob = internalAction({
                         speechAct: context.turnUnderstanding?.speechAct,
                         requestedOperation: context.turnUnderstanding?.requestedOperation,
                         userMessage: context.turn.message,
+                        documentContextActive: hasDocumentContextForPublicationRepair({
+                            selectedDocumentIds: publication?.plan.selectedDocumentIds ?? [],
+                            selectedAttachmentContexts: result.attachmentContexts,
+                        }),
                     });
                     const repairedResponse = plainTextAssistantResponse(repairedContent);
                     repairedResponse.artifacts = result.response.artifacts;

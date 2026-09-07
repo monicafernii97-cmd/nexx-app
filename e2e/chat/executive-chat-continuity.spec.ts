@@ -75,6 +75,14 @@ test('critical executive-chat sequence matrix preserves focus without unwanted d
     const switchedTopic = await sendAndWait(page, 'Switch topics: explain mediation in one sentence.');
     await expect(switchedTopic).toContainText(/mediat/i);
     await expect(switchedTopic).not.toContainText(/(?:the|your|this|that) (?:order|document|file|pdf) (?:says|states|contains|requires|provides|shows|means)/i);
+
+    const conciseAnswer = await sendAndWait(page, 'What is 9 + 6? Answer with only the number.');
+    await expect(conciseAnswer).toHaveText(/^15(?:\.0+)?[.!]?$/);
+    await expectNoHistoricalDocumentWork(conciseAnswer);
+
+    const conciseFollowUp = await sendAndWait(page, 'Now add 4 to that result. Answer with only the number.');
+    await expect(conciseFollowUp).toHaveText(/^19(?:\.0+)?[.!]?$/);
+    await expectNoHistoricalDocumentWork(conciseFollowUp);
   } finally {
     await finishSyntheticRun(page, testInfo, environment.runId);
   }

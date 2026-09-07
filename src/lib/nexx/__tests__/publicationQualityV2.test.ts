@@ -3,7 +3,11 @@ import type { CapabilityDecision, DocumentCapabilitySnapshot } from '../capabili
 import { assessGenericAnswer, isGenericCanonicalLegalAnswer } from '../legal-engine/genericAnswerPolicy';
 import type { TurnExecutionPlan } from '../orchestration/types';
 import { verifyResponseClaims } from '../response/claimVerifier';
-import { buildPublicationRepairContent, decideRepair } from '../response/repairPolicy';
+import {
+  buildPublicationRepairContent,
+  decideRepair,
+  hasDocumentContextForPublicationRepair,
+} from '../response/repairPolicy';
 import {
   mintPublicationEnvelope,
   PUBLICATION_VALIDATOR_V2_VERSION,
@@ -105,6 +109,22 @@ describe('publication quality v2', () => {
   it('rejects a generic direct answer even when retrieval produced no evidence', () => {
     expect(verify('I can help you with that.', { requiresDirectAnswer: true }).errors)
       .toContain('RESP_GENERIC_WHEN_EVIDENCE_AVAILABLE');
+  });
+
+  it('accepts concise direct answers without imposing a prose-length minimum', () => {
+    for (const content of ['15', 'No.', 'September 8.']) {
+      expect(verify(content, {
+        requiresDirectAnswer: true,
+        documentContextAllowed: false,
+      })).toMatchObject({ passed: true, errors: [] });
+    }
+  });
+
+  it('still rejects empty, punctuation-only, and explicit non-answers', () => {
+    for (const content of ['   ', '.', '—', 'I do not know.', "I can't answer that."]) {
+      expect(verify(content, { requiresDirectAnswer: true }).errors)
+        .toContain('RESP_MISSING_DIRECT_ANSWER');
+    }
   });
 
   it('does not reject a generic lead-in followed by a concrete answer', () => {
@@ -419,6 +439,41 @@ describe('publication quality v2', () => {
       speechAct: 'unknown',
       userMessage: 'ZQX?',
     })).toBe('What do you mean by “ZQX”?');
+  });
+
+  it('keeps safe fallbacks scoped to the active conversation context', () => {
+    const general = buildPublicationRepairContent({
+      errors: ['RESP_MISSING_DIRECT_ANSWER'],
+      questionKind: 'other',
+      stage: 'safe_limitation',
+      documentContextActive: false,
+    });
+    expect(general).toContain('Retry the response');
+    expect(general).not.toMatch(/\b(?:document|file|order|upload|attachment)\b/i);
+    expect(verify(general, {
+      requiresDirectAnswer: true,
+      documentContextAllowed: false,
+      publicationDecision: 'publish_scoped',
+    })).toMatchObject({ passed: true, errors: [] });
+
+    const document = buildPublicationRepairContent({
+      errors: ['RESP_MISSING_DIRECT_ANSWER'],
+      questionKind: 'other',
+      stage: 'safe_limitation',
+      documentContextActive: true,
+    });
+    expect(document).toContain('saved document');
+  });
+
+  it('treats a stored document selected during generation as active repair context', () => {
+    expect(hasDocumentContextForPublicationRepair({
+      selectedDocumentIds: [],
+      selectedAttachmentContexts: [{ source: 'stored-document' }],
+    })).toBe(true);
+    expect(hasDocumentContextForPublicationRepair({
+      selectedDocumentIds: [],
+      selectedAttachmentContexts: [],
+    })).toBe(false);
   });
 
   it('allows one v2 regeneration for a non-narrow generic failure and then stops retrying', () => {

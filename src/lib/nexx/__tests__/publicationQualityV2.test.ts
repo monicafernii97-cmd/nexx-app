@@ -338,8 +338,9 @@ describe('publication quality v2', () => {
       {
         publicationDecision: 'ask_clarification',
         speechAct: 'clarify',
+        unresolvedReferent: true,
         plan: plan({
-          responseAct: 'clarify',
+          responseAct: 'answer',
           selectedDocumentIds: ['signed-order'],
           evidenceRequirements: ['relevant_source_unit'],
           questionKind: 'confirmation',

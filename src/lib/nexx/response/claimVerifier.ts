@@ -165,7 +165,7 @@ export function verifyResponseClaims(args: {
     }
   }
   if (args.expectedFocusRevision !== args.currentFocusRevision) errors.push('RESP_STALE_FOCUS');
-  if (args.unresolvedReferent && args.plan.responseAct !== 'clarify') errors.push('RESP_UNRESOLVED_REFERENT');
+  if (args.unresolvedReferent && !publishingInteraction && args.plan.responseAct !== 'clarify') errors.push('RESP_UNRESOLVED_REFERENT');
   if (INTERNAL_PAYLOAD.test(content)) errors.push('RESP_INTERNAL_PAYLOAD');
   if (args.publicationV2 && ACTION_COMPLETION_CLAIM.test(content) && !args.plan.requestedOperation && !args.plan.analysisMode) {
     errors.push('RESP_EXECUTION_WITHOUT_OPERATION');

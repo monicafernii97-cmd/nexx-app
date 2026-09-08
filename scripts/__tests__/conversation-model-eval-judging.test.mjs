@@ -9,6 +9,7 @@ test('accepts natural concise and contextual answers', () => {
   assert.equal(evaluateConversationModelAnswer(byId('incident-mediation-follow-up'), 'A mediation session is a guided discussion with a neutral mediator.').passed, true);
   assert.equal(evaluateConversationModelAnswer(byId('topic-switch-2'), '48').passed, true);
   assert.equal(evaluateConversationModelAnswer(byId('follow-up-6'), 'A budget can be a table of planned income and actual spending.').passed, true);
+  assert.equal(evaluateConversationModelAnswer(byId('follow-up-10'), 'They accelerate toward each other unless another force changes their motion.').passed, true);
 });
 
 test('does not confuse ordinary legal filing language with a background document activation', () => {

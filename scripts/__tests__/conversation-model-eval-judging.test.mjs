@@ -17,6 +17,13 @@ test('accepts natural concise and contextual answers', () => {
     ).passed,
     true,
   );
+  assert.equal(
+    evaluateConversationModelAnswer(
+      byId('follow-up-14'),
+      'It can resolve disputes faster than court, lets parties choose a neutral expert, and may limit appeals.',
+    ).passed,
+    true,
+  );
 });
 
 test('does not confuse ordinary legal filing language with a background document activation', () => {

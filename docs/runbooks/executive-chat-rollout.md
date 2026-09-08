@@ -23,7 +23,19 @@ The required conversational metrics have these operational definitions:
 - Task idempotency is violated by more than one terminal turn for a conversation/request pair. Publication idempotency is violated by more than one committed publication for a turn or envelope.
 - Successful-turn cost is compared with the counterfactual GPT-5.4 list-price cost for the exact same provider-reported tokens.
 
-Hard-stop the rollout for any published unauthorized evidence, zero-document analysis, false tool/action claim, material side effect without confirmation, QA evidence in a production turn, or task/publication idempotency violation. Soft-stop advancement when document false activation exceeds 0.5%, background resume falls below 98%, successful-turn savings fall below 50% versus GPT-5.4, or p95 completion latency exceeds the observed GPT-5.4 baseline by more than 20%.
+Hard-stop the rollout for any published unauthorized evidence, zero-document analysis, false tool/action claim, material side effect without confirmation, QA evidence in a production turn, or task/publication idempotency violation. Soft-stop advancement when document false activation exceeds 0.5%, background resume falls below 98%, successful-turn savings fall below 50% versus GPT-5.4, p95 completion latency exceeds the observed GPT-5.4 baseline by more than 20%, or the exact release lacks a complete, passing model-policy evaluation from the prior 24 hours.
+
+## Model-policy release evaluation
+
+After the exact web/backend release pair is live, run the frozen 226-case provider comparison against that merge SHA and persist only the sanitized results:
+
+```powershell
+npm run eval:conversation-model-policy -- --release <exact-merge-sha> --environment production --record --output <private-local-report-path>
+```
+
+The private local report contains synthetic response text and must not be committed or uploaded as a public artifact. Convex stores hashes, model choices, usage, cost, latency, outcomes, and failure codes without response text. Routine cases use Luna; evidence-sensitive and correction cases use Terra. Each eligible Luna case is also compared with Terra so critical regressions and counterfactual cost remain visible.
+
+Do not advance a cohort unless the latest run for the exact release contains all 226 cases, is less than 24 hours old, has no failed or review-needed candidate outcomes, preserves 100% of the frozen incident corpus, and satisfies the corpus thresholds for follow-ups, resumptions, corrections, clarifications, evidence use, latest-goal relevance, document activation, unauthorized evidence, false tool claims, known fallbacks, usage capture, and critical regressions. A missing, partial, failed, or stale run is a soft stop. Rerun the evaluation before a gate when the prior run would become stale during the observation decision.
 
 ## Configuration lifecycle
 

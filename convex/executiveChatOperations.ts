@@ -95,6 +95,41 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
   const web = manifests.find((manifest) => manifest.runtime === 'web');
   const convex = manifests.find((manifest) => manifest.runtime === 'convex');
   const releaseGitSha = web && convex && web.gitSha === convex.gitSha ? web.gitSha : undefined;
+  const evaluationRows = releaseGitSha
+    ? await ctx.db.query('conversationKernelEvaluations')
+      .withIndex('by_release_created', (q) => q.eq('releaseGitSha', releaseGitSha))
+      .order('desc')
+      .take(MAX_ROWS)
+    : [];
+  const latestEvaluationRunId = evaluationRows[0]?.runId;
+  const latestEvaluationRows = latestEvaluationRunId
+    ? evaluationRows.filter((row) => row.runId === latestEvaluationRunId)
+    : [];
+  const evaluationCreatedAt = latestEvaluationRows.length > 0
+    ? Math.max(...latestEvaluationRows.map((row) => row.createdAt))
+    : undefined;
+  const evaluationCategories = latestEvaluationRows.map((row) => {
+    try { return (JSON.parse(row.metricsJson) as { category?: string }).category ?? 'unknown'; }
+    catch { return 'unknown'; }
+  });
+  const modelPolicyEvaluation = {
+    runId: latestEvaluationRunId,
+    total: latestEvaluationRows.length,
+    passed: latestEvaluationRows.filter((row) => row.outcome === 'passed').length,
+    failed: latestEvaluationRows.filter((row) => row.outcome === 'failed').length,
+    needsReview: latestEvaluationRows.filter((row) => row.outcome === 'needs_review').length,
+    frozenTotal: evaluationCategories.filter((category) => category === 'frozen_incident').length,
+    frozenPassed: latestEvaluationRows.filter((row, index) =>
+      evaluationCategories[index] === 'frozen_incident' && row.outcome === 'passed').length,
+    candidateModels: Object.fromEntries(Array.from(new Set(latestEvaluationRows.map((row) => row.candidateModel))).map((model) => [
+      model,
+      latestEvaluationRows.filter((row) => row.candidateModel === model).length,
+    ])),
+    createdAt: evaluationCreatedAt,
+    stale: evaluationCreatedAt !== undefined && now - evaluationCreatedAt > 24 * 60 * 60 * 1000,
+    complete: latestEvaluationRows.length >= 226,
+    failureCodes: Array.from(new Set(latestEvaluationRows.flatMap((row) => row.failureCodes))),
+  };
   const activeRolloutConfigVersion = configs[0]?.version;
   const releaseCohortStartedAt = web && convex
     ? Math.max(web.deployedAt, convex.deployedAt, configs[0]?.activatedAt ?? 0)
@@ -331,6 +366,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     p95CompletionLatencyRegressionVsGpt54: legacyGpt54P95CompletionLatencyMs > 0
       ? (percentile95(releaseGenerationAttempts.flatMap((attempt) => attempt.totalLatencyMs === undefined ? [] : [attempt.totalLatencyMs])) / legacyGpt54P95CompletionLatencyMs) - 1
       : 0,
+    modelPolicyEvaluation,
     ...releaseDetailedMetrics,
   };
   const rollingHardStopCodes = [
@@ -384,6 +420,11 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ...(releaseMetrics.solTurnRate > 0.05 ? ['sol_usage_above_5_percent'] : []),
     ...(releaseDetailedMetrics.documentActivationFalsePositiveRate > 0.005 ? ['document_activation_false_positive_above_0_5_percent'] : []),
     ...(releaseDetailedMetrics.backgroundTaskResumes > 0 && releaseDetailedMetrics.backgroundTaskResumeSuccessRate < 0.98 ? ['background_task_resume_below_98_percent'] : []),
+    ...(!modelPolicyEvaluation.runId ? ['model_policy_evaluation_missing'] : []),
+    ...(modelPolicyEvaluation.runId && !modelPolicyEvaluation.complete ? ['model_policy_evaluation_incomplete'] : []),
+    ...(modelPolicyEvaluation.failed > 0 || modelPolicyEvaluation.needsReview > 0 ? ['model_policy_evaluation_failed'] : []),
+    ...(modelPolicyEvaluation.frozenTotal > 0 && modelPolicyEvaluation.frozenPassed !== modelPolicyEvaluation.frozenTotal ? ['frozen_incident_model_evaluation_failed'] : []),
+    ...(modelPolicyEvaluation.stale ? ['model_policy_evaluation_stale'] : []),
     ...(releaseSuccessfulAttempts.length > 0 && releaseGpt54CounterfactualMicrousd > 0 && releaseMetrics.successfulCostSavingsVsGpt54 < 0.5 ? ['successful_turn_cost_savings_below_50_percent'] : []),
     ...(legacyGpt54P95CompletionLatencyMs > 0 && releaseGenerationAttempts.some((attempt) => attempt.totalLatencyMs !== undefined) && releaseMetrics.p95CompletionLatencyRegressionVsGpt54 > 0.2 ? ['p95_latency_regression_above_20_percent'] : []),
     ...(canaryStale ? ['semantic_canary_stale'] : []),

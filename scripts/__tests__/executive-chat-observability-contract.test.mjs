@@ -30,5 +30,26 @@ test('release gates cover the prohibited Phase 2 outcomes', () => {
     'background_task_resume_below_98_percent',
     'successful_turn_cost_savings_below_50_percent',
     'p95_latency_regression_above_20_percent',
+    'model_policy_evaluation_missing',
+    'model_policy_evaluation_incomplete',
+    'model_policy_evaluation_failed',
+    'frozen_incident_model_evaluation_failed',
+    'model_policy_evaluation_stale',
   ]) assert.match(operations, new RegExp(code));
+});
+
+test('provider model evaluation is persisted per exact release and never publishes answers', () => {
+  const evaluator = fs.readFileSync('scripts/run-conversation-model-policy-eval.mjs', 'utf8');
+  const persistence = fs.readFileSync('convex/conversationKernelEvaluations.ts', 'utf8');
+  assert.match(evaluator, /CONVERSATION_EVAL_CASES/);
+  assert.match(evaluator, /gpt-5\.6-luna/);
+  assert.match(evaluator, /gpt-5\.6-terra/);
+  assert.match(evaluator, /published: false/);
+  assert.match(evaluator, /latestGoalRate/);
+  assert.match(evaluator, /unauthorizedEvidenceUses/);
+  assert.match(evaluator, /knownFallbacks/);
+  assert.match(evaluator, /clarificationPassRate/);
+  assert.match(evaluator, /criticalSliceRegressions/);
+  assert.match(persistence, /by_run_case/);
+  assert.match(persistence, /by_release_created/);
 });

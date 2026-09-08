@@ -29,7 +29,7 @@ function relevancePatterns(testCase) {
     mediation: /mediat|neutral|agreement|negotiat|resolve|session/i,
     arbitration: /arbitrat|award|hearing|binding|private decision/i,
     photosynthesis: /photosynth|plant|light|sun|glucose|oxygen|carbon dioxide|chloroplast/i,
-    gravity: /gravit|mass|attract|space|time|fall|orbit/i,
+    gravity: /gravit|mass|attract|space|time|fall|orbit|accelerat|force|motion|toward each other/i,
     appeals: /appeal|higher court|lower court|decision|hearing|legal error/i,
     budgeting: /budget|income|expense|spend|saving|money|planned|actual/i,
   };

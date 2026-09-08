@@ -21,9 +21,10 @@ const body = [
   `Cohort start: ${health.releaseCohortStartedAt ? new Date(health.releaseCohortStartedAt).toISOString() : 'unknown'}`,
   `Hard-stop codes: ${health.hardStopCodes.join(', ')}`,
   `Soft-stop codes: ${(health.softStopCodes ?? []).join(', ') || 'none'}`,
+  `Release metrics: ${JSON.stringify(health.releaseMetrics ?? {})}`,
   '',
   'Rollback recommendation: disable the narrowest responsible Phase 2 rollout flag, preserve receipts, and rerun the signed-in release sequence.',
-  'Runbook: https://github.com/monicafernii97-cmd/nexx-app/blob/main/docs/runbooks/conversation-kernel-phase-2.md',
+  'Runbook: https://github.com/monicafernii97-cmd/nexx-app/blob/main/docs/runbooks/executive-chat-rollout.md',
 ].join('\n');
 const headers = {
   Authorization: `Bearer ${token}`,

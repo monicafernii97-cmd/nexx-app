@@ -11,7 +11,7 @@ Production application errors are retained in Convex operational records rather 
 ## Release checks
 
 1. Confirm the web and Convex release manifests identify the same Git SHA and compatible contract versions.
-2. Run deterministic tests, the 225-case conversation corpus, the semantic canary, preview provider tests, and the signed-in browser sequence.
+2. Run deterministic tests, the 226-case conversation corpus, the semantic canary, preview provider tests, and the signed-in browser sequence.
 3. Confirm the current-release health slice has no hard-stop codes. Do not use a legacy rolling-window warning as proof that the new cohort failed.
 4. Confirm actual usage coverage is at least 99%, Sol turn rate is at most 5%, unnecessary tools are at most 2%, and known fallback publications are zero.
 5. Advance with a new immutable rollout configuration. Never edit an active configuration.

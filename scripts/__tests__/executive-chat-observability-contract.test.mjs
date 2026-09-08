@@ -53,3 +53,13 @@ test('provider model evaluation is persisted per exact release and never publish
   assert.match(persistence, /by_run_case/);
   assert.match(persistence, /by_release_created/);
 });
+
+test('weekly staging fault assurance covers conversational and upload recovery', () => {
+  const workflow = fs.readFileSync('.github/workflows/chat-upload-e2e-resilience.yml', 'utf8');
+  const packageJson = fs.readFileSync('package.json', 'utf8');
+  assert.match(workflow, /cron: ["']15 3 \* \* 3["']/);
+  assert.doesNotMatch(workflow, /cron: ["']15 3 1 \* \*["']/);
+  assert.match(workflow, /npm run test:e2e:upload:resilience/);
+  assert.match(workflow, /npm run test:executive-chat:faults/);
+  assert.match(packageJson, /"test:executive-chat:faults"/);
+});

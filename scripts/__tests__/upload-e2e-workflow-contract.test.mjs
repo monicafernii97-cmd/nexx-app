@@ -113,6 +113,6 @@ test("Node and release dependencies are pinned to the production runtime", () =>
   const action = fs.readFileSync(path.resolve(".github/actions/setup-node/action.yml"), "utf8");
   assert.equal(packageJson.engines.node, "24.x");
   assert.equal(packageJson.packageManager, "npm@11.11.0");
-  assert.equal(packageJson.dependencies.convex, "1.36.1");
+  assert.equal(packageJson.dependencies.convex, "1.45.0");
   assert.match(action, /default: '24\.14\.1'/);
 });

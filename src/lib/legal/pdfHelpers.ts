@@ -24,8 +24,8 @@ export function getLegalCSS(): string {
         let loaded = false;
         for (const candidate of candidates) {
             try {
-                if (existsSync(candidate)) {
-                    cachedCSS = readFileSync(candidate, 'utf-8');
+                if (existsSync(/* turbopackIgnore: true */ candidate)) {
+                    cachedCSS = readFileSync(/* turbopackIgnore: true */ candidate, 'utf-8');
                     loaded = true;
                     break;
                 }

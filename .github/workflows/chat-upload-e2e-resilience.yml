@@ -1,8 +1,8 @@
-name: Chat Upload — Staging Resilience Assurance
+name: Executive Chat + Upload — Staging Resilience Assurance
 
 on:
   schedule:
-    - cron: "15 3 1 * *"
+    - cron: "15 3 * * 3"
       timezone: "America/Chicago"
   workflow_dispatch:
 
@@ -48,6 +48,8 @@ jobs:
         run: node scripts/verify-upload-e2e-env.mjs
       - name: Run interruption and resumable recovery suite
         run: npm run test:e2e:upload:resilience
+      - name: Run executive chat fault-injection contracts
+        run: npm run test:executive-chat:faults
       - name: Build owner-facing operations envelope
         if: always()
         env:

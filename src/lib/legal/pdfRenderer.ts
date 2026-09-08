@@ -83,9 +83,10 @@ export async function renderHTMLToPDF(
 
     // Set the HTML content
     await page.setContent(html, {
-      waitUntil: 'networkidle0',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
+    await page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
 
     // Build footer template for page numbering (TRCP requires page numbers)
     const showPageNumbers = rules.pageNumbering;

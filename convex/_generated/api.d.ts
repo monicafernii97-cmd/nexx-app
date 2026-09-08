@@ -27,6 +27,7 @@ import type * as chatUploadResumableAssembly from "../chatUploadResumableAssembl
 import type * as chatUploads from "../chatUploads.js";
 import type * as chatWorker from "../chatWorker.js";
 import type * as conversationControl from "../conversationControl.js";
+import type * as conversationKernelEvaluations from "../conversationKernelEvaluations.js";
 import type * as conversationSummaries from "../conversationSummaries.js";
 import type * as conversations from "../conversations.js";
 import type * as costObservability from "../costObservability.js";
@@ -106,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   chatUploads: typeof chatUploads;
   chatWorker: typeof chatWorker;
   conversationControl: typeof conversationControl;
+  conversationKernelEvaluations: typeof conversationKernelEvaluations;
   conversationSummaries: typeof conversationSummaries;
   conversations: typeof conversations;
   costObservability: typeof costObservability;

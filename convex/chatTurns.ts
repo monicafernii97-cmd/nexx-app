@@ -1427,6 +1427,8 @@ export const acceptChatTurn = mutation({
         const turnId = await ctx.db.insert('chatTurns', {
             conversationId: args.conversationId,
             userId: user._id,
+            dataProvenance: conversation.dataProvenance ?? 'production',
+            qaNamespace: conversation.qaNamespace,
             requestId: args.requestId,
             message: effectiveMessage,
             turnNumber,

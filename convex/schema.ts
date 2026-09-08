@@ -319,6 +319,8 @@ export default defineSchema({
     chatTurns: defineTable({
         conversationId: v.id('conversations'),
         userId: v.id('users'),
+        dataProvenance: v.optional(dataProvenanceValidator),
+        qaNamespace: v.optional(v.string()),
         requestId: v.string(),
         message: v.string(),
         turnNumber: v.number(),

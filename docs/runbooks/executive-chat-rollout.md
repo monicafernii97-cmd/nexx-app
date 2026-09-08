@@ -8,6 +8,23 @@ Every accepted turn persists the rollout configuration version, effective featur
 
 Synthetic robot traffic is an isolated enforcement cohort used for preview and production smoke. Its records are marked QA/synthetic at creation and excluded from ordinary user reads.
 
+## Dashboard interpretation
+
+The release dashboard is receipt-backed. It reports real production and QA/synthetic traffic separately and never uses synthetic turns to satisfy a customer-traffic gate. New turns persist their provenance directly so the distinction does not depend on filenames or client-supplied metadata.
+
+The required conversational metrics have these operational definitions:
+
+- A successful turn has one committed answer or clarification. Degraded, failed, and cancelled turns are not successful.
+- A clarification is resolved when the next completed user turn in the same conversation produces an answer instead of another clarification or failure.
+- Topic-switch and background-resume success require a committed result on a turn whose understanding or task-transition receipt records that operation.
+- Document activation precision is the complement of receipt-detected false activation. Social, topic-switch, unknown-intent, awaiting-upload, and source-less activations are false positives.
+- Tool use, authorization rejection, model escalation, usage, latency, repair, and cost figures come from their corresponding receipts rather than response text.
+- Stream recovery requires a completed continuation or later attempt for a turn with a recorded failed/incomplete attempt.
+- Task idempotency is violated by more than one terminal turn for a conversation/request pair. Publication idempotency is violated by more than one committed publication for a turn or envelope.
+- Successful-turn cost is compared with the counterfactual GPT-5.4 list-price cost for the exact same provider-reported tokens.
+
+Hard-stop the rollout for any published unauthorized evidence, zero-document analysis, false tool/action claim, material side effect without confirmation, QA evidence in a production turn, or task/publication idempotency violation. Soft-stop advancement when document false activation exceeds 0.5%, background resume falls below 98%, successful-turn savings fall below 50% versus GPT-5.4, or p95 completion latency exceeds the observed GPT-5.4 baseline by more than 20%.
+
 ## Configuration lifecycle
 
 1. Propose a new monotonically versioned configuration with an idempotency key, stable salt, release contract, reason, and change ticket.
@@ -37,3 +54,5 @@ Advance one family at a time: foreground/activation, publication, self-correctio
 Use the server-side emergency-disable mutation first when Convex is healthy. If database control is unavailable, set `EXEC_CHAT_EMERGENCY_OFF=1` and redeploy. Narrow variables can force document activation, publication v2, self-correction, or understanding resume off. Emergency variables may disable behavior; they are not a substitute for an approved enablement configuration.
 
 After disabling, stop expansion and new repair/reprocess work, preserve control state and verified durable nodes, capture the affected release/config versions, and follow the incident runbook.
+
+When a hard-stop alert is cleared, rerun signed-in assurance and the release audit, document the clean release/config pair on the issue, then close it explicitly. A green snapshot alone does not close an incident.

@@ -1,5 +1,7 @@
 import { internalMutation, mutation, query, type MutationCtx } from './_generated/server';
 import { v } from 'convex/values';
+import { deriveExecutiveChatMetrics } from './lib/executiveChatMetrics';
+import { estimateProviderCostMicrousd } from '../src/lib/nexx/provider/usageAccounting';
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_ROWS = 2_000;
@@ -41,42 +43,61 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
   ]);
 
   const recentTurns = turns.slice(0, 250);
-  const orchestration = await Promise.all(recentTurns.map(async (turn) => ({
-    turn,
-    understanding: turn.understandingId ? await ctx.db.get(turn.understandingId) : null,
-    plan: turn.executionPlanId ? await ctx.db.get(turn.executionPlanId) : null,
-    assistant: turn.assistantMessageId ? await ctx.db.get(turn.assistantMessageId) : null,
-  })));
-  const retrievalTurnIds = new Set(retrievals.map((row) => row.turnId.toString()));
-  const socialDocumentActivations = orchestration.filter(({ understanding, plan }) =>
+  const orchestration = await Promise.all(recentTurns.map(async (turn) => {
+    const [understanding, plan, assistant, conversation] = await Promise.all([
+      turn.understandingId ? ctx.db.get(turn.understandingId) : null,
+      turn.executionPlanId ? ctx.db.get(turn.executionPlanId) : null,
+      turn.assistantMessageId ? ctx.db.get(turn.assistantMessageId) : null,
+      ctx.db.get(turn.conversationId),
+    ]);
+    const selectedDocuments = await Promise.all((plan?.selectedDocumentIds ?? []).map((id) => ctx.db.get(id)));
+    return { turn, understanding, plan, assistant, conversation, selectedDocuments };
+  }));
+  const isProductionTurn = (turn: typeof turns[number]) =>
+    (turn.dataProvenance ?? 'production') === 'production';
+  const productionOrchestration = orchestration.filter(({ turn }) => isProductionTurn(turn));
+  const syntheticOrchestration = orchestration.filter(({ turn }) => !isProductionTurn(turn));
+  const productionTurnIds = new Set(turns.filter(isProductionTurn).map((turn) => turn._id.toString()));
+  const productionPublications = publications.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionRepairs = repairs.filter((row) => productionTurnIds.has(row.currentTurnId.toString()));
+  const productionInteractionResolutions = interactionResolutions.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionGenerationAttempts = generationAttempts.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionToolReceipts = toolReceipts.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionEscalationReceipts = escalationReceipts.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionRetrievals = retrievals.filter((row) => productionTurnIds.has(row.turnId.toString()));
+  const productionReviewRuns = reviewRuns.filter((run) => (run.dataProvenance ?? 'production') === 'production');
+  const retrievalTurnIds = new Set(productionRetrievals.map((row) => row.turnId.toString()));
+  const socialDocumentActivations = productionOrchestration.filter(({ understanding, plan }) =>
     understanding?.speechAct === 'social' && (plan?.selectedDocumentIds.length ?? 0) > 0
   ).length;
-  const awaitingUploadRetrievals = orchestration.filter(({ turn, understanding }) =>
+  const awaitingUploadRetrievals = productionOrchestration.filter(({ turn, understanding }) =>
     understanding?.requestedOperation === 'await_upload' && retrievalTurnIds.has(turn._id.toString())
   ).length;
-  const terminalTurns = turns.filter((turn) => ['assistant_saved', 'degraded_saved', 'failed_retryable', 'failed_final'].includes(turn.status));
+  const terminalTurns = turns.filter((turn) => isProductionTurn(turn) &&
+    ['assistant_saved', 'clarification_saved', 'degraded_saved', 'failed_retryable', 'failed_final', 'cancelled'].includes(turn.status));
   const unexplainedFallbacks = terminalTurns.filter((turn) => turn.status === 'degraded_saved' || turn.errorCode === 'minimal_fallback').length;
   const publicationWithoutEnvelope = terminalTurns.filter((turn) => turn.status === 'assistant_saved' && !turn.publicationEnvelopeId).length;
-  const exhaustedRepairs = repairs.filter((repair) => repair.status === 'exhausted').length;
-  const loopBudgetViolations = repairs.filter((repair) => repair.attempt > repair.maxAttempts).length;
-  const rejectedPublications = publications.filter((publication) => publication.decision === 'rejected').length;
-  const shadowPublicationBlocks = publications.filter((publication) => (publication.shadowRejectionCodes?.length ?? 0) > 0).length;
-  const falseAvailabilityPublications = publications.filter((publication) =>
+  const exhaustedRepairs = productionRepairs.filter((repair) => repair.status === 'exhausted').length;
+  const loopBudgetViolations = productionRepairs.filter((repair) => repair.attempt > repair.maxAttempts).length;
+  const rejectedPublications = productionPublications.filter((publication) => publication.decision === 'rejected').length;
+  const shadowPublicationBlocks = productionPublications.filter((publication) => (publication.shadowRejectionCodes?.length ?? 0) > 0).length;
+  const falseAvailabilityPublications = productionPublications.filter((publication) =>
     (publication.shadowRejectionCodes ?? []).includes('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE') ||
     publication.rejectionCodes.includes('RESP_SELECTED_DOCUMENT_FALSE_UNAVAILABLE')
   ).length;
-  const acceptedActionNotExecuted = publications.filter((publication) =>
+  const acceptedActionNotExecuted = productionPublications.filter((publication) =>
     (publication.shadowRejectionCodes ?? []).includes('RESP_ACCEPTED_ACTION_NOT_EXECUTED') ||
     publication.rejectionCodes.includes('RESP_ACCEPTED_ACTION_NOT_EXECUTED')
   ).length;
-  const completedReviewRuns = reviewRuns.filter((run) => ['ready', 'partial', 'failed', 'dead_letter'].includes(run.status));
+  const completedReviewRuns = productionReviewRuns.filter((run) => ['ready', 'partial', 'failed', 'dead_letter'].includes(run.status));
   const successfulReviewRuns = completedReviewRuns.filter((run) => run.status === 'ready').length;
-  const resumedReviewRuns = reviewRuns.filter((run) => (run.resumeCount ?? 0) > 0).length;
+  const resumedReviewRuns = productionReviewRuns.filter((run) => (run.resumeCount ?? 0) > 0).length;
   const web = manifests.find((manifest) => manifest.runtime === 'web');
   const convex = manifests.find((manifest) => manifest.runtime === 'convex');
   const releaseGitSha = web && convex && web.gitSha === convex.gitSha ? web.gitSha : undefined;
+  const activeRolloutConfigVersion = configs[0]?.version;
   const releaseCohortStartedAt = web && convex
-    ? Math.max(web.deployedAt, convex.deployedAt)
+    ? Math.max(web.deployedAt, convex.deployedAt, configs[0]?.activatedAt ?? 0)
     : undefined;
   const inCurrentRelease = (row: { createdAt: number; releaseGitSha?: string }) => {
     if (!releaseGitSha || releaseCohortStartedAt === undefined) return false;
@@ -84,7 +105,12 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
       ? row.releaseGitSha === releaseGitSha
       : row.createdAt >= releaseCohortStartedAt;
   };
-  const currentReleaseTurnIds = new Set(turns.filter(inCurrentRelease).map((turn) => turn._id.toString()));
+  const currentReleaseTurnIds = new Set(turns.filter((turn) =>
+    isProductionTurn(turn) &&
+    inCurrentRelease(turn) &&
+    activeRolloutConfigVersion !== undefined &&
+    turn.rolloutConfigVersion === activeRolloutConfigVersion
+  ).map((turn) => turn._id.toString()));
   const releaseTurns = terminalTurns.filter((turn) => currentReleaseTurnIds.has(turn._id.toString()));
   const releasePublications = publications.filter((publication) => currentReleaseTurnIds.has(publication.turnId.toString()));
   const releaseRepairs = repairs.filter((repair) => currentReleaseTurnIds.has(repair.currentTurnId.toString()));
@@ -96,7 +122,11 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
   const releaseRetrievalTurnIds = new Set(retrievals
     .filter((row) => currentReleaseTurnIds.has(row.turnId.toString()))
     .map((row) => row.turnId.toString()));
-  const releaseOrchestration = orchestration.filter(({ turn }) => currentReleaseTurnIds.has(turn._id.toString()));
+  const releaseOrchestration = productionOrchestration.filter(({ turn }) => currentReleaseTurnIds.has(turn._id.toString()));
+  const syntheticTurnIds = new Set(syntheticOrchestration.map(({ turn }) => turn._id.toString()));
+  const syntheticPublications = publications.filter((publication) => syntheticTurnIds.has(publication.turnId.toString()));
+  const syntheticAttempts = generationAttempts.filter((attempt) => syntheticTurnIds.has(attempt.turnId.toString()));
+  const syntheticToolReceipts = toolReceipts.filter((receipt) => syntheticTurnIds.has(receipt.turnId.toString()));
   const releaseUnexplainedFallbacks = releaseTurns.filter((turn) =>
     turn.status === 'degraded_saved' || turn.errorCode === 'minimal_fallback').length;
   const releasePublicationWithoutEnvelope = releaseTurns.filter((turn) =>
@@ -121,6 +151,85 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     .map(({ turn }) => turn._id.toString()));
   const unnecessaryToolCalls = releaseToolReceipts.filter((receipt) => naturalTurnIds.has(receipt.turnId.toString())).length;
   const approvedSolEscalations = releaseEscalationReceipts.filter((receipt) => receipt.decision === 'approved' && receipt.requestedModel === 'gpt-5.6-sol').length;
+  const toMetricContext = ({ turn, understanding, plan, conversation, selectedDocuments }: typeof orchestration[number]) => ({
+    turn: {
+      id: turn._id.toString(),
+      conversationId: turn.conversationId.toString(),
+      requestId: turn.requestId,
+      status: turn.status,
+      outcomeType: turn.outcomeType,
+      taskTransitionsJson: turn.taskTransitionsJson,
+      createdAt: turn.createdAt,
+    },
+    speechAct: understanding?.speechAct,
+    requestedOperation: understanding?.requestedOperation,
+    documentActivationJson: plan?.documentActivationJson,
+    selectedDocumentIds: (plan?.selectedDocumentIds ?? []).map(String),
+    conversationProvenance: turn.dataProvenance ?? conversation?.dataProvenance ?? 'production' as const,
+    selectedDocumentProvenances: selectedDocuments
+      .filter((document) => document !== null)
+      .map((document) => document.dataProvenance ?? 'production'),
+  });
+  const toMetricPublication = (publication: typeof publications[number]) => ({
+    turnId: publication.turnId.toString(),
+    envelopeId: publication.envelopeId,
+    decision: publication.decision,
+    rejectionCodes: publication.rejectionCodes,
+    shadowRejectionCodes: publication.shadowRejectionCodes,
+  });
+  const toMetricAttempt = (attempt: typeof generationAttempts[number]) => ({
+    turnId: attempt.turnId.toString(),
+    attemptNumber: attempt.attemptNumber,
+    strategy: attempt.strategy,
+    status: attempt.status,
+    incompleteReason: attempt.incompleteReason,
+    estimatedCostMicrousd: attempt.estimatedCostMicrousd,
+  });
+  const toMetricToolReceipt = (receipt: typeof toolReceipts[number]) => ({
+    turnId: receipt.turnId.toString(),
+    status: receipt.status,
+    failureCode: receipt.failureCode,
+    sideEffect: receipt.sideEffect,
+    confirmationId: receipt.confirmationId,
+  });
+  const detailedMetrics = deriveExecutiveChatMetrics({
+    contexts: productionOrchestration.map(toMetricContext),
+    publications: productionPublications.map(toMetricPublication),
+    attempts: productionGenerationAttempts.map(toMetricAttempt),
+    toolReceipts: productionToolReceipts.map(toMetricToolReceipt),
+  });
+  const releaseDetailedMetrics = deriveExecutiveChatMetrics({
+    contexts: releaseOrchestration.map(toMetricContext),
+    publications: releasePublications.map(toMetricPublication),
+    attempts: releaseGenerationAttempts.map(toMetricAttempt),
+    toolReceipts: releaseToolReceipts.map(toMetricToolReceipt),
+  });
+  const syntheticDetailedMetrics = deriveExecutiveChatMetrics({
+    contexts: syntheticOrchestration.map(toMetricContext),
+    publications: syntheticPublications.map(toMetricPublication),
+    attempts: syntheticAttempts.map(toMetricAttempt),
+    toolReceipts: syntheticToolReceipts.map(toMetricToolReceipt),
+  });
+  const releaseSuccessfulTurnIds = new Set(releaseTurns
+    .filter((turn) => turn.status === 'assistant_saved' || turn.status === 'clarification_saved')
+    .map((turn) => turn._id.toString()));
+  const releaseSuccessfulAttempts = releaseGenerationAttempts.filter((attempt) =>
+    attempt.status === 'completed' && releaseSuccessfulTurnIds.has(attempt.turnId.toString()));
+  const releaseGpt54CounterfactualMicrousd = releaseSuccessfulAttempts.reduce((sum, attempt) => {
+    if (attempt.inputTokens === undefined || attempt.outputTokens === undefined) return sum;
+    return sum + (estimateProviderCostMicrousd('gpt-5.4', {
+      inputTokens: attempt.inputTokens,
+      cachedInputTokens: attempt.cachedInputTokens ?? 0,
+      outputTokens: attempt.outputTokens,
+      reasoningTokens: attempt.reasoningTokens ?? 0,
+      totalTokens: attempt.totalTokens ?? attempt.inputTokens + attempt.outputTokens + (attempt.reasoningTokens ?? 0),
+    }) ?? 0);
+  }, 0);
+  const releaseSuccessfulCostMicrousd = releaseSuccessfulAttempts.reduce((sum, attempt) =>
+    sum + (attempt.estimatedCostMicrousd ?? 0), 0);
+  const legacyGpt54Attempts = productionGenerationAttempts.filter((attempt) => attempt.model === 'gpt-5.4');
+  const legacyGpt54P95CompletionLatencyMs = percentile95(legacyGpt54Attempts.flatMap((attempt) =>
+    attempt.totalLatencyMs === undefined ? [] : [attempt.totalLatencyMs]));
   const releaseMismatch = !web || !convex || web.gitSha !== convex.gitSha ||
     web.schemaVersion !== convex.schemaVersion || web.controlVersion !== convex.controlVersion ||
     web.capabilityVersion !== convex.capabilityVersion || web.validatorVersion !== convex.validatorVersion ||
@@ -133,28 +242,28 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     traceCompleteTurns: terminalTurns.filter((turn) => turn.taskId && turn.understandingId && turn.executionPlanId).length,
     unexplainedFallbacks,
     unexplainedFallbackRate: rate(unexplainedFallbacks, terminalTurns.length),
-    publications: publications.length,
+    publications: productionPublications.length,
     rejectedPublications,
-    publicationRejectionRate: rate(rejectedPublications, publications.length),
+    publicationRejectionRate: rate(rejectedPublications, productionPublications.length),
     shadowPublicationBlocks,
-    shadowPublicationBlockRate: rate(shadowPublicationBlocks, publications.filter((publication) => publication.rolloutMode === 'shadow').length),
+    shadowPublicationBlockRate: rate(shadowPublicationBlocks, productionPublications.filter((publication) => publication.rolloutMode === 'shadow').length),
     publicationWithoutEnvelope,
-    interactionResolutions: interactionResolutions.length,
-    executedInteractionResolutions: interactionResolutions.filter((resolution) => resolution.decision === 'execute').length,
-    clarifiedInteractionResolutions: interactionResolutions.filter((resolution) => resolution.decision === 'clarify').length,
-    recommendationAcceptances: interactionResolutions.filter((resolution) => resolution.intent === 'accept_recommendation').length,
-    semanticClassifierExecutions: interactionResolutions.filter((resolution) =>
+    interactionResolutions: productionInteractionResolutions.length,
+    executedInteractionResolutions: productionInteractionResolutions.filter((resolution) => resolution.decision === 'execute').length,
+    clarifiedInteractionResolutions: productionInteractionResolutions.filter((resolution) => resolution.decision === 'clarify').length,
+    recommendationAcceptances: productionInteractionResolutions.filter((resolution) => resolution.intent === 'accept_recommendation').length,
+    semanticClassifierExecutions: productionInteractionResolutions.filter((resolution) =>
       resolution.classifierVersion === 'semantic-interaction-model-v1' && resolution.decision === 'execute'
     ).length,
-    semanticClassifierFallbacks: interactionResolutions.filter((resolution) =>
+    semanticClassifierFallbacks: productionInteractionResolutions.filter((resolution) =>
       resolution.classifierVersion === 'semantic-interaction-model-v1' && resolution.decision !== 'execute'
     ).length,
     falseAvailabilityPublications,
     acceptedActionNotExecuted,
-    repairs: repairs.length,
-    successfulRepairs: repairs.filter((repair) => repair.status === 'succeeded').length,
+    repairs: productionRepairs.length,
+    successfulRepairs: productionRepairs.filter((repair) => repair.status === 'succeeded').length,
     exhaustedRepairs,
-    repairExhaustionRate: rate(exhaustedRepairs, repairs.length),
+    repairExhaustionRate: rate(exhaustedRepairs, productionRepairs.length),
     loopBudgetViolations,
     socialDocumentActivations,
     awaitingUploadRetrievals,
@@ -164,14 +273,15 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     resumedReviewRuns,
     canaryStatus: canaries[0]?.status ?? 'missing',
     canaryStale,
-    generationAttempts: generationAttempts.length,
-    attemptsWithActualUsage: generationAttempts.filter((attempt) => attempt.totalTokens !== undefined).length,
-    inputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
-    cachedInputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.cachedInputTokens ?? 0), 0),
-    outputTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
-    reasoningTokens: generationAttempts.reduce((sum, attempt) => sum + (attempt.reasoningTokens ?? 0), 0),
-    estimatedCostUsd: Number((generationAttempts.reduce((sum, attempt) =>
+    generationAttempts: productionGenerationAttempts.length,
+    attemptsWithActualUsage: productionGenerationAttempts.filter((attempt) => attempt.totalTokens !== undefined).length,
+    inputTokens: productionGenerationAttempts.reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
+    cachedInputTokens: productionGenerationAttempts.reduce((sum, attempt) => sum + (attempt.cachedInputTokens ?? 0), 0),
+    outputTokens: productionGenerationAttempts.reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
+    reasoningTokens: productionGenerationAttempts.reduce((sum, attempt) => sum + (attempt.reasoningTokens ?? 0), 0),
+    estimatedCostUsd: Number((productionGenerationAttempts.reduce((sum, attempt) =>
       sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
+    ...detailedMetrics,
   };
   const releaseMetrics = {
     eligibleTurns: releaseTurns.length,
@@ -213,12 +323,28 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     reasoningTokens: releaseGenerationAttempts.reduce((sum, attempt) => sum + (attempt.reasoningTokens ?? 0), 0),
     estimatedCostUsd: Number((releaseGenerationAttempts.reduce((sum, attempt) =>
       sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
+    gpt54CounterfactualSuccessfulCostUsd: Number((releaseGpt54CounterfactualMicrousd / 1_000_000).toFixed(6)),
+    successfulCostSavingsVsGpt54: releaseGpt54CounterfactualMicrousd > 0
+      ? 1 - (releaseSuccessfulCostMicrousd / releaseGpt54CounterfactualMicrousd)
+      : 0,
+    legacyGpt54P95CompletionLatencyMs,
+    p95CompletionLatencyRegressionVsGpt54: legacyGpt54P95CompletionLatencyMs > 0
+      ? (percentile95(releaseGenerationAttempts.flatMap((attempt) => attempt.totalLatencyMs === undefined ? [] : [attempt.totalLatencyMs])) / legacyGpt54P95CompletionLatencyMs) - 1
+      : 0,
+    ...releaseDetailedMetrics,
   };
   const rollingHardStopCodes = [
     ...(publicationWithoutEnvelope > 0 ? ['publication_without_envelope'] : []),
     ...(loopBudgetViolations > 0 ? ['self_correction_loop_budget_exceeded'] : []),
     ...(consecutiveCanaryFailures ? ['consecutive_semantic_canary_failures'] : []),
     ...(falseAvailabilityPublications > 0 ? ['false_document_unavailable_published'] : []),
+    ...(detailedMetrics.qaProductionIsolationViolations > 0 ? ['qa_production_isolation_violation'] : []),
+    ...(detailedMetrics.taskIdempotencyViolations > 0 ? ['task_idempotency_violation'] : []),
+    ...(detailedMetrics.publicationIdempotencyViolations > 0 ? ['publication_idempotency_violation'] : []),
+    ...(detailedMetrics.unauthorizedEvidencePublications > 0 ? ['unauthorized_evidence_published'] : []),
+    ...(detailedMetrics.zeroDocumentAnalysisPublications > 0 ? ['zero_document_analysis_published'] : []),
+    ...(detailedMetrics.falseToolOrActionClaimPublications > 0 ? ['false_tool_or_action_claim_published'] : []),
+    ...(detailedMetrics.materialSideEffectsWithoutConfirmation > 0 ? ['material_side_effect_without_confirmation'] : []),
   ];
   const rollingSoftStopCodes = [
     ...(metrics.unexplainedFallbackRate > 0.01 ? ['fallback_rate_above_1_percent'] : []),
@@ -227,6 +353,8 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ...(socialDocumentActivations > 0 ? ['document_activation_on_social_turn'] : []),
     ...(awaitingUploadRetrievals > 0 ? ['retrieval_while_awaiting_upload'] : []),
     ...(completedReviewRuns.length > 0 && metrics.durableReviewCompletionRate < 0.99 ? ['durable_review_completion_below_99_percent'] : []),
+    ...(detailedMetrics.documentActivationFalsePositiveRate > 0.005 ? ['document_activation_false_positive_above_0_5_percent'] : []),
+    ...(detailedMetrics.backgroundTaskResumes > 0 && detailedMetrics.backgroundTaskResumeSuccessRate < 0.98 ? ['background_task_resume_below_98_percent'] : []),
     ...(canaryStale ? ['semantic_canary_stale'] : []),
   ];
   const hardStopCodes = [
@@ -236,6 +364,13 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ...(consecutiveCanaryFailures ? ['consecutive_semantic_canary_failures'] : []),
     ...(releaseFalseAvailabilityPublications > 0 ? ['false_document_unavailable_published'] : []),
     ...(releaseKnownFallbacks > 0 ? ['known_canned_fallback_published'] : []),
+    ...(releaseDetailedMetrics.qaProductionIsolationViolations > 0 ? ['qa_production_isolation_violation'] : []),
+    ...(releaseDetailedMetrics.taskIdempotencyViolations > 0 ? ['task_idempotency_violation'] : []),
+    ...(releaseDetailedMetrics.publicationIdempotencyViolations > 0 ? ['publication_idempotency_violation'] : []),
+    ...(releaseDetailedMetrics.unauthorizedEvidencePublications > 0 ? ['unauthorized_evidence_published'] : []),
+    ...(releaseDetailedMetrics.zeroDocumentAnalysisPublications > 0 ? ['zero_document_analysis_published'] : []),
+    ...(releaseDetailedMetrics.falseToolOrActionClaimPublications > 0 ? ['false_tool_or_action_claim_published'] : []),
+    ...(releaseDetailedMetrics.materialSideEffectsWithoutConfirmation > 0 ? ['material_side_effect_without_confirmation'] : []),
   ];
   const softStopCodes = [
     ...(releaseMetrics.unexplainedFallbackRate > 0.01 ? ['fallback_rate_above_1_percent'] : []),
@@ -247,23 +382,27 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     ...(releaseGenerationAttempts.length > 0 && releaseMetrics.actualUsageCoverage < 0.99 ? ['actual_usage_coverage_below_99_percent'] : []),
     ...(releaseMetrics.unnecessaryToolUseRate > 0.02 ? ['unnecessary_tool_use_above_2_percent'] : []),
     ...(releaseMetrics.solTurnRate > 0.05 ? ['sol_usage_above_5_percent'] : []),
+    ...(releaseDetailedMetrics.documentActivationFalsePositiveRate > 0.005 ? ['document_activation_false_positive_above_0_5_percent'] : []),
+    ...(releaseDetailedMetrics.backgroundTaskResumes > 0 && releaseDetailedMetrics.backgroundTaskResumeSuccessRate < 0.98 ? ['background_task_resume_below_98_percent'] : []),
+    ...(releaseSuccessfulAttempts.length > 0 && releaseGpt54CounterfactualMicrousd > 0 && releaseMetrics.successfulCostSavingsVsGpt54 < 0.5 ? ['successful_turn_cost_savings_below_50_percent'] : []),
+    ...(legacyGpt54P95CompletionLatencyMs > 0 && releaseGenerationAttempts.some((attempt) => attempt.totalLatencyMs !== undefined) && releaseMetrics.p95CompletionLatencyRegressionVsGpt54 > 0.2 ? ['p95_latency_regression_above_20_percent'] : []),
     ...(canaryStale ? ['semantic_canary_stale'] : []),
   ];
-  const speechActs = Object.fromEntries(Array.from(new Set(orchestration.map(({ understanding }) => understanding?.speechAct ?? 'missing'))).map((speechAct) => [
+  const speechActs = Object.fromEntries(Array.from(new Set(productionOrchestration.map(({ understanding }) => understanding?.speechAct ?? 'missing'))).map((speechAct) => [
     speechAct,
-    orchestration.filter(({ understanding }) => (understanding?.speechAct ?? 'missing') === speechAct).length,
+    productionOrchestration.filter(({ understanding }) => (understanding?.speechAct ?? 'missing') === speechAct).length,
   ]));
-  const rolloutVersions = Object.fromEntries(Array.from(new Set(turns.map((turn) => String(turn.rolloutConfigVersion ?? 0)))).map((version) => [
+  const rolloutVersions = Object.fromEntries(Array.from(new Set(terminalTurns.map((turn) => String(turn.rolloutConfigVersion ?? 0)))).map((version) => [
     version,
-    turns.filter((turn) => String(turn.rolloutConfigVersion ?? 0) === version).length,
+    terminalTurns.filter((turn) => String(turn.rolloutConfigVersion ?? 0) === version).length,
   ]));
-  const models = Object.fromEntries(Array.from(new Set(generationAttempts.map((attempt) => attempt.model))).map((model) => [
+  const models = Object.fromEntries(Array.from(new Set(productionGenerationAttempts.map((attempt) => attempt.model))).map((model) => [
     model,
     {
-      attempts: generationAttempts.filter((attempt) => attempt.model === model).length,
-      inputTokens: generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
-      outputTokens: generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
-      estimatedCostUsd: Number((generationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) =>
+      attempts: productionGenerationAttempts.filter((attempt) => attempt.model === model).length,
+      inputTokens: productionGenerationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.inputTokens ?? 0), 0),
+      outputTokens: productionGenerationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) => sum + (attempt.outputTokens ?? 0), 0),
+      estimatedCostUsd: Number((productionGenerationAttempts.filter((attempt) => attempt.model === model).reduce((sum, attempt) =>
         sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
     },
   ]));
@@ -277,6 +416,14 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
         sum + (attempt.estimatedCostMicrousd ?? 0), 0) / 1_000_000).toFixed(6)),
     },
   ]));
+  const escalationReasons = Object.fromEntries(Array.from(new Set(productionEscalationReceipts.map((receipt) => receipt.reasonCode))).map((reasonCode) => [
+    reasonCode,
+    productionEscalationReceipts.filter((receipt) => receipt.reasonCode === reasonCode).length,
+  ]));
+  const releaseEscalationReasons = Object.fromEntries(Array.from(new Set(releaseEscalationReceipts.map((receipt) => receipt.reasonCode))).map((reasonCode) => [
+    reasonCode,
+    releaseEscalationReceipts.filter((receipt) => receipt.reasonCode === reasonCode).length,
+  ]));
   return {
     environment,
     windowStartedAt: since,
@@ -286,7 +433,19 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
     rolloutConfigVersion: configs[0]?.version,
     metrics,
     releaseMetrics,
-    segments: { speechActs, rolloutVersions, models, releaseModels },
+    segments: {
+      speechActs,
+      rolloutVersions,
+      models,
+      releaseModels,
+      escalationReasons,
+      releaseEscalationReasons,
+      provenance: {
+        realProductionTurns: detailedMetrics.realProductionTurns,
+        syntheticQaTurns: syntheticDetailedMetrics.syntheticQaTurns,
+        syntheticQaMetrics: syntheticDetailedMetrics,
+      },
+    },
     hardStopCodes,
     softStopCodes,
     rollingHardStopCodes,

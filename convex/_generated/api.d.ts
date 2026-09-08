@@ -62,6 +62,7 @@ import type * as lib_chatUploadConfig from "../lib/chatUploadConfig.js";
 import type * as lib_chatUploadFallbackPolicy from "../lib/chatUploadFallbackPolicy.js";
 import type * as lib_chatUploadReadiness from "../lib/chatUploadReadiness.js";
 import type * as lib_documentTelemetry from "../lib/documentTelemetry.js";
+import type * as lib_executiveChatMetrics from "../lib/executiveChatMetrics.js";
 import type * as lib_exportConfig from "../lib/exportConfig.js";
 import type * as lib_qaProvenance from "../lib/qaProvenance.js";
 import type * as lib_routeModeValidator from "../lib/routeModeValidator.js";
@@ -140,6 +141,7 @@ declare const fullApi: ApiFromModules<{
   "lib/chatUploadFallbackPolicy": typeof lib_chatUploadFallbackPolicy;
   "lib/chatUploadReadiness": typeof lib_chatUploadReadiness;
   "lib/documentTelemetry": typeof lib_documentTelemetry;
+  "lib/executiveChatMetrics": typeof lib_executiveChatMetrics;
   "lib/exportConfig": typeof lib_exportConfig;
   "lib/qaProvenance": typeof lib_qaProvenance;
   "lib/routeModeValidator": typeof lib_routeModeValidator;

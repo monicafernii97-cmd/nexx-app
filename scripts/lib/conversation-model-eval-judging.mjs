@@ -27,7 +27,7 @@ function relevancePatterns(testCase) {
   const priorTopic = testCase.recentMessages.find((message) => message.role === 'user')?.content.match(/what is ([a-z]+)/i)?.[1]?.toLowerCase();
   const topicPatterns = {
     mediation: /mediat|neutral|agreement|negotiat|resolve|session/i,
-    arbitration: /arbitrat|award|hearing|binding|private decision/i,
+    arbitration: /arbitrat|award|hearing|binding|private decision|choose a neutral|neutral (?:expert|decision[- ]maker)|limit(?:s|ed|ing)? appeals?|proceedings?/i,
     photosynthesis: /photosynth|plant|light|sun|glucose|oxygen|carbon dioxide|chloroplast/i,
     gravity: /gravit|mass|attract|space|time|fall|orbit|accelerat|force|motion|toward each other/i,
     appeals: /appeal|higher court|lower court|decision|hearing|legal error/i,

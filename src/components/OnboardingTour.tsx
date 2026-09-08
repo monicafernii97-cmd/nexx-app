@@ -307,7 +307,6 @@ export default function OnboardingTour({ user }: OnboardingTourProps) {
             const { driver } = await import('driver.js');
             if (!mountedRef.current) return;
 
-            // @ts-expect-error -- CSS module has no type declarations for dynamic import
             await import('driver.js/dist/driver.css');
             if (!mountedRef.current) return;
 

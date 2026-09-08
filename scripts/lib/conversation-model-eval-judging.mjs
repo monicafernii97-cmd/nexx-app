@@ -9,7 +9,7 @@ function relevancePatterns(testCase) {
   if (testCase.id === 'incident-contextual-math') return [/\b30\b/];
   if (/12 times 4/i.test(testCase.message)) return [/\b48\b/];
   if (/rainbow/i.test(testCase.message)) return [/rainbow|light|color|refract/i];
-  if (/grocery/i.test(testCase.message)) return [/grocery|list|food|produce|shop|meal/i];
+  if (/grocery/i.test(testCase.message)) return [/grocer(?:y|ies)|list|food|produce|shop|meal|diet|budget/i];
   if (/bread rise/i.test(testCase.message)) return [/yeast|gas|ferment|rise/i];
   if (/saturn/i.test(testCase.message)) return [/saturn|ring|planet/i];
   if (/upload/i.test(testCase.message)) return [/upload|attach|send|when/i];

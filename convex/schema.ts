@@ -1,4 +1,5 @@
 import { defineSchema, defineTable } from 'convex/server';
+import { exhibitTables } from './lib/exhibitTables';
 import { v } from 'convex/values';
 import { routeModeValidator } from './lib/routeModeValidator';
 
@@ -112,6 +113,7 @@ const documentAnalysisModeValidator = v.union(
 );
 
 export default defineSchema({
+    ...exhibitTables,
     // ═══ Users ═══
     users: defineTable({
         clerkId: v.optional(v.string()),

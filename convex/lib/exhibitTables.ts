@@ -1,0 +1,108 @@
+import { defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export const exhibitTables = {
+  exhibitTextAnchors: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    sourceId: v.id("exhibitSources"),
+    generationId: v.id("documentMemoryGenerations"),
+    pageId: v.id("documentPages"),
+    page: v.number(),
+    start: v.number(),
+    end: v.number(),
+    text: v.string(),
+    method: v.string(),
+    createdAt: v.number(),
+  }).index("by_case", ["caseId"]),
+  exhibitClassifications: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    name: v.string(),
+    code: v.string(),
+    definition: v.string(),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_case", ["caseId"]),
+  exhibitMessages: defineTable({
+    userId: v.id("users"),
+    collectionId: v.id("exhibitCollections"),
+    exhibitId: v.optional(v.string()),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    proposalJson: v.optional(v.string()),
+    operationId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_collection", ["collectionId"])
+    .index("by_user_time", ["userId", "createdAt"]),
+  exhibitSources: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    title: v.string(),
+    kind: v.union(v.literal("file"), v.literal("timeline"), v.literal("note")),
+    originId: v.string(),
+    storageId: v.optional(v.id("_storage")),
+    sha256: v.optional(v.string()),
+    mimeType: v.string(),
+    snapshot: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_case", ["caseId"])
+    .index("by_user_origin", ["userId", "originId"]),
+  exhibitCollections: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    title: v.string(),
+    itemsJson: v.string(),
+    settingsJson: v.string(),
+    revision: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_case", ["caseId"]),
+  exhibitOperations: defineTable({
+    userId: v.id("users"),
+    operationId: v.string(),
+    collectionId: v.id("exhibitCollections"),
+    beforeJson: v.optional(v.string()),
+    resultRevision: v.number(),
+    createdAt: v.number(),
+  }).index("by_user_operation", ["userId", "operationId"]),
+  exhibitCandidates: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    collectionId: v.id("exhibitCollections"),
+    revision: v.number(),
+    title: v.string(),
+    itemsJson: v.string(),
+    settingsJson: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("generating"),
+      v.literal("ready"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+      v.literal("finalized"),
+    ),
+    operationId: v.string(),
+    attempts: v.number(),
+    leaseUntil: v.optional(v.number()),
+    stage: v.optional(v.string()),
+    error: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+    sha256: v.optional(v.string()),
+    manifestHash: v.optional(v.string()),
+    manifestJson: v.optional(v.string()),
+    indexStorageId: v.optional(v.id("_storage")),
+    indexSha256: v.optional(v.string()),
+    reportJson: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    finalizedAt: v.optional(v.number()),
+    redactionsReviewed: v.optional(v.boolean()),
+  })
+    .index("by_collection", ["collectionId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_operation", ["userId", "operationId"]),
+};

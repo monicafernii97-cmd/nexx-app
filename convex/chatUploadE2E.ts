@@ -7,6 +7,7 @@ import {
   query,
 } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import { cleanupExhibitTestRun } from "./lib/exhibitTestCleanup";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import type { Id, TableNames } from "./_generated/dataModel";
@@ -308,6 +309,7 @@ export const deleteRunData = internalMutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
     if (!run) return { run: 0 };
+    await cleanupExhibitTestRun(ctx, run.clerkUserId, run.runId, run.filenamePrefix);
     const sessions = (
       await ctx.db
         .query("chatUploadSessions")

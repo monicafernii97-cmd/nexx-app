@@ -48,6 +48,10 @@ jobs:
         run: npm run test:e2e:upload:release
       - name: Run executive chat continuity journey
         run: npm run test:e2e:executive-chat:release
+      - name: Run exhibit packet release journey
+        env:
+          E2E_EXHIBIT_RELEASE: "true"
+        run: npx playwright test --config playwright.exhibits.config.ts release.spec.ts
       - name: Register exact release pair and record passing smoke suite
         run: node scripts/publish-executive-chat-release.mjs pair
       - name: Enforce executive chat hard-stop dashboard

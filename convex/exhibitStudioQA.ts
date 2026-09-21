@@ -2,6 +2,7 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { cleanupCandidateExtensions } from "./lib/exhibitExtensionCleanup";
 function guard(runId: string) {
   if (
     process.env.EXHIBIT_STUDIO_QA_ENABLED !== "true" ||
@@ -11,6 +12,50 @@ function guard(runId: string) {
   if (!/^exhibit-qa-[a-z0-9-]{8,80}$/.test(runId))
     throw new Error("Invalid synthetic run ID.");
 }
+export const deliveryFault = internalMutation({
+  args: {
+    runId: v.string(),
+    candidateId: v.id("exhibitCandidates"),
+    mode: v.union(v.literal("cancel"), v.literal("expired")),
+  },
+  handler: async (ctx, { runId, candidateId, mode }) => {
+    guard(runId);
+    const p = await ctx.db.get(candidateId),
+      u = p ? await ctx.db.get(p.userId) : null;
+    if (
+      !p ||
+      p.status !== "finalized" ||
+      u?.clerkId !== runId ||
+      u.name !== "Synthetic Exhibit QA"
+    )
+      throw new Error("Synthetic finalized packet required.");
+    const id = await ctx.db.insert("exhibitDeliveries", {
+      userId: p.userId,
+      caseId: p.caseId,
+      candidateId,
+      operationId: `${runId}-delivery-${mode}`,
+      settingsJson: JSON.stringify({
+        individual: false,
+        volumes: false,
+        maxPages: 100,
+        allowSplit: false,
+      }),
+      parentSha256: p.sha256!,
+      status: mode === "expired" ? "running" : "queued",
+      attempts: mode === "expired" ? 1 : 0,
+      leaseUntil: mode === "expired" ? Date.now() - 1 : undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    if (mode === "expired")
+      await ctx.scheduler.runAfter(0, internal.exhibitDelivery.expire, { id });
+    else
+      await ctx.scheduler.runAfter(15000, internal.exhibitDeliveryWorker.run, {
+        id,
+      });
+    return id;
+  },
+});
 export const seed = internalMutation({
   args: { runId: v.string(), storageId: v.id("_storage"), sha256: v.string() },
   handler: async (ctx, args) => {
@@ -221,6 +266,7 @@ export const cleanup = internalMutation({
             await ctx.storage.delete(candidate.storageId);
           if (candidate.indexStorageId)
             await ctx.storage.delete(candidate.indexStorageId);
+          await cleanupCandidateExtensions(ctx, candidate._id);
           await ctx.db.delete(candidate._id);
         }
         for (const message of await ctx.db
@@ -258,6 +304,11 @@ export const cleanup = internalMutation({
         if (file.storageId) await ctx.storage.delete(file.storageId);
         await ctx.db.delete(file._id);
       }
+      for (const series of await ctx.db
+        .query("exhibitBatesSeries")
+        .withIndex("by_case", (q) => q.eq("caseId", c._id))
+        .collect())
+        await ctx.db.delete(series._id);
       await ctx.db.delete(c._id);
     }
     for (const op of await ctx.db
@@ -335,6 +386,7 @@ export const cleanupBrowserRun = internalMutation({
             throw new Error("Wait for synthetic packet generation to finish.");
           if (row.storageId) await ctx.storage.delete(row.storageId);
           if (row.indexStorageId) await ctx.storage.delete(row.indexStorageId);
+          await cleanupCandidateExtensions(ctx, row._id);
           await ctx.db.delete(row._id);
         }
         for (const msg of await ctx.db

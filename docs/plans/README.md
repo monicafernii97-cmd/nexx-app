@@ -3,6 +3,12 @@
 > Plans from April 9–13 and July 16, 2026, organized chronologically.
 > Open any file below to read the full plan, then check off what's done.
 
+## Exhibit Studio
+
+- [Core packet specification](./19_exhibit_studio_and_packet_builder_spec.md)
+- [Core release verification](./20_exhibit_studio_release_verification.md)
+- [Remaining-feature implementation contract](./21_exhibit_studio_extensions_spec.md): delivery formats, shared Bates, voice and remaining refinements.
+
 ## Current response-integrity work
 
 Plans 14–18 form one release history. Earlier plans remain as incident evidence; Plan 18 is the current architecture and acceptance contract.

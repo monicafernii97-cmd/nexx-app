@@ -9,6 +9,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { getAuthenticatedUser, validateCaseOwnership } from "./lib/auth";
+import { settleBates } from "./lib/exhibitBates";
 import {
   DEFAULT_PACKET_SETTINGS,
   parseItems,
@@ -194,6 +195,7 @@ export const recordAssistantResponse = internalMutation({
     requestId: v.id("exhibitMessages"),
     content: v.string(),
     proposalJson: v.optional(v.string()),
+    proposalRevision: v.optional(v.number()),
     operationId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -206,9 +208,84 @@ export const recordAssistantResponse = internalMutation({
       role: "assistant",
       content: args.content.slice(0, 12000),
       proposalJson: args.proposalJson,
+      proposalRevision: args.proposalRevision,
+      proposalDecision: args.proposalJson ? "pending" : undefined,
       operationId: args.operationId,
       createdAt: Date.now(),
     });
+  },
+});
+export const decideProposal = mutation({
+  args: {
+    messageId: v.id("exhibitMessages"),
+    decision: v.union(v.literal("accepted"), v.literal("rejected")),
+  },
+  handler: async (ctx, { messageId, decision }) => {
+    enabled();
+    const m = await ctx.db.get(messageId);
+    if (!m || !m.proposalJson || m.role !== "assistant")
+      throw new Error("Proposal unavailable.");
+    const c = await collection(ctx, m.collectionId);
+    if (m.proposalDecision === decision) return;
+    if (m.proposalDecision && m.proposalDecision !== "pending")
+      throw new Error("Proposal already decided.");
+    if (decision === "rejected") {
+      await ctx.db.patch(messageId, { proposalDecision: decision });
+      return;
+    }
+    if (m.proposalRevision === undefined || m.proposalRevision !== c.revision)
+      throw new Error(
+        "This proposal is stale. Ask for a new suggestion so newer edits are preserved.",
+      );
+    const items = parseItems(JSON.parse(c.itemsJson)),
+      target = items.find((i) => i.id === m.exhibitId);
+    if (!target) throw new Error("Exhibit unavailable.");
+    const patch = JSON.parse(m.proposalJson) as {
+      title?: string;
+      summary?: string;
+      classification?: string;
+    };
+    if (target.summaryLocked && patch.summary !== undefined)
+      throw new Error(
+        "Unlock the reviewed summary before requesting a replacement.",
+      );
+    const updated = parseItems(
+      items.map((i) =>
+        i.id === target.id
+          ? {
+              ...i,
+              ...(patch.title !== undefined ? { title: patch.title } : {}),
+              ...(patch.summary !== undefined
+                ? { summary: patch.summary }
+                : {}),
+              ...(patch.classification !== undefined
+                ? { classification: patch.classification }
+                : {}),
+            }
+          : i,
+      ),
+    );
+    await checkSources(ctx, c.caseId, c.userId, updated);
+    const operationId = `proposal:${messageId}`,
+      revision = c.revision + 1;
+    await ctx.db.insert("exhibitOperations", {
+      userId: c.userId,
+      collectionId: c._id,
+      operationId,
+      resultRevision: revision,
+      beforeJson: JSON.stringify({
+        title: c.title,
+        itemsJson: c.itemsJson,
+        settingsJson: c.settingsJson,
+      }),
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(c._id, {
+      itemsJson: JSON.stringify(updated),
+      revision,
+      updatedAt: Date.now(),
+    });
+    await ctx.db.patch(messageId, { proposalDecision: decision, operationId });
   },
 });
 export const overview = query({
@@ -769,6 +846,7 @@ export const cancel = mutation({
     if (!["queued", "generating"].includes(r.status))
       throw new Error("Packet is no longer running.");
     await ctx.db.patch(id, { status: "cancelled", updatedAt: Date.now() });
+    await settleBates(ctx, id, "void");
   },
 });
 export const finalize = mutation({
@@ -814,6 +892,7 @@ export const finalize = mutation({
       finalizedAt: Date.now(),
       updatedAt: Date.now(),
     });
+    await settleBates(ctx, id, "committed");
     return id;
   },
 });
@@ -966,6 +1045,7 @@ export const fail = internalMutation({
     const r = await ctx.db.get(id);
     if (!r || r.status !== "generating" || r.attempts !== attempt) return;
     const retry = retryable && r.attempts < 3;
+    if (!retry) await settleBates(ctx, id, "void");
     await ctx.db.patch(id, {
       status: retry ? "queued" : "failed",
       stage: retry ? "Retry scheduled" : "Failed",
@@ -996,6 +1076,7 @@ export const expire = internalMutation({
       return;
     }
     const retry = r.attempts < 3;
+    if (!retry) await settleBates(ctx, id, "void");
     await ctx.db.patch(id, {
       status: retry ? "queued" : "failed",
       leaseUntil: undefined,

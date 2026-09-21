@@ -12,6 +12,9 @@ import { PdfPreview } from "./PdfPreview";
 import { UploadEvidence } from "./UploadEvidence";
 import { Classifications } from "./Classifications";
 import { TextExcerpt } from "./TextExcerpt";
+import { DeliveryPanel } from "./DeliveryPanel";
+import { BatesSeries } from "./BatesSeries";
+import { VoiceInput } from "./VoiceInput";
 import {
   sourceSelections,
   classificationNames,
@@ -887,15 +890,6 @@ function CollectionEditor({
               onCollectionScope={() => setFocused(undefined)}
               collectionId={initialId}
               exhibitId={focused}
-              onApply={(patch) => {
-                if (focus?.summaryLocked && patch.summary !== undefined) {
-                  setError(
-                    "Unlock the reviewed summary before applying a replacement.",
-                  );
-                  return;
-                }
-                if (focused) update(focused, patch);
-              }}
             />
           )}
           <section className="space-y-3 rounded-xl border border-white/10 p-4">
@@ -942,7 +936,13 @@ function CollectionEditor({
                   type="checkbox"
                   checked={settings[key]}
                   onChange={(e) =>
-                    setSettings((s) => ({ ...s, [key]: e.target.checked }))
+                    setSettings((s) => ({
+                      ...s,
+                      [key]: e.target.checked,
+                      ...(key === "bates" && !e.target.checked
+                        ? { batesSeriesId: undefined }
+                        : {}),
+                    }))
                   }
                 />
               </label>
@@ -977,44 +977,55 @@ function CollectionEditor({
             )}
             {settings.bates && (
               <>
-                <Field
-                  label="Bates prefix"
-                  value={settings.batesPrefix}
-                  onChange={(batesPrefix) =>
-                    setSettings((s) => ({ ...s, batesPrefix }))
+                <BatesSeries
+                  caseId={caseId}
+                  value={settings.batesSeriesId}
+                  onChange={(batesSeriesId) =>
+                    setSettings((s) => ({ ...s, batesSeriesId }))
                   }
                 />
-                <label className="block text-xs">
-                  Bates start
-                  <input
-                    type="number"
-                    min={0}
-                    className={`${control} mt-1 w-full`}
-                    value={settings.batesStart}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        batesStart: Number(e.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label className="block text-xs">
-                  Bates digits
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className={`${control} mt-1 w-full`}
-                    value={settings.batesPadding}
-                    onChange={(e) =>
-                      setSettings((s) => ({
-                        ...s,
-                        batesPadding: Number(e.target.value),
-                      }))
-                    }
-                  />
-                </label>
+                {!settings.batesSeriesId && (
+                  <>
+                    <Field
+                      label="Bates prefix"
+                      value={settings.batesPrefix}
+                      onChange={(batesPrefix) =>
+                        setSettings((s) => ({ ...s, batesPrefix }))
+                      }
+                    />
+                    <label className="block text-xs">
+                      Bates start
+                      <input
+                        type="number"
+                        min={0}
+                        className={`${control} mt-1 w-full`}
+                        value={settings.batesStart}
+                        onChange={(e) =>
+                          setSettings((s) => ({
+                            ...s,
+                            batesStart: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="block text-xs">
+                      Bates digits
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        className={`${control} mt-1 w-full`}
+                        value={settings.batesPadding}
+                        onChange={(e) =>
+                          setSettings((s) => ({
+                            ...s,
+                            batesPadding: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                  </>
+                )}
                 <label className="block text-xs">
                   Bates placement
                   <select
@@ -1262,14 +1273,12 @@ function Field({
 function StudioAssistant({
   collectionId,
   exhibitId,
-  onApply,
   beforeSend,
   onChanged,
   onCollectionScope,
 }: {
   collectionId: Id<"exhibitCollections">;
   exhibitId?: string;
-  onApply: (patch: Partial<ExhibitItem>) => void;
   beforeSend: () => Promise<unknown>;
   onChanged: () => void;
   onCollectionScope: () => void;
@@ -1279,6 +1288,7 @@ function StudioAssistant({
     }),
     respond = useAction(api.exhibitAssistant.respond);
   const undo = useMutation(api.exhibitStudio.undo);
+  const decide = useMutation(api.exhibitStudio.decideProposal);
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -1317,12 +1327,40 @@ function StudioAssistant({
                 </button>
               )}
               {h.proposalJson && h.exhibitId === exhibitId && (
-                <button
-                  className={`${button} mt-2`}
-                  onClick={() => onApply(JSON.parse(h.proposalJson!))}
-                >
-                  Apply suggested description
-                </button>
+                <>
+                  <pre className="whitespace-pre-wrap text-xs">
+                    {Object.entries(
+                      JSON.parse(h.proposalJson) as Record<string, string>,
+                    )
+                      .map(([key, value]) => `${key}: ${value}`)
+                      .join("\n")}
+                  </pre>
+                  {!h.proposalDecision || h.proposalDecision === "pending" ? (
+                    <div className="flex gap-2">
+                      {(["accepted", "rejected"] as const).map((decision) => (
+                        <button
+                          key={decision}
+                          className={`${button} mt-2`}
+                          onClick={async () => {
+                            try {
+                              await beforeSend();
+                              await decide({ messageId: h._id, decision });
+                              onChanged();
+                            } catch (e) {
+                              setError(String(e));
+                            }
+                          }}
+                        >
+                          {decision === "accepted"
+                            ? "Apply suggested description"
+                            : "Reject suggestion"}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Suggestion {h.proposalDecision}.</p>
+                  )}
+                </>
               )}
             </div>
           ))}
@@ -1332,6 +1370,13 @@ function StudioAssistant({
           {error}
         </p>
       )}
+      <VoiceInput
+        key={`${collectionId}:${exhibitId ?? "collection"}`}
+        disabled={busy}
+        onInsert={(text) =>
+          setMessage((current) => (current ? `${current}\n${text}` : text))
+        }
+      />
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -1488,6 +1533,7 @@ function PacketVersions({
               {c.error}
             </p>
           )}
+          {c.status === "finalized" && <DeliveryPanel candidateId={c._id} />}
         </div>
       ))}
       {selected?.url && (

@@ -276,6 +276,8 @@ export const respond = action({
         content: message,
         proposalJson:
           !changed && proposal ? JSON.stringify(proposal) : undefined,
+        proposalRevision:
+          !changed && proposal ? input.collection.revision : undefined,
         operationId,
       });
       return { message, proposal, changed };

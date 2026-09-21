@@ -62,6 +62,7 @@ export type PacketSettings = {
   prefix: string;
   start: number;
   bates: boolean;
+  batesSeriesId?: string;
   batesPrefix: string;
   batesStart: number;
   batesPadding: number;
@@ -168,6 +169,11 @@ export function parseSettings(input: unknown): PacketSettings {
   s.labelStyle = r.labelStyle as PacketSettings["labelStyle"];
   s.prefix = text(r.prefix, 40);
   s.batesPrefix = text(r.batesPrefix, 30);
+  if (r.batesSeriesId !== undefined) {
+    s.batesSeriesId = text(r.batesSeriesId, 100);
+    if (!s.batesSeriesId || !s.bates)
+      throw new Error("A shared Bates series requires numbering enabled.");
+  }
   s.coverLetter = text(r.coverLetter, 15000);
   s.start = integer(r.start, 1, 999999);
   s.batesStart = integer(r.batesStart, 0, 999999999);

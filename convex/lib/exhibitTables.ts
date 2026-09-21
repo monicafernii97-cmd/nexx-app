@@ -2,6 +2,70 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export const exhibitTables = {
+  exhibitBatesSeries: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    name: v.string(),
+    prefix: v.string(),
+    padding: v.number(),
+    next: v.number(),
+    archived: v.boolean(),
+    revision: v.number(),
+    createdAt: v.number(),
+  }).index("by_case", ["caseId"]),
+  exhibitBatesReservations: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    candidateId: v.id("exhibitCandidates"),
+    seriesId: v.id("exhibitBatesSeries"),
+    start: v.number(),
+    end: v.number(),
+    count: v.number(),
+    prefix: v.string(),
+    padding: v.number(),
+    status: v.union(
+      v.literal("reserved"),
+      v.literal("committed"),
+      v.literal("void"),
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_candidate", ["candidateId"])
+    .index("by_series", ["seriesId"]),
+  exhibitDeliveries: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    candidateId: v.id("exhibitCandidates"),
+    operationId: v.string(),
+    settingsJson: v.string(),
+    parentSha256: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("ready"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+    attempts: v.number(),
+    leaseUntil: v.optional(v.number()),
+    stage: v.optional(v.string()),
+    error: v.optional(v.string()),
+    artifacts: v.optional(
+      v.array(
+        v.object({
+          filename: v.string(),
+          storageId: v.id("_storage"),
+          sha256: v.string(),
+          mimeType: v.string(),
+        }),
+      ),
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_candidate", ["candidateId"])
+    .index("by_user_operation", ["userId", "operationId"])
+    .index("by_user_status", ["userId", "status"]),
   exhibitTextAnchors: defineTable({
     userId: v.id("users"),
     caseId: v.id("cases"),
@@ -32,6 +96,14 @@ export const exhibitTables = {
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
     proposalJson: v.optional(v.string()),
+    proposalRevision: v.optional(v.number()),
+    proposalDecision: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("rejected"),
+      ),
+    ),
     operationId: v.optional(v.string()),
     createdAt: v.number(),
   })

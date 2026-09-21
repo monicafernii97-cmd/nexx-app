@@ -284,6 +284,14 @@ export async function composePacket(input: {
     method: string;
   }[];
   checkpoint?: (stage: string) => Promise<void>;
+  allocateBates?: (
+    count: number,
+  ) => Promise<{
+    start: number;
+    prefix: string;
+    padding: number;
+    reservationId: string;
+  }>;
   context?: { caseId: string; collectionId: string; revision: number };
 }): Promise<{
   bytes: Uint8Array;
@@ -605,9 +613,12 @@ export async function composePacket(input: {
           bottom: box.y,
           top: box.y + box.height,
         };
-        const embedded = await body.embedPage(p, bounds);
-        const w = embedded.width,
-          h = embedded.height,
+        // A legitimate blank PDF page may have no Contents stream at all.
+        const embedded = p.node.Contents()
+          ? await body.embedPage(p, bounds)
+          : null;
+        const w = box.width,
+          h = box.height,
           sw = rotation === 90 || rotation === 270 ? h : w,
           sh = rotation === 90 || rotation === 270 ? w : h;
         if (sw > 14400 || sh > 14400 || sw < 10 || sh < 10)
@@ -624,10 +635,11 @@ export async function composePacket(input: {
         };
         if (!positions[rotation])
           throw new Error("Unsupported source rotation.");
-        target.drawPage(embedded, {
-          ...positions[rotation],
-          rotate: degrees(-rotation),
-        });
+        if (embedded)
+          target.drawPage(embedded, {
+            ...positions[rotation],
+            rotate: degrees(-rotation),
+          });
         recordPages(1, {
           role: "evidence",
           exhibitId: item.id,
@@ -814,6 +826,19 @@ export async function composePacket(input: {
     }),
   );
   output.catalog.set(PDFName.of("Outlines"), root);
+  const reservation =
+    settings.bates && settings.batesSeriesId
+      ? await input.allocateBates?.(
+          pages.filter((p) => settings.batesRoles.includes(p.role)).length,
+        )
+      : undefined;
+  if (settings.batesSeriesId && !reservation)
+    throw new Error("BATES_RESERVATION_REQUIRED");
+  if (reservation) {
+    settings.batesStart = reservation.start;
+    settings.batesPrefix = reservation.prefix;
+    settings.batesPadding = reservation.padding;
+  }
   let bates = settings.batesStart;
   for (const entry of pages) {
     const page = output.getPage(entry.page - 1);
@@ -902,6 +927,7 @@ export async function composePacket(input: {
     sources: sourceHashes,
     context: input.context,
     textAnchors: input.textAnchors,
+    batesReservation: reservation,
   });
   const manifestHash = hash(manifestJson),
     sha256 = hash(bytes);

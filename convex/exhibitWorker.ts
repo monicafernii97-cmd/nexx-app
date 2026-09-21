@@ -82,6 +82,12 @@ export const generate = internalAction({
           method: a.method,
         })),
         checkpoint,
+        allocateBates: (count) =>
+          ctx.runMutation(internal.exhibitBates.reserve, {
+            candidateId: id,
+            attempt,
+            count,
+          }),
         context: {
           caseId: input.job.caseId,
           collectionId: input.job.collectionId,

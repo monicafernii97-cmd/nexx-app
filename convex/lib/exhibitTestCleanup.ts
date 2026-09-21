@@ -1,4 +1,5 @@
 import type { MutationCtx } from "../_generated/server";
+import { cleanupCandidateExtensions } from "./exhibitExtensionCleanup";
 /** Extend the existing registered upload-test lifecycle; only approved robots and exact run prefixes. */
 export async function cleanupExhibitTestRun(
   ctx: MutationCtx,
@@ -70,6 +71,7 @@ export async function cleanupExhibitTestRun(
           "Wait for synthetic exhibit generation before cleanup.",
         );
       for (const job of jobs) {
+        await cleanupCandidateExtensions(ctx, job._id);
         if (job.storageId) await ctx.storage.delete(job.storageId);
         if (job.indexStorageId) await ctx.storage.delete(job.indexStorageId);
         await ctx.db.delete(job._id);
@@ -94,6 +96,25 @@ export async function cleanupExhibitTestRun(
       if (anchor.userId === user._id && ids.has(anchor.sourceId))
         await ctx.db.delete(anchor._id);
     for (const source of fixtureSources) await ctx.db.delete(source._id);
+    for (const series of await ctx.db
+      .query("exhibitBatesSeries")
+      .withIndex("by_case", (q) => q.eq("caseId", c._id))
+      .collect()) {
+      if (series.userId !== user._id || !series.name.startsWith(`${runId} `))
+        continue;
+      if (
+        (
+          await ctx.db
+            .query("exhibitBatesReservations")
+            .withIndex("by_series", (q) => q.eq("seriesId", series._id))
+            .take(1)
+        ).length
+      )
+        throw new Error(
+          "Synthetic series still has reservations outside this cleanup.",
+        );
+      await ctx.db.delete(series._id);
+    }
   }
   return count;
 }

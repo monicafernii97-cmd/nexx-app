@@ -1,4 +1,6 @@
 'use client';
+import { AddToCollection } from '@/components/exhibit-studio/AddToCollection';
+import type { Id as ExhibitSourceId } from '@convex/_generated/dataModel';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, ArrowsClockwise, PencilSimple, X, PaperPlaneRight, CaretDown, Scales, Sword, FileText, CalendarBlank, ListBullets, Quotes, WarningCircle } from '@phosphor-icons/react';
@@ -284,6 +286,7 @@ function UserAttachmentReceipt({ attachments, isLight }: { attachments: UserAtta
                             {attachment.analysisMode === 'full_document_review' ? 'Full document review' : 'Document attachment'}
                             {' · '}{coverageText}
                         </div>
+                        <div className="mt-2"><AddToCollection fileIds={[attachment.uploadedFileId as ExhibitSourceId<'uploadedFiles'>]}/></div>
                         {processingDetails && <div className="mt-1 text-[11px] leading-4 opacity-80">{processingDetails}</div>}
                         {hasWarning && (
                             <div className="mt-1 flex items-start gap-1 text-[11px] leading-4 text-amber-500">

@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
   // Ensure non-imported files (read via fs.readFileSync at runtime)
   // are included in the serverless function bundle for PDF generation.
   outputFileTracingIncludes: {
+    '/api/exhibits/**/*': ['./node_modules/pdfjs-dist/standard_fonts/**/*','./node_modules/pdfjs-dist/cmaps/**/*','./node_modules/pdfjs-dist/wasm/**/*','./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'],
     '/api/incidents/\\[id\\]/pdf': ['./src/lib/legal/legalDocStyles.css'],
     '/api/incidents/export': ['./src/lib/legal/legalDocStyles.css'],
     '/api/documents/generate': ['./src/lib/legal/legalDocStyles.css'],
@@ -29,7 +30,7 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'img.clerk.com', pathname: '/img/**' },
+      { protocol: 'https', hostname: 'img.clerk.com', pathname: '/**' },
     ],
   },
 };

@@ -822,6 +822,10 @@ export function ExportProvider({ children }: { children: ReactNode }) {
      * Flow: Configure → Fetch Inputs → Build Request → Run Assembly → Validate → Navigate to Review.
      */
     const startStructuredExport = useCallback(async (config: ExportConfig) => {
+        if (config.path === 'exhibit_document') {
+            router.push('/docuvault/exhibits');
+            return;
+        }
         try {
             // 1. Initialize
             dispatch({ type: 'START_CONFIGURE', exportPath: config.path, caseId: config.caseId });
@@ -843,9 +847,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                 path: config.path,
                 structureSource: config.path === 'court_document'
                     ? 'court_prompt_profile'
-                    : config.path === 'exhibit_document'
-                        ? 'exhibit_prompt_profile'
-                        : 'summary_default',
+                    : 'summary_default',
                 templateId: config.templateId,
                 selectedNodeIds: [],   // use all — assembly filters internally
                 selectedEvidenceIds: config.linkedExhibitIds ?? [],
@@ -863,23 +865,7 @@ export function ExportProvider({ children }: { children: ReactNode }) {
                         linkedExhibitIds: config.linkedExhibitIds ?? [],
                         outputFormat: 'pdf' as const,
                     }
-                    : config.path === 'exhibit_document'
-                        ? {
-                            exhibitMode: 'court_structured' as const,
-                            packetType: 'packet_with_index' as const,
-                            organization: 'chronological' as const,
-                            labelStyle: 'alpha' as const,
-                            includeCoverSheets: true,
-                            includeSummaries: true,
-                            includeBatesNumbers: false,
-                            includeSourceMetadata: true,
-                            includeDividerPages: false,
-                            includeConfidentialNotes: false,
-                            includeTimeline: config.includeTimeline ?? false,
-                            mergedOutput: true,
-                            outputFormat: 'pdf' as const,
-                        }
-                        : {
+                    : {
                             audience: 'internal' as const,
                             detailLevel: config.narrativeDepth === 'full' ? 'detailed' as const : config.narrativeDepth === 'light' ? 'concise' as const : 'standard' as const,
                             organization: 'chronological' as const,

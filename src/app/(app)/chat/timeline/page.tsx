@@ -1,4 +1,6 @@
 'use client';
+import { AddToCollection } from '@/components/exhibit-studio/AddToCollection';
+import { TimelinePDFButton } from '@/components/exhibit-studio/TimelinePDFButton';
 
 import { useState, useMemo, useCallback } from 'react';
 import { PageContainer, PageHeader } from '@/components/layout/PageLayout';
@@ -96,6 +98,7 @@ export default function TimelineExplorer() {
                 </div>
             </div>
 
+            {filteredEvents.length > 0 && <div className="mb-6 flex flex-wrap items-center gap-3"><span className="text-sm text-white/60">Use these {filteredEvents.length} filtered events as a timeline document</span><AddToCollection timelineIds={filteredEvents.map(event => event._id)}/><TimelinePDFButton timelineIds={filteredEvents.map(event=>event._id)}/></div>}
             {timeline === undefined ? (
                 <div className="max-w-3xl mx-auto space-y-8 opacity-40 animate-pulse">
                     {[1, 2, 3].map(i => (
@@ -188,6 +191,7 @@ export default function TimelineExplorer() {
                                         <p className="text-[14px] text-white/60 leading-relaxed mb-6">
                                             {event.description}
                                         </p>
+                                        <AddToCollection timelineIds={[event._id]}/>
 
                                         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/5">
                                             <div className="flex flex-wrap gap-2">

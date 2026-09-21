@@ -210,6 +210,9 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    if (body.exportRequest?.path === 'exhibit_document') {
+        return Response.json({error:'Build source-preserving exhibit packets in Exhibit Studio.',code:'EXHIBIT_STUDIO_REQUIRED',url:'/docuvault/exhibits'},{status:409});
+    }
     if (!body.runId || !body.caseId) {
         return new Response(JSON.stringify({ error: 'Missing runId or caseId' }), {
             status: 400,

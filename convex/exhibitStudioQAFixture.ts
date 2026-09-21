@@ -19,7 +19,7 @@ export const create = internalAction({
       throw new Error("Invalid run ID.");
     const doc = await PDFDocument.create();
     const font = await doc.embedFont(StandardFonts.Helvetica);
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 32; i++) {
       const page = doc.addPage([612, 792]);
       page.drawText(`SYNTHETIC ORIGINAL PAGE ${i}`, { font, x: 50, y: 700 });
       page.drawText("March 12, 2026 - Synthetic appointment conversation", {

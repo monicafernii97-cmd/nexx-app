@@ -40,7 +40,54 @@ export const seed = internalMutation({
       status: "ready",
       createdAt: Date.now(),
     });
-    return { caseId, fileId, subject: args.runId };
+    const generationId = await ctx.db.insert("documentMemoryGenerations", {
+      clerkUserId: args.runId,
+      caseId,
+      uploadedFileId: fileId,
+      generationNumber: 1,
+      status: "active",
+      reason: "initial_upload",
+      sourceFileHash: args.sha256,
+      extractionPlan: { nativeExtraction: true, mistralOcr: false },
+      counts: { pagesStored: 1 },
+      qualitySummary: { warnings: [] },
+      validation: { passed: true, checks: ["fixture"], failedChecks: [] },
+      createdAt: Date.now(),
+    });
+    const text =
+      "SYNTHETIC ORIGINAL PAGE 2\nMarch 12, 2026 - Synthetic appointment conversation";
+    await ctx.db.insert("documentPages", {
+      uploadedFileId: fileId,
+      memoryGenerationId: generationId,
+      clerkUserId: args.runId,
+      caseId,
+      pageNumber: 2,
+      text,
+      textLength: text.length,
+      warnings: [],
+      isSynthetic: false,
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(fileId, { activeMemoryGenerationId: generationId });
+    const otherCaseId = await ctx.db.insert("cases", {
+      userId,
+      title: args.runId,
+      description: "Synthetic cross-case fixture",
+      status: "active",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    const otherSourceId = await ctx.db.insert("exhibitSources", {
+      userId,
+      caseId: otherCaseId,
+      title: "Other case synthetic note",
+      kind: "note",
+      originId: "fixture",
+      mimeType: "text/plain",
+      snapshot: "Other case only",
+      createdAt: Date.now(),
+    });
+    return { caseId, fileId, subject: args.runId, otherSourceId };
   },
 });
 /** Fault injection is limited to this run's synthetic owner and collection. */
@@ -53,6 +100,7 @@ export const fault = internalMutation({
       v.literal("expired"),
       v.literal("remove-source"),
       v.literal("restore-source"),
+      v.literal("ocr-replace"),
     ),
   },
   handler: async (ctx, { runId, collectionId, mode }) => {
@@ -68,6 +116,30 @@ export const fault = internalMutation({
       collection?.userId !== user._id
     )
       throw new Error("Synthetic ownership required.");
+    if (mode === "ocr-replace") {
+      const files = await ctx.db
+        .query("uploadedFiles")
+        .withIndex("by_clerk_case", (q) =>
+          q.eq("clerkUserId", runId).eq("caseId", collection.caseId),
+        )
+        .collect();
+      for (const file of files) {
+        if (!file.activeMemoryGenerationId) continue;
+        const old = await ctx.db.get(file.activeMemoryGenerationId);
+        if (!old) continue;
+        const { _id: _, _creationTime: __, ...data } = old;
+        const generationId = await ctx.db.insert("documentMemoryGenerations", {
+          ...data,
+          generationNumber: old.generationNumber + 1,
+          createdAt: Date.now(),
+        });
+        await ctx.db.patch(old._id, { status: "retired" });
+        await ctx.db.patch(file._id, {
+          activeMemoryGenerationId: generationId,
+        });
+      }
+      return null;
+    }
     if (mode === "remove-source" || mode === "restore-source") {
       const files = await ctx.db
         .query("uploadedFiles")
@@ -123,7 +195,16 @@ export const cleanup = internalMutation({
       .collect();
     for (const c of cases) {
       if (c.title !== runId) throw new Error("Unexpected fixture ownership.");
-      for(const classification of await ctx.db.query('exhibitClassifications').withIndex('by_case',q=>q.eq('caseId',c._id)).collect())await ctx.db.delete(classification._id);
+      for (const anchor of await ctx.db
+        .query("exhibitTextAnchors")
+        .withIndex("by_case", (q) => q.eq("caseId", c._id))
+        .collect())
+        await ctx.db.delete(anchor._id);
+      for (const classification of await ctx.db
+        .query("exhibitClassifications")
+        .withIndex("by_case", (q) => q.eq("caseId", c._id))
+        .collect())
+        await ctx.db.delete(classification._id);
       const collections = await ctx.db
         .query("exhibitCollections")
         .withIndex("by_case", (q) => q.eq("caseId", c._id))
@@ -160,6 +241,20 @@ export const cleanup = internalMutation({
           q.eq("clerkUserId", runId).eq("caseId", c._id),
         )
         .collect()) {
+        for (const page of await ctx.db
+          .query("documentPages")
+          .withIndex("by_uploaded_file_page", (q) =>
+            q.eq("uploadedFileId", file._id),
+          )
+          .collect())
+          await ctx.db.delete(page._id);
+        for (const generation of await ctx.db
+          .query("documentMemoryGenerations")
+          .withIndex("by_file_generation", (q) =>
+            q.eq("uploadedFileId", file._id),
+          )
+          .collect())
+          await ctx.db.delete(generation._id);
         if (file.storageId) await ctx.storage.delete(file.storageId);
         await ctx.db.delete(file._id);
       }
@@ -200,6 +295,20 @@ export const cleanupBrowserRun = internalMutation({
       for (const file of fixtureFiles.filter(
         (f) => f.filename === `${runId}.pdf`,
       )) {
+        for (const page of await ctx.db
+          .query("documentPages")
+          .withIndex("by_uploaded_file_page", (q) =>
+            q.eq("uploadedFileId", file._id),
+          )
+          .collect())
+          await ctx.db.delete(page._id);
+        for (const generation of await ctx.db
+          .query("documentMemoryGenerations")
+          .withIndex("by_file_generation", (q) =>
+            q.eq("uploadedFileId", file._id),
+          )
+          .collect())
+          await ctx.db.delete(generation._id);
         for (const source of await ctx.db
           .query("exhibitSources")
           .withIndex("by_user_origin", (q) =>
@@ -252,6 +361,12 @@ export const cleanupBrowserRun = internalMutation({
         )
           await ctx.db.delete(source._id);
       }
+      for (const anchor of await ctx.db
+        .query("exhibitTextAnchors")
+        .withIndex("by_case", (q) => q.eq("caseId", c._id))
+        .collect())
+        if (anchor.userId === user._id && sources.has(anchor.sourceId))
+          await ctx.db.delete(anchor._id);
       for (const event of await ctx.db
         .query("timelineCandidates")
         .withIndex("by_userId_caseId", (q) =>
@@ -296,6 +411,34 @@ export const seedBrowserFile = internalMutation({
       status: "ready",
       createdAt: Date.now(),
     });
+    const generationId = await ctx.db.insert("documentMemoryGenerations", {
+      clerkUserId: args.subject,
+      caseId: active._id,
+      uploadedFileId: fileId,
+      generationNumber: 1,
+      status: "active",
+      reason: "initial_upload",
+      sourceFileHash: args.sha256,
+      extractionPlan: { nativeExtraction: true, mistralOcr: false },
+      counts: { pagesStored: 1 },
+      qualitySummary: { warnings: [] },
+      validation: { passed: true, checks: ["fixture"], failedChecks: [] },
+      createdAt: Date.now(),
+    });
+    const text = "SYNTHETIC REGION TEST";
+    await ctx.db.insert("documentPages", {
+      uploadedFileId: fileId,
+      memoryGenerationId: generationId,
+      clerkUserId: args.subject,
+      caseId: active._id,
+      pageNumber: 1,
+      text,
+      textLength: text.length,
+      warnings: [],
+      isSynthetic: false,
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(fileId, { activeMemoryGenerationId: generationId });
     return { fileId, caseId: active._id };
   },
 });

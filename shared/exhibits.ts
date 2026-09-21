@@ -14,6 +14,12 @@ export function normalizeSha256(value: string | undefined): string | undefined {
 export type Region = { x: number; y: number; width: number; height: number };
 export type ExhibitPart = {
   sourceId: string;
+  title?: string;
+  date?: string;
+  classification?: string;
+  classifications?: ExhibitItem["classifications"];
+  summary?: string;
+  textAnchorId?: string;
   pages?: number[];
   crop?: Region;
   redactions?: { page: number; region: Region }[];
@@ -22,6 +28,7 @@ export type ExhibitPart = {
 export type ExhibitItem = {
   id: string;
   sourceId: string;
+  textAnchorId?: string;
   title: string;
   date?: string;
   classification?: string;
@@ -34,6 +41,7 @@ export type ExhibitItem = {
   participants?: string;
   conversation?: string;
   summary?: string;
+  summaryLocked?: boolean;
   pages?: number[];
   messageIds?: string[];
   crop?: Region;
@@ -44,6 +52,7 @@ export type ExhibitItem = {
   parts?: ExhibitPart[];
 };
 export type PacketSettings = {
+  timelineLayout: "narrative" | "table";
   titleSheet: boolean;
   index: boolean;
   covers: boolean;
@@ -68,14 +77,20 @@ export type PacketSettings = {
   )[];
   coverLetter: string;
 };
-export function classificationNames(item: ExhibitItem): string[] {
+export function classificationNames(
+  item: Pick<ExhibitItem, "classification" | "classifications" | "parts">,
+): string[] {
   const names = [
     item.classification,
     ...(item.classifications ?? []).map((c) => c.name),
+    ...(item.parts ?? []).flatMap((part) =>
+      classificationNames(part).filter((name) => name !== "Unclassified"),
+    ),
   ].filter((s): s is string => !!s);
   return names.length ? [...new Set(names)] : ["Unclassified"];
 }
 export const DEFAULT_PACKET_SETTINGS: PacketSettings = {
+  timelineLayout: "narrative",
   titleSheet: true,
   index: true,
   covers: true,
@@ -127,6 +142,12 @@ function integer(value: unknown, min: number, max: number): number {
 export function parseSettings(input: unknown): PacketSettings {
   const r = record(input);
   const s = { ...DEFAULT_PACKET_SETTINGS };
+  if (
+    r.timelineLayout !== undefined &&
+    !["narrative", "table"].includes(String(r.timelineLayout))
+  )
+    throw new Error("Invalid timeline layout.");
+  s.timelineLayout = (r.timelineLayout ?? "narrative") as "narrative" | "table";
   for (const key of [
     "titleSheet",
     "index",
@@ -199,6 +220,18 @@ export function parseItems(input: unknown): ExhibitItem[] {
         "Exhibits require unique identities, sources, and titles.",
       );
     ids.add(item.id);
+    if (r.summaryLocked !== undefined) {
+      if (typeof r.summaryLocked !== "boolean")
+        throw new Error("Invalid summary lock.");
+      item.summaryLocked = r.summaryLocked;
+    }
+    if (r.textAnchorId !== undefined) {
+      item.textAnchorId = text(r.textAnchorId, 100);
+      if (!item.textAnchorId || r.crop || r.redactions || r.messageIds)
+        throw new Error(
+          "Text excerpts cannot be mixed with redaction, crop or message selectors.",
+        );
+    }
     if (r.classifications !== undefined) {
       if (!Array.isArray(r.classifications) || r.classifications.length > 20)
         throw new Error("Choose at most 20 classifications.");
@@ -229,10 +262,16 @@ export function parseItems(input: unknown): ExhibitItem[] {
         const p = record(part);
         if (p.parts) throw new Error("Nested exhibits are unsupported.");
         const parsed = parseItems([
-          { ...p, id: `part-${index}`, title: "Source selection" },
+          { ...p, id: `part-${index}`, title: p.title ?? "Source selection" },
         ])[0];
         return {
           sourceId: parsed.sourceId,
+          title: p.title ? parsed.title : undefined,
+          date: parsed.date,
+          classification: parsed.classification,
+          classifications: parsed.classifications,
+          summary: parsed.summary,
+          textAnchorId: parsed.textAnchorId,
           pages: parsed.pages,
           crop: parsed.crop,
           redactions: parsed.redactions,
@@ -357,14 +396,58 @@ export function combineExhibits(items: ExhibitItem[]): ExhibitItem {
     ...first,
     parts: selections
       .slice(1)
-      .map(({ sourceId, pages, crop, redactions, messageIds }) => ({
-        sourceId,
-        pages,
-        crop,
-        redactions,
-        messageIds,
-      })),
+      .map(
+        ({
+          sourceId,
+          pages,
+          crop,
+          redactions,
+          messageIds,
+          textAnchorId,
+          title,
+          date,
+          classification,
+          classifications,
+          summary,
+        }) => ({
+          sourceId,
+          title,
+          date,
+          classification,
+          classifications,
+          summary,
+          textAnchorId,
+          pages,
+          crop,
+          redactions,
+          messageIds,
+        }),
+      ),
   };
+}
+export function matchingClassifiedSelections(
+  items: ExhibitItem[],
+  group: string,
+): ExhibitItem[] {
+  return items.flatMap((item) => {
+    const matches = sourceSelections([item]).filter((part) =>
+      classificationNames({ ...part, parts: undefined }).includes(group),
+    );
+    if (!matches.length) return [];
+    const [first, ...parts] = matches;
+    return [
+      {
+        ...item,
+        ...first,
+        title: first.title ?? item.title,
+        summary: first.summary,
+        classification: first.classification,
+        classifications: first.classifications,
+        parts: parts.map((part) => ({ ...part, parts: undefined })),
+        originLabel: item.originLabel ?? item.label,
+      },
+    ];
+  });
 }
 export function alphaLabel(index: number): string {
   let n = index + 1;

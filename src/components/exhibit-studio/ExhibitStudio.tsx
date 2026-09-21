@@ -11,9 +11,11 @@ import { StudioDialog } from "./StudioDialog";
 import { PdfPreview } from "./PdfPreview";
 import { UploadEvidence } from "./UploadEvidence";
 import { Classifications } from "./Classifications";
+import { TextExcerpt } from "./TextExcerpt";
 import {
   sourceSelections,
   classificationNames,
+  matchingClassifiedSelections,
   compareExhibitDates,
 } from "../../../shared/exhibits";
 import {
@@ -118,7 +120,10 @@ function CaseStudio({ caseId }: { caseId: Id<"cases"> }) {
           <p className="text-sm text-slate-400">
             Original evidence. Organized collections. Reviewed packets.
           </p>
-          <p className="mt-1 text-xs text-slate-400">Up to 100 exhibits and 500 total packet pages. Originals: 30 MB each, 150 MB combined. Two generation jobs at a time.</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Up to 100 exhibits and 500 total packet pages. Originals: 30 MB
+            each, 150 MB combined. Two generation jobs at a time.
+          </p>
         </div>
         <div className="flex min-w-0 max-w-full flex-wrap gap-2">
           <select
@@ -199,6 +204,7 @@ function CollectionEditor({
   const [destination, setDestination] = useState("");
   const [collectionTitle, setCollectionTitle] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [matchingOnly, setMatchingOnly] = useState(false);
   const [lastOperation, setLastOperation] = useState("");
   const [importFiles, setImportFiles] = useState<string[]>([]);
   const [timelineIds, setTimelineIds] = useState<string[]>([]);
@@ -684,10 +690,15 @@ function CollectionEditor({
                         ? sourceSelections([i]).map((part, index) => ({
                             ...i,
                             sourceId: part.sourceId,
+                            classification: part.classification,
+                            classifications: part.classifications,
+                            summary: part.summary,
+                            date: part.date,
                             pages: part.pages,
                             crop: part.crop,
                             redactions: part.redactions,
                             messageIds: part.messageIds,
+                            textAnchorId: part.textAnchorId,
                             id: crypto.randomUUID(),
                             title:
                               index === 0
@@ -707,13 +718,21 @@ function CollectionEditor({
               </button>
             </section>
           )}
+          {focus && focusSource?.mimeType === "application/pdf" && (
+            <TextExcerpt
+              key={`text-${focus.id}`}
+              item={focus}
+              onChange={(patch) => update(focus.id, patch)}
+            />
+          )}
           {focus &&
+            !focus.textAnchorId &&
             focusSource?.kind === "file" &&
             ["application/pdf", "image/png", "image/jpeg"].includes(
               focusSource.mimeType,
             ) && (
               <RegionEditor
-                key={focus.id}
+                key={`region-${focus.id}`}
                 item={focus}
                 onChange={(patch) => update(focus.id, patch)}
               />
@@ -724,7 +743,7 @@ function CollectionEditor({
               focusSource.mimeType,
             ) && (
               <MessageSelector
-                key={focus.id}
+                key={`messages-${focus.id}`}
                 item={focus}
                 mimeType={focusSource.mimeType}
                 onChange={(patch) => update(focus.id, patch)}
@@ -838,6 +857,7 @@ function CollectionEditor({
                   <textarea
                     className={`${control} mt-1 min-h-28 w-full`}
                     value={focus.summary ?? ""}
+                    disabled={focus.summaryLocked}
                     onChange={(e) =>
                       update(focus.id, { summary: e.target.value })
                     }
@@ -847,6 +867,16 @@ function CollectionEditor({
                   Summaries describe the source. Original pages are included
                   separately.
                 </p>
+                <label className="flex gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={focus.summaryLocked ?? false}
+                    onChange={(e) =>
+                      update(focus.id, { summaryLocked: e.target.checked })
+                    }
+                  />
+                  Lock reviewed summary
+                </label>
               </>
             )}
           </section>
@@ -858,12 +888,35 @@ function CollectionEditor({
               collectionId={initialId}
               exhibitId={focused}
               onApply={(patch) => {
+                if (focus?.summaryLocked && patch.summary !== undefined) {
+                  setError(
+                    "Unlock the reviewed summary before applying a replacement.",
+                  );
+                  return;
+                }
                 if (focused) update(focused, patch);
               }}
             />
           )}
           <section className="space-y-3 rounded-xl border border-white/10 p-4">
             <h2 className="font-semibold">Packet settings</h2>
+            <label className="block text-xs">
+              Timeline layout
+              <select
+                className={`${control} mt-1 w-full`}
+                value={settings.timelineLayout}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    timelineLayout: e.target
+                      .value as PacketSettings["timelineLayout"],
+                  }))
+                }
+              >
+                <option value="narrative">Narrative chronology</option>
+                <option value="table">Chronology table</option>
+              </select>
+            </label>
             {(
               [
                 "titleSheet",
@@ -1078,6 +1131,18 @@ function CollectionEditor({
               />
               Preserve source packet labels
             </label>
+            {classificationFilter && !subset && (
+              <label className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={matchingOnly}
+                  onChange={(e) => setMatchingOnly(e.target.checked)}
+                />
+                Include only source selections classified as “
+                {classificationFilter}”. Leave unchecked to include complete
+                exhibits.
+              </label>
+            )}
             <label className="flex gap-2 text-sm">
               <input
                 type="checkbox"
@@ -1134,19 +1199,25 @@ function CollectionEditor({
                     const target = data.collections.find(
                       (c) => c._id === destination,
                     );
+                    const selectedItems = (
+                      subset ??
+                      items.map((i, index) => ({
+                        ...i,
+                        label: labels[index],
+                        originPacket: `${title}, revision ${revision}`,
+                      }))
+                    ).filter((i) => selected.includes(i.id));
                     await add({
                       id: target?._id,
                       caseId,
                       title: collectionTitle,
                       itemsJson: JSON.stringify(
-                        (
-                          subset ??
-                          items.map((i, index) => ({
-                            ...i,
-                            label: labels[index],
-                            originPacket: `${title}, revision ${revision}`,
-                          }))
-                        ).filter((i) => selected.includes(i.id)),
+                        matchingOnly && classificationFilter && !subset
+                          ? matchingClassifiedSelections(
+                              selectedItems,
+                              classificationFilter,
+                            )
+                          : selectedItems,
                       ),
                       expectedRevision: target?.revision ?? 0,
                       relabel: !preserveLabels,

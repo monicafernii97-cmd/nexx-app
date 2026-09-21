@@ -27,7 +27,7 @@ it("composes 100 indexed exhibits into a reconciled 500-page packet", async () =
   const input = {
     title: "Synthetic scale verification",
     items,
-    settings: { ...DEFAULT_PACKET_SETTINGS, bates: true },
+    settings: { ...DEFAULT_PACKET_SETTINGS, bates: true, summaries: false },
     sources: [
       {
         id: "scale-source",

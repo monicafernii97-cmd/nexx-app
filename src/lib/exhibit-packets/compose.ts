@@ -1,7 +1,7 @@
 import {
   PDFDocument,
   PDFName,
-  PDFString,
+  PDFHexString,
   PDFArray,
   rgb,
   degrees,
@@ -47,6 +47,7 @@ export type PageEntry = {
   sourceId?: string;
   sourcePage?: number;
   messageIds?: string[];
+  textAnchorId?: string;
   bates?: string;
 };
 export type PacketReport = {
@@ -138,6 +139,7 @@ function textPages(
   font: PDFFont,
   title: string,
   body: string,
+  preserveSpacing = false,
 ): PDFPage[] {
   const result: PDFPage[] = [];
   let page: PDFPage;
@@ -154,7 +156,25 @@ function textPages(
     y -= 25;
   }
   y -= 20;
-  for (const line of lines(body, font, 11, 504)) {
+  const bodyLines = preserveSpacing
+    ? body
+        .replace(/\t/g, "    ")
+        .split("\n")
+        .flatMap((line) => {
+          const wrapped: string[] = [];
+          let current = "";
+          for (const char of line) {
+            if (font.widthOfTextAtSize(current + char, 11) > 504) {
+              wrapped.push(current);
+              current = "";
+            }
+            current += char;
+          }
+          wrapped.push(current);
+          return wrapped;
+        })
+    : lines(body, font, 11, 504);
+  for (const line of bodyLines) {
     if (y < 72) add();
     draw(page!, font, line, 54, y);
     y -= 17;
@@ -182,11 +202,87 @@ function sourceText(source: PacketSource): string {
       .join("\n\n")
   );
 }
+function timelineTable(
+  doc: PDFDocument,
+  font: PDFFont,
+  source: PacketSource,
+): PDFPage[] {
+  const events = JSON.parse(source.snapshot ?? "[]") as {
+    date: string;
+    title: string;
+    description: string;
+    status: string;
+    sourceMessageId?: string;
+  }[];
+  const result: PDFPage[] = [];
+  let page: PDFPage,
+    y = 0;
+  const add = () => {
+    page = doc.addPage([612, 792]);
+    result.push(page);
+    draw(page, font, "RECORDED TIMELINE", 54, 738, 18, BLUE);
+    draw(
+      page,
+      font,
+      "Snapshot of recorded accounts; status is not independent verification.",
+      54,
+      713,
+      9,
+      MUTED,
+    );
+    draw(page, font, "Date", 54, 680, 10, BLUE);
+    draw(
+      page,
+      font,
+      "Event / description / source reference",
+      148,
+      680,
+      10,
+      BLUE,
+    );
+    draw(page, font, "Status", 495, 680, 10, BLUE);
+    y = 653;
+  };
+  add();
+  for (const event of events) {
+    const columns = [
+      lines(event.date, font, 10, 80),
+      lines(
+        `${event.title}\n${event.description}${event.sourceMessageId ? `\nSource message: ${event.sourceMessageId}` : ""}`,
+        font,
+        10,
+        330,
+      ),
+      lines(event.status, font, 10, 63),
+    ];
+    const count = Math.max(...columns.map((c) => c.length));
+    for (let row = 0; row < count; row++) {
+      if (y < 72) add();
+      for (let col = 0; col < 3; col++) {
+        const value = columns[col][row];
+        if (value) draw(page!, font, value, [54, 148, 495][col], y, 10);
+      }
+      y -= 15;
+    }
+    y -= 15;
+  }
+  return result;
+}
 export async function composePacket(input: {
   title: string;
   items: ExhibitItem[];
   settings: PacketSettings;
   sources: PacketSource[];
+  textAnchors?: {
+    id: string;
+    sourceId: string;
+    generationId: string;
+    page: number;
+    start: number;
+    end: number;
+    text: string;
+    method: string;
+  }[];
   checkpoint?: (stage: string) => Promise<void>;
   context?: { caseId: string; collectionId: string; revision: number };
 }): Promise<{
@@ -225,6 +321,10 @@ export async function composePacket(input: {
     sourceHashes.push({ id, sha256: actual });
   }
   const { doc: body, font } = await newDoc();
+  if ((input.textAnchors ?? []).reduce((n, a) => n + a.text.length, 0) > 100000)
+    throw new Error(
+      "PROCESSING_LIMIT_EXCEEDED: Split extracted text into smaller collections.",
+    );
   const pdfCache = new Map<string, PDFDocument>();
   const sourcePdf = async (source: PacketSource) => {
     let pdf = pdfCache.get(source.id);
@@ -260,6 +360,7 @@ export async function composePacket(input: {
         crop: part.crop,
         redactions: part.redactions,
         messageIds: part.messageIds,
+        textAnchorId: part.textAnchorId,
         parts: undefined,
       })),
     ].map((part, partIndex) => ({
@@ -275,7 +376,7 @@ export async function composePacket(input: {
     const { item, label, first } = expanded[index],
       source = sources.get(item.sourceId)!;
     const group = classificationNames(item).join("; ");
-    if (settings.dividers && group !== lastGroup) {
+    if (settings.dividers && first && group !== lastGroup) {
       recordPages(textPages(body, font, group, "Exhibit collection").length, {
         role: "divider",
       });
@@ -308,9 +409,33 @@ export async function composePacket(input: {
         label,
       });
     }
+    if (item.textAnchorId) {
+      const anchor = input.textAnchors?.find(
+        (a) => a.id === item.textAnchorId && a.sourceId === item.sourceId,
+      );
+      if (!anchor || !item.pages?.includes(anchor.page))
+        throw new Error("TEXT_ANCHOR_UNAVAILABLE");
+      recordPages(
+        textPages(
+          body,
+          font,
+          `EXHIBIT ${label} · EXTRACTED TEXT`,
+          `${source.title} | Original page ${anchor.page}\nExtraction: ${anchor.method}. This transcription may contain recognition errors. The original page follows; compare it before relying on this excerpt.\n\n${anchor.text}`,
+          true,
+        ).length,
+        {
+          role: "evidence",
+          exhibitId: item.id,
+          label,
+          sourceId: source.id,
+          sourcePage: anchor.page,
+          textAnchorId: anchor.id,
+        },
+      );
+    }
     if (
-      (source.mimeType === "text/plain" && source.kind === "file") ||
-      source.mimeType === "application/json"
+      source.kind === "file" &&
+      ["text/plain", "application/json"].includes(source.mimeType)
     ) {
       if (item.pages || item.crop || item.redactions?.length)
         throw new Error("Use message selection for a structured transcript.");
@@ -391,7 +516,10 @@ export async function composePacket(input: {
           "Use whole timeline/note snapshots; page selections apply to original PDF files.",
         );
       recordPages(
-        textPages(body, font, item.title, sourceText(source)).length,
+        (source.kind === "timeline" && settings.timelineLayout === "table"
+          ? timelineTable(body, font, source)
+          : textPages(body, font, item.title, sourceText(source))
+        ).length,
         { role: "evidence", exhibitId: item.id, label, sourceId: source.id },
       );
     } else if (item.crop || item.redactions?.length) {
@@ -614,10 +742,17 @@ export async function composePacket(input: {
         10,
         420,
       );
-      const height = rowLines.length * 15 + 14;
-      if (y - height < 65) add();
-      indexRows.push({ page: indexPage!, y, exhibitIndex: i });
+      if (y < 100) add();
+      let fragment = true;
       for (const line of rowLines) {
+        if (y < 80) {
+          add();
+          fragment = true;
+        }
+        if (fragment) {
+          indexRows.push({ page: indexPage!, y, exhibitIndex: i });
+          fragment = false;
+        }
         draw(indexPage!, outFont, line, 54, y, 10);
         y -= 15;
       }
@@ -661,7 +796,7 @@ export async function composePacket(input: {
     output.context.assign(
       outlineRefs[i],
       output.context.obj({
-        Title: PDFString.of(`Exhibit ${ex.label}`),
+        Title: PDFHexString.fromText(`Exhibit ${ex.label} — ${ex.title}`),
         Parent: root,
         Dest: [output.getPage(ex.start - 1).ref, "Fit"],
         ...(i ? { Prev: outlineRefs[i - 1] } : {}),
@@ -681,8 +816,16 @@ export async function composePacket(input: {
   output.catalog.set(PDFName.of("Outlines"), root);
   let bates = settings.batesStart;
   for (const entry of pages) {
-    const page = output.getPage(entry.page - 1),
-      width = page.getWidth();
+    const page = output.getPage(entry.page - 1);
+    const evidenceStamp = `Exhibit ${entry.label}${entry.sourcePage ? ` | Source page ${entry.sourcePage}` : ""}`;
+    if (entry.role === "evidence")
+      page.setWidth(
+        Math.max(
+          page.getWidth(),
+          48 + outFont.widthOfTextAtSize(evidenceStamp, 8),
+        ),
+      );
+    const width = page.getWidth();
     draw(
       page,
       outFont,
@@ -758,6 +901,7 @@ export async function composePacket(input: {
     settings,
     sources: sourceHashes,
     context: input.context,
+    textAnchors: input.textAnchors,
   });
   const manifestHash = hash(manifestJson),
     sha256 = hash(bytes);

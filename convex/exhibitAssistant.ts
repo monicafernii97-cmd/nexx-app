@@ -57,6 +57,7 @@ export const respond = action({
             items: JSON.parse(input.collection.itemsJson),
             focused: input.focused,
             sourceSnapshot: input.source?.snapshot,
+            pinnedTranscription: input.textAnchor,
             history: input.history.map((h) => ({
               role: h.role,
               content: h.content,

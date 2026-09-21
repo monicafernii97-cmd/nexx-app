@@ -88,6 +88,13 @@ export function planStudioAction(input: {
     settings = parseSettings(input.settings);
   if (["set_title", "set_summary", "classify"].includes(action.kind)) {
     if (!ids.size) throw new Error("Select the exhibits to change.");
+    if (
+      action.kind === "set_summary" &&
+      items.some((i) => ids.has(i.id) && i.summaryLocked)
+    )
+      throw new Error(
+        "Unlock the reviewed summary in the inspector before replacing it.",
+      );
     const field =
       action.kind === "set_title"
         ? "title"

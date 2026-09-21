@@ -2,6 +2,19 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export const exhibitTables = {
+  exhibitTextAnchors: defineTable({
+    userId: v.id("users"),
+    caseId: v.id("cases"),
+    sourceId: v.id("exhibitSources"),
+    generationId: v.id("documentMemoryGenerations"),
+    pageId: v.id("documentPages"),
+    page: v.number(),
+    start: v.number(),
+    end: v.number(),
+    text: v.string(),
+    method: v.string(),
+    createdAt: v.number(),
+  }).index("by_case", ["caseId"]),
   exhibitClassifications: defineTable({
     userId: v.id("users"),
     caseId: v.id("cases"),

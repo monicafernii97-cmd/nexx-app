@@ -126,7 +126,7 @@ test("signed-in Studio: timeline selection, saved draft, generated preview and i
     const cases = await client.query(api.cases.list, {});
     const active = cases.find((c) => c.status === "active") ?? cases[0];
     expect(active).toBeTruthy();
-    await client.mutation(api.timelineCandidates.create, {
+    const timelineId = await client.mutation(api.timelineCandidates.create, {
       caseId: active._id,
       title: runId,
       description:
@@ -205,6 +205,11 @@ test("signed-in Studio: timeline selection, saved draft, generated preview and i
     expect(download.status()).toBe(200);
     expect(download.headers()["content-disposition"]).toContain("attachment");
     expect(await download.body()).toEqual(reviewedBytes);
+    await client.mutation(api.timelineCandidates.confirm, {
+      candidateId: timelineId,
+    });
+    const unchanged = await page.request.get(previewUrl!);
+    expect(await unchanged.body()).toEqual(reviewedBytes);
     await page.getByRole("button", { name: "Select all", exact: true }).click();
     await page
       .getByRole("button", { name: "Add to collection (1)", exact: true })
@@ -230,6 +235,37 @@ test("signed-in Studio: timeline selection, saved draft, generated preview and i
       path: "output/exhibit-browser/studio-verified.png",
       fullPage: true,
     });
+    await page.goto("/chat/timeline");
+    await page
+      .getByLabel("Search timeline events", { exact: true })
+      .fill(runId);
+    await page
+      .getByRole("button", { name: "Build timeline PDF", exact: true })
+      .click();
+    await page
+      .getByLabel("Timeline PDF title", { exact: true })
+      .fill(`${runId} standalone chronology`);
+    await page
+      .getByLabel("Chronology format", { exact: true })
+      .selectOption("table");
+    await page
+      .getByRole("button", {
+        name: "Generate selected chronology",
+        exact: true,
+      })
+      .click();
+    const chronology = page.getByRole("link", {
+      name: "Download timeline PDF",
+      exact: true,
+    });
+    await expect(chronology).toBeVisible({ timeout: 90000 });
+    const chronologyResponse = await page.request.get(
+      (await chronology.getAttribute("href"))!,
+    );
+    expect(chronologyResponse.status()).toBe(200);
+    expect(
+      (await PDFDocument.load(await chronologyResponse.body())).getPageCount(),
+    ).toBe(1);
   } finally {
     if (subject) {
       const cleanup = spawnSync(
@@ -292,6 +328,22 @@ test("source region studio: authenticated rendered page and reviewed redaction",
       .filter({ hasText: `${runId}.pdf` })
       .click();
     const rendered = await renderedResponse;
+    await page.getByText("Select extracted text", { exact: true }).click();
+    const transcription = page.getByLabel("Extracted source text", {
+      exact: true,
+    });
+    await expect(transcription).toBeVisible({ timeout: 60000 });
+    await transcription.focus();
+    await transcription.press("ControlOrMeta+A");
+    await page
+      .getByRole("button", { name: /^Pin selected text \([1-9]/ })
+      .click();
+    await expect(
+      page.getByText(/Later OCR updates do not change this excerpt/),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Remove text excerpt", exact: true })
+      .click();
     expect(
       rendered.status(),
       rendered.status() === 200

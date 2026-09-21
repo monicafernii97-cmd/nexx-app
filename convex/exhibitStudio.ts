@@ -46,7 +46,22 @@ async function checkSources(
   items: ReturnType<typeof parseItems>,
 ) {
   const owner = await ctx.db.get(userId);
-  for (const item of items)
+  for (const selection of sourceSelections(items)) {
+    if (!selection.textAnchorId) continue;
+    const id = ctx.db.normalizeId("exhibitTextAnchors", selection.textAnchorId),
+      anchor = id ? await ctx.db.get(id) : null;
+    if (
+      !anchor ||
+      anchor.userId !== userId ||
+      anchor.caseId !== caseId ||
+      anchor.sourceId !== selection.sourceId ||
+      !selection.pages?.includes(anchor.page)
+    )
+      throw new Error(
+        "TEXT_ANCHOR_UNAVAILABLE: Keep the referenced original page selected or create a new excerpt.",
+      );
+  }
+  for (const item of sourceSelections(items))
     for (const ref of item.classifications ?? []) {
       const id = ctx.db.normalizeId("exhibitClassifications", ref.id);
       const row = id ? await ctx.db.get(id) : null;
@@ -128,7 +143,18 @@ export const assistantContext = query({
       .withIndex("by_collection", (q) => q.eq("collectionId", collectionId))
       .order("desc")
       .take(10);
-    return { collection: row, focused, source, history: history.reverse() };
+    const textAnchor = focused?.textAnchorId
+      ? await ctx.db.get(
+          ctx.db.normalizeId("exhibitTextAnchors", focused.textAnchorId)!,
+        )
+      : null;
+    return {
+      collection: row,
+      focused,
+      source,
+      textAnchor,
+      history: history.reverse(),
+    };
   },
 });
 export const recordAssistantRequest = mutation({
@@ -481,6 +507,7 @@ export const addToCollection = mutation({
         crop: i.crop,
         redactions: i.redactions,
         messageIds: i.messageIds,
+        textAnchorId: i.textAnchorId,
         parts: i.parts,
       });
     const existing = new Set(items.map(key));
@@ -805,7 +832,16 @@ export const workerInput = internalQuery({
       const id = ctx.db.normalizeId("exhibitSources", sourceId)!;
       sources.push((await ctx.db.get(id))!);
     }
-    return { job, sources };
+    const anchors = [];
+    for (const selection of sourceSelections(items)) {
+      if (selection.textAnchorId)
+        anchors.push(
+          (await ctx.db.get(
+            ctx.db.normalizeId("exhibitTextAnchors", selection.textAnchorId)!,
+          ))!,
+        );
+    }
+    return { job, sources, anchors };
   },
 });
 /** Read the publication pointer and delete only unreferenced attempt outputs in one transaction. */

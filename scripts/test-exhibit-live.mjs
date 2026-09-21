@@ -68,8 +68,25 @@ try {
       pages: [2, 3],
     },
   ];
-  const classificationId=run('exhibitClassifications:save',{caseId:fixture.caseId,name:'Written appointment confirmation',code:'APPT',definition:'Messages explicitly confirming an appointment date or time.',revision:0},fixture.subject);
-  items[0].classifications=[{id:classificationId,name:'Written appointment confirmation',definition:'Messages explicitly confirming an appointment date or time.',revision:1}];
+  const classificationId = run(
+    "exhibitClassifications:save",
+    {
+      caseId: fixture.caseId,
+      name: "Written appointment confirmation",
+      code: "APPT",
+      definition: "Messages explicitly confirming an appointment date or time.",
+      revision: 0,
+    },
+    fixture.subject,
+  );
+  items[0].classifications = [
+    {
+      id: classificationId,
+      name: "Written appointment confirmation",
+      definition: "Messages explicitly confirming an appointment date or time.",
+      revision: 1,
+    },
+  ];
   const saved = run(
     "exhibitStudio:saveCollection",
     {
@@ -83,10 +100,102 @@ try {
     fixture.subject,
   );
   checks.push("Authenticated source import and persisted collection");
-  run('exhibitClassifications:save',{caseId:fixture.caseId,id:classificationId,name:'Appointment communications',code:'APPT',definition:'Broader appointment-related communications.',revision:1},fixture.subject);
-  const pinned=run('exhibitStudio:overview',{caseId:fixture.caseId},fixture.subject).collections.find(c=>c._id===saved.id);
-  if(JSON.parse(pinned.itemsJson)[0].classifications[0].name!=='Written appointment confirmation')throw new Error('Classification edit rewrote pinned assignments');
-  checks.push('Case classification revisions preserve existing excerpt assignments');
+  const batchArgs = {
+    caseId: fixture.caseId,
+    title: "Synthetic 30-item batch",
+    itemsJson: JSON.stringify(
+      Array.from({ length: 30 }, (_, i) => ({
+        id: `batch-${i}`,
+        sourceId: sources[0],
+        title: `Page ${i + 1}`,
+        pages: [i + 1],
+      })),
+    ),
+    expectedRevision: 0,
+    operationId: `${runId}-batch`,
+  };
+  const batch = run(
+      "exhibitStudio:addToCollection",
+      batchArgs,
+      fixture.subject,
+    ),
+    retried = run("exhibitStudio:addToCollection", batchArgs, fixture.subject);
+  if (batch.id !== retried.id)
+    throw new Error("Batch retry created a second collection");
+  const batchRow = run(
+    "exhibitStudio:overview",
+    { caseId: fixture.caseId },
+    fixture.subject,
+  ).collections.find((c) => c._id === batch.id);
+  if (JSON.parse(batchRow.itemsJson).length !== 30)
+    throw new Error("Wrong batch count");
+  let crossCaseBlocked = false;
+  try {
+    run(
+      "exhibitStudio:addToCollection",
+      {
+        ...batchArgs,
+        id: batch.id,
+        expectedRevision: batch.revision,
+        operationId: `${runId}-invalid-batch`,
+        itemsJson: JSON.stringify([
+          {
+            id: "valid",
+            sourceId: sources[0],
+            title: "Valid page",
+            pages: [32],
+          },
+          {
+            id: "invalid",
+            sourceId: fixture.otherSourceId,
+            title: "Wrong case",
+          },
+        ]),
+      },
+      fixture.subject,
+    );
+  } catch {
+    crossCaseBlocked = true;
+  }
+  const unchangedBatch = run(
+    "exhibitStudio:overview",
+    { caseId: fixture.caseId },
+    fixture.subject,
+  ).collections.find((c) => c._id === batch.id);
+  if (
+    !crossCaseBlocked ||
+    unchangedBatch.revision !== batch.revision ||
+    JSON.parse(unchangedBatch.itemsJson).length !== 30
+  )
+    throw new Error("Cross-case batch was not atomic");
+  checks.push(
+    "30-item retry deduplicated; mixed valid/cross-case batch rolled back atomically",
+  );
+  run(
+    "exhibitClassifications:save",
+    {
+      caseId: fixture.caseId,
+      id: classificationId,
+      name: "Appointment communications",
+      code: "APPT",
+      definition: "Broader appointment-related communications.",
+      revision: 1,
+    },
+    fixture.subject,
+  );
+  const pinned = run(
+    "exhibitStudio:overview",
+    { caseId: fixture.caseId },
+    fixture.subject,
+  ).collections.find((c) => c._id === saved.id);
+  if (
+    JSON.parse(pinned.itemsJson)[0].classifications[0].name !==
+    "Written appointment confirmation"
+  )
+    throw new Error("Classification edit rewrote pinned assignments");
+  checks.push(
+    "Case classification revisions preserve existing excerpt assignments",
+  );
   const duplicate = run(
     "exhibitStudio:saveCollection",
     {
@@ -194,6 +303,87 @@ try {
     fixture.subject,
   );
   checks.push("Exact reviewed candidate finalized");
+  const extracted = run(
+    "exhibitText:page",
+    { sourceId: sources[0], page: 2 },
+    fixture.subject,
+  );
+  if (!extracted) throw new Error("Fixture extraction unavailable");
+  const anchorId = run(
+    "exhibitText:pin",
+    {
+      sourceId: sources[0],
+      pageId: extracted.id,
+      generationId: extracted.generationId,
+      start: 0,
+      end: 25,
+    },
+    fixture.subject,
+  );
+  run("exhibitStudioQA:fault", {
+    runId,
+    collectionId: saved.id,
+    mode: "ocr-replace",
+  });
+  const anchor = run("exhibitText:anchor", { id: anchorId }, fixture.subject);
+  if (
+    anchor.text !== extracted.text.slice(0, 25) ||
+    anchor.generationId !== extracted.generationId
+  )
+    throw new Error("OCR replacement changed pinned text");
+  checks.push(
+    "Pinned text retains exact extraction and generation after OCR replacement",
+  );
+  const excerptCollection = run(
+    "exhibitStudio:saveCollection",
+    {
+      caseId: fixture.caseId,
+      title: "Synthetic pinned excerpt",
+      itemsJson: JSON.stringify([
+        { ...items[0], pages: [2], textAnchorId: anchorId },
+      ]),
+      settingsJson: JSON.stringify(settings),
+      expectedRevision: 0,
+      operationId: `${runId}-pinned-save`,
+    },
+    fixture.subject,
+  );
+  const excerptCandidateId = run(
+    "exhibitStudio:generate",
+    {
+      collectionId: excerptCollection.id,
+      revision: excerptCollection.revision,
+      operationId: `${runId}-pinned-generate`,
+    },
+    fixture.subject,
+  );
+  let excerptCandidate;
+  for (let i = 0; i < 30; i++) {
+    excerptCandidate = run(
+      "exhibitStudio:candidates",
+      { collectionId: excerptCollection.id },
+      fixture.subject,
+    ).find((c) => c._id === excerptCandidateId);
+    if (["ready", "failed", "cancelled"].includes(excerptCandidate?.status))
+      break;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  if (excerptCandidate?.status !== "ready")
+    throw new Error(
+      `Pinned excerpt generation failed: ${excerptCandidate?.error}`,
+    );
+  const excerptManifest = JSON.parse(excerptCandidate.manifestJson),
+    excerptReport = JSON.parse(excerptCandidate.reportJson);
+  if (
+    excerptManifest.textAnchors[0].text !== anchor.text ||
+    excerptReport.evidencePageCount !== 2
+  )
+    throw new Error(
+      "Worker did not retain pinned transcription and original page",
+    );
+  checks.push(
+    "Live worker exports pinned transcription and original page after OCR replacement",
+  );
   const subset = run(
     "exhibitStudio:addToCollection",
     {

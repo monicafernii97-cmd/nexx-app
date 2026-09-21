@@ -6,7 +6,7 @@ import {
   composePacket,
   type PacketSource,
 } from "../src/lib/exhibit-packets/compose";
-import { parseItems, parseSettings } from "../shared/exhibits";
+import { EXHIBIT_LIMITS, parseItems, parseSettings } from "../shared/exhibits";
 
 export const generate = internalAction({
   args: { id: v.id("exhibitCandidates") },
@@ -34,6 +34,7 @@ export const generate = internalAction({
       });
       if (!input) return;
       const sources: PacketSource[] = [];
+      let totalBytes = 0;
       for (const source of input.sources) {
         await checkpoint(
           `Resolving source ${sources.length + 1} of ${input.sources.length}`,
@@ -45,6 +46,16 @@ export const generate = internalAction({
           throw new Error(
             "SOURCE_UNAVAILABLE: Original bytes are unavailable.",
           );
+        if (blob) {
+          totalBytes += blob.size;
+          if (
+            blob.size > EXHIBIT_LIMITS.sourceBytes ||
+            totalBytes > EXHIBIT_LIMITS.totalBytes
+          )
+            throw new Error(
+              "SOURCE_SIZE_LIMIT: Originals exceed the supported packet size.",
+            );
+        }
         sources.push({
           id: source._id,
           title: source.title,
@@ -60,6 +71,16 @@ export const generate = internalAction({
         items: parseItems(JSON.parse(input.job.itemsJson)),
         settings: parseSettings(JSON.parse(input.job.settingsJson)),
         sources,
+        textAnchors: input.anchors.map((a) => ({
+          id: a._id,
+          sourceId: a.sourceId,
+          generationId: a.generationId,
+          page: a.page,
+          start: a.start,
+          end: a.end,
+          text: a.text,
+          method: a.method,
+        })),
         checkpoint,
         context: {
           caseId: input.job.caseId,

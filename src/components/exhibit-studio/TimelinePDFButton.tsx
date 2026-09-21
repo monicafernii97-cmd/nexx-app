@@ -11,7 +11,7 @@ export function TimelinePDFButton({
   timelineIds: Id<"timelineCandidates">[];
 }) {
   const [open, setOpen] = useState(false);
-  const {activeCaseId}=useWorkspace();
+  const { activeCaseId } = useWorkspace();
   return open ? (
     <TimelinePDF key={activeCaseId} timelineIds={timelineIds} />
   ) : (
@@ -43,6 +43,7 @@ function TimelinePDF({
     id ? { collectionId: id } : "skip",
   );
   const candidate = candidates?.[0];
+  const [layout, setLayout] = useState<"narrative" | "table">("narrative");
   return (
     <div className="space-y-2 rounded border border-white/10 p-3 text-sm">
       <p>
@@ -61,6 +62,7 @@ function TimelinePDF({
       )}
       {!id && (
         <button
+          aria-label="Generate selected chronology"
           disabled={
             busy || !activeCaseId || !timelineIds.length || !title.trim()
           }
@@ -83,6 +85,7 @@ function TimelinePDF({
                 ]),
                 settingsJson: JSON.stringify({
                   ...DEFAULT_PACKET_SETTINGS,
+                  timelineLayout: layout,
                   titleSheet: false,
                   index: false,
                   covers: false,
@@ -111,6 +114,20 @@ function TimelinePDF({
         <p role="status">
           {candidate?.error ?? candidate?.stage ?? "Preparing chronology…"}
         </p>
+      )}
+      {!id && (
+        <label className="block text-xs">
+          Chronology format
+          <select
+            aria-label="Chronology format"
+            className="ml-2 rounded bg-slate-900 p-2"
+            value={layout}
+            onChange={(e) => setLayout(e.target.value as "narrative" | "table")}
+          >
+            <option value="narrative">Narrative</option>
+            <option value="table">Table</option>
+          </select>
+        </label>
       )}
       {candidate?.url && (
         <a

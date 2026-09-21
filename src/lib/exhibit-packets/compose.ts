@@ -169,15 +169,15 @@ function sourceText(source: PacketSource): string {
     title: string;
     description: string;
     status: string;
-    sourceMessageId?:string;
-    sourceConversationId?:string;
+    sourceMessageId?: string;
+    sourceConversationId?: string;
   }[];
   return (
     "Recorded timeline snapshot. Entries reflect recorded accounts; confirmation status does not independently verify the event.\n\n" +
     events
       .map(
         (e) =>
-          `${e.date} | ${e.title}\n${e.description}\nRecorded status: ${e.status}${e.sourceMessageId?`\nSource message reference: ${e.sourceMessageId}`:''}${e.sourceConversationId?`\nSource conversation reference: ${e.sourceConversationId}`:''}`,
+          `${e.date} | ${e.title}\n${e.description}\nRecorded status: ${e.status}${e.sourceMessageId ? `\nSource message reference: ${e.sourceMessageId}` : ""}${e.sourceConversationId ? `\nSource conversation reference: ${e.sourceConversationId}` : ""}`,
       )
       .join("\n\n")
   );
@@ -674,7 +674,7 @@ export async function composePacket(input: {
     output.context.obj({
       Type: "Outlines",
       First: outlineRefs[0],
-      Last: outlineRefs.at(-1),
+      Last: outlineRefs[outlineRefs.length - 1],
       Count: outlineRefs.length,
     }),
   );
@@ -746,7 +746,7 @@ export async function composePacket(input: {
     exhibit.evidenceStart = evidence[0]?.page;
     exhibit.evidencePageCount = evidence.length;
     exhibit.batesStart = evidence.find((p) => p.bates)?.bates;
-    exhibit.batesEnd = evidence.findLast((p) => p.bates)?.bates;
+    exhibit.batesEnd = [...evidence].reverse().find((p) => p.bates)?.bates;
   }
   const manifestJson = canonicalJSON({
     schemaVersion: 1,

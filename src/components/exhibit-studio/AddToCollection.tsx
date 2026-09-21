@@ -15,7 +15,6 @@ export function AddToCollection({
   timelineIds?: Id<"timelineCandidates">[];
 }) {
   const [open, setOpen] = useState(false);
-  const {activeCaseId}=useWorkspace();
   return (
     <>
       <button
@@ -26,8 +25,7 @@ export function AddToCollection({
         Add to collection
       </button>
       {open && (
-        <Chooser
-          key={activeCaseId}
+        <ScopedChooser
           fileIds={fileIds}
           timelineIds={timelineIds}
           close={() => setOpen(false)}
@@ -35,6 +33,10 @@ export function AddToCollection({
       )}
     </>
   );
+}
+function ScopedChooser(props: Parameters<typeof Chooser>[0]) {
+  const { activeCaseId } = useWorkspace();
+  return <Chooser key={activeCaseId} {...props} />;
 }
 function Chooser({
   fileIds,
@@ -53,8 +55,8 @@ function Chooser({
   );
   const importSources = useMutation(api.exhibitStudio.importSources),
     add = useMutation(api.exhibitStudio.addToCollection);
-  const undo=useMutation(api.exhibitStudio.undo);
-  const operation=useRef<{signature:string;id:string}|null>(null);
+  const undo = useMutation(api.exhibitStudio.undo);
+  const operation = useRef<{ signature: string; id: string } | null>(null);
   const [destination, setDestination] = useState(""),
     [title, setTitle] = useState(""),
     [busy, setBusy] = useState(false),
@@ -77,7 +79,24 @@ function Chooser({
             <Link href="/docuvault/exhibits" className="text-amber-300">
               Open Exhibit Studio
             </Link>
-            <button className="block rounded border border-white/20 p-2" disabled={busy} onClick={async()=>{if(!operation.current)return;setBusy(true);try{await undo({operationId:operation.current.id});close();}catch(e){setError(String(e));}finally{setBusy(false);}}}>Undo addition</button>
+            <button
+              className="block rounded border border-white/20 p-2"
+              disabled={busy}
+              onClick={async () => {
+                if (!operation.current) return;
+                setBusy(true);
+                try {
+                  await undo({ operationId: operation.current.id });
+                  close();
+                } catch (e) {
+                  setError(String(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Undo addition
+            </button>
           </>
         ) : (
           <>
@@ -135,8 +154,14 @@ function Chooser({
                       "Evidence",
                   );
                   if (timelineIds.length) names.push("Recorded timeline");
-                  const signature=JSON.stringify({destination,title,fileIds,timelineIds});
-                  if(operation.current?.signature!==signature)operation.current={signature,id:crypto.randomUUID()};
+                  const signature = JSON.stringify({
+                    destination,
+                    title,
+                    fileIds,
+                    timelineIds,
+                  });
+                  if (operation.current?.signature !== signature)
+                    operation.current = { signature, id: crypto.randomUUID() };
                   await add({
                     id: row?._id,
                     caseId: activeCaseId,

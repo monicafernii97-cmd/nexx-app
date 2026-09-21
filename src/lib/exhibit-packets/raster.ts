@@ -23,9 +23,10 @@ export async function rasterizeSource(args: {
     const require = createRequire(import.meta.url);
     const modulePath = require.resolve("pdfjs-dist/package.json");
     // Turbopack represents traced modules relative to its [project] root.
-    const root = isAbsolute(modulePath)
-      ? dirname(modulePath)
-      : join(process.cwd(), "node_modules", "pdfjs-dist");
+    const root =
+      typeof modulePath === "string" && isAbsolute(modulePath)
+        ? dirname(modulePath)
+        : join(process.cwd(), "node_modules", "pdfjs-dist");
     GlobalWorkerOptions.workerSrc = pathToFileURL(
       join(root, "legacy/build/pdf.worker.mjs"),
     ).href;

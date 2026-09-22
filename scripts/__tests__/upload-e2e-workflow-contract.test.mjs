@@ -93,6 +93,18 @@ test("release assurance cannot loop on GitHub environment deployments", () => {
   );
 });
 
+test("preview assurance ignores Actions deployments and tests the deployed commit", () => {
+  const source = fs.readFileSync(
+    path.join(workflowDir, "chat-upload-e2e-preview.yml"),
+    "utf8",
+  );
+  assert.match(source, /github\.event\.deployment\.creator\.login == 'vercel\[bot\]'/);
+  assert.match(source, /deployment_status\.environment_url \|\| github\.event\.deployment_status\.target_url/);
+  assert.match(source, /E2E_REQUIRE_VERCEL_PREVIEW: "true"/);
+  assert.ok(source.includes("!startsWith(github.event.deployment_status.target_url, 'https://github.com/')"));
+  assert.match(source, /ref: \$\{\{ github\.event\.deployment\.sha \}\}/);
+});
+
 test("release assurance atomically registers a passing pair before checking hard stops", () => {
   const source = fs.readFileSync(
     path.join(workflowDir, "chat-upload-e2e-release.yml"),

@@ -15,12 +15,15 @@ jobs:
   upload-preview:
     if: >-
       github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Preview'
+      github.event.deployment.environment == 'Preview' &&
+      github.event.deployment.creator.login == 'vercel[bot]' &&
+      !startsWith(github.event.deployment_status.target_url, 'https://github.com/')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: Preview
     env:
-      E2E_BASE_URL: ${{ github.event.deployment_status.target_url }}
+      E2E_BASE_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+      E2E_REQUIRE_VERCEL_PREVIEW: "true"
       E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
       E2E_OUTSIDER_EMAIL: ${{ secrets.E2E_OUTSIDER_EMAIL }}
       E2E_LANE: pr
@@ -29,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.deployment.ref }}
+          ref: ${{ github.event.deployment.sha }}
       - uses: ./.github/actions/setup-node
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

@@ -10,6 +10,23 @@ for (const name of required) {
 }
 
 const baseUrl = new URL(process.env.E2E_BASE_URL);
+// Actions environment deployments point at job pages, not the application.
+// Reject those before starting a browser or sending authentication traffic.
+if (
+  baseUrl.hostname === "github.com" ||
+  baseUrl.hostname.endsWith(".github.com")
+) {
+  throw new Error("E2E_BASE_URL must point to the application, not GitHub.");
+}
+if (
+  process.env.E2E_REQUIRE_VERCEL_PREVIEW === "true" &&
+  (baseUrl.protocol !== "https:" ||
+    !baseUrl.hostname.endsWith(".vercel.app") ||
+    baseUrl.username || baseUrl.password || baseUrl.port ||
+    baseUrl.pathname !== "/" || baseUrl.search || baseUrl.hash)
+) {
+  throw new Error("Preview assurance requires a Vercel HTTPS application origin.");
+}
 const production = ["nexproof.io", "www.nexproof.io"].includes(
   baseUrl.hostname,
 );

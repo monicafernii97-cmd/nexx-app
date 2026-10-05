@@ -1,5 +1,6 @@
 import { cronJobs } from 'convex/server';
 import { internal } from './_generated/api';
+import { uploadCanaryEnabled } from './lib/chatUploadCanaryPolicy';
 
 const crons = cronJobs();
 
@@ -74,13 +75,13 @@ crons.interval(
   internal.chatUploads.auditRecentStorageUploadFailures,
 );
 
-crons.interval(
+if (uploadCanaryEnabled(process.env)) crons.interval(
   'run production chat upload canary',
   { minutes: 10 },
   internal.chatUploadCanary.runProductionUploadCanary,
 );
 
-crons.interval(
+if (uploadCanaryEnabled(process.env)) crons.interval(
   'audit production chat upload canary',
   { minutes: 5 },
   internal.chatUploadCanary.auditProductionUploadCanary,

@@ -3,10 +3,11 @@ import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { makeFunctionReference, type FunctionReference } from 'convex/server';
 import { CHAT_UPLOAD_CONFIG } from './lib/chatUploadConfig';
+import { canAdvanceCanary, uploadCanaryEnabled } from './lib/chatUploadCanaryPolicy';
 
 type CanaryPhase = 'route' | 'generate_url' | 'post' | 'metadata' | 'read' | 'cleanup' | 'complete';
 type StartCanaryResult =
-  | { skipped: true; runId: Id<'chatUploadCanaryRuns'> }
+  | { skipped: true; runId?: Id<'chatUploadCanaryRuns'> }
   | { skipped: false; runId: Id<'chatUploadCanaryRuns'> };
 const START_CANARY_RUN: FunctionReference<
   'mutation',
@@ -100,6 +101,11 @@ export const startCanaryRun = internalMutation({
   args: { expectedSha256: v.string(), byteSize: v.number() },
   handler: async (ctx, args) => {
     const now = Date.now();
+    if (!uploadCanaryEnabled(process.env, now)) return { skipped: true as const };
+    const latest = await ctx.db.query('chatUploadCanaryRuns').withIndex('by_created').order('desc').first();
+    if (latest && latest.createdAt > now - CHAT_UPLOAD_CONFIG.canaryIntervalMs) {
+      return { skipped: true as const, runId: latest._id };
+    }
     const recentRunning = await ctx.db
       .query('chatUploadCanaryRuns')
       .withIndex('by_status_created', (q) => q.eq('status', 'running'))
@@ -118,6 +124,8 @@ export const startCanaryRun = internalMutation({
       });
     }
     const runId = await ctx.db.insert('chatUploadCanaryRuns', {
+      deploymentUrl: process.env.CONVEX_SITE_URL || process.env.CONVEX_CLOUD_URL || 'unknown',
+      deadlineAt: now + 120_000,
       status: 'running',
       phase: 'route',
       byteSize: args.byteSize,
@@ -141,6 +149,10 @@ export const advanceCanaryRun = internalMutation({
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
     if (!run || run.status !== 'running') return false;
+    const now = Date.now();
+    if (!uploadCanaryEnabled(process.env, now) || now >= (run.deadlineAt ?? run.startedAt + CHAT_UPLOAD_CONFIG.canaryIntervalMs)) return false;
+    if (args.phase === run.phase) return true;
+    if (!canAdvanceCanary(run.phase, args.phase)) return false;
     await ctx.db.patch(run._id, {
       phase: args.phase,
       storageId: args.storageId ?? run.storageId,
@@ -164,7 +176,7 @@ export const finishCanaryRun = internalMutation({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.runId);
-    if (!run) return false;
+    if (!run || run.status !== 'running') return false;
     const now = Date.now();
     await ctx.db.patch(run._id, {
       status: args.status,
@@ -190,7 +202,7 @@ export const runProductionUploadCanary = internalAction({
     runId?: Id<'chatUploadCanaryRuns'>;
     errorCode?: string;
   }> => {
-    if (process.env.CHAT_UPLOAD_CANARY_ENABLED === 'false') return { skipped: true };
+    if (!uploadCanaryEnabled(process.env)) return { skipped: true };
     const payload = canaryPayload();
     const expectedSha256 = await sha256Hex(payload.buffer as ArrayBuffer);
     const started: StartCanaryResult = await ctx.runMutation(START_CANARY_RUN, {
@@ -203,10 +215,15 @@ export const runProductionUploadCanary = internalAction({
     let phase: CanaryPhase = 'route';
     let actualSha256: string | undefined;
     let cleanupSucceeded = false;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 120_000);
+    const advance = async (args: { runId: Id<'chatUploadCanaryRuns'>; phase: CanaryPhase; storageId?: Id<'_storage'>; actualSha256?: string }) => {
+      if (!await ctx.runMutation(ADVANCE_CANARY_RUN, args)) throw new Error('canary_run_expired_or_stopped');
+    };
     try {
       const routeUrl = `${canarySiteUrl()}/chat-upload-resumable-chunk`;
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase });
       const preflight = await fetch(routeUrl, {
+        signal: controller.signal,
         method: 'OPTIONS',
         headers: {
           Origin: 'https://nexproof.io',
@@ -219,6 +236,7 @@ export const runProductionUploadCanary = internalAction({
         preflight.headers.get('access-control-allow-origin') !== 'https://nexproof.io'
       ) throw new Error(`canary_route_preflight_${preflight.status}`);
       const unauthenticated = await fetch(`${routeUrl}?uploadSessionId=canary&resumableUploadId=canary&chunkIndex=0`, {
+        signal: controller.signal,
         method: 'POST',
         headers: { Origin: 'https://nexproof.io', 'Content-Type': 'application/octet-stream' },
         body: new Uint8Array([1]),
@@ -226,11 +244,12 @@ export const runProductionUploadCanary = internalAction({
       if (unauthenticated.status !== 401) throw new Error(`canary_route_auth_${unauthenticated.status}`);
 
       phase = 'generate_url';
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase });
+      await advance({ runId, phase });
       const uploadUrl = await ctx.storage.generateUploadUrl();
       phase = 'post';
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase });
+      await advance({ runId, phase });
       const response = await fetch(uploadUrl, {
+        signal: controller.signal,
         method: 'POST',
         headers: {
           Origin: 'https://nexproof.io',
@@ -248,7 +267,7 @@ export const runProductionUploadCanary = internalAction({
       storageId = json.storageId as Id<'_storage'>;
 
       phase = 'metadata';
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase, storageId });
+      await advance({ runId, phase, storageId });
       const metadata = await ctx.storage.getMetadata(storageId);
       if (!metadata || metadata.size !== payload.byteLength || metadata.sha256 !== expectedSha256) {
         throw new Error('canary_metadata_mismatch');
@@ -256,14 +275,14 @@ export const runProductionUploadCanary = internalAction({
       actualSha256 = metadata.sha256;
 
       phase = 'read';
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase, storageId, actualSha256 });
+      await advance({ runId, phase, storageId, actualSha256 });
       const stored = await ctx.storage.get(storageId);
       if (!stored || await sha256Hex(await stored.arrayBuffer()) !== expectedSha256) {
         throw new Error('canary_read_mismatch');
       }
 
       phase = 'cleanup';
-      await ctx.runMutation(ADVANCE_CANARY_RUN, { runId, phase, storageId, actualSha256 });
+      await advance({ runId, phase, storageId, actualSha256 });
       await ctx.storage.delete(storageId);
       cleanupSucceeded = true;
       phase = 'complete';
@@ -286,6 +305,8 @@ export const runProductionUploadCanary = internalAction({
       });
       console.error(JSON.stringify({ level: 'error', event: 'chat_upload_canary_failed', phase, errorCode }));
       return { skipped: false, ok: false, runId, errorCode };
+    } finally {
+      clearTimeout(deadline);
     }
   },
 });
@@ -293,7 +314,7 @@ export const runProductionUploadCanary = internalAction({
 export const auditProductionUploadCanary = internalMutation({
   args: {},
   handler: async (ctx) => {
-    if (process.env.CHAT_UPLOAD_CANARY_ENABLED === 'false') return { disabled: true };
+    if (!uploadCanaryEnabled(process.env)) return { disabled: true };
     const latest = await ctx.db.query('chatUploadCanaryRuns').withIndex('by_created').order('desc').first();
     const now = Date.now();
     const latestSuccess = await ctx.db
@@ -305,7 +326,14 @@ export const auditProductionUploadCanary = internalMutation({
       .query('chatUploadCanaryRuns')
       .withIndex('by_created', (q) => q.lt('createdAt', now - CHAT_UPLOAD_CONFIG.canaryRetentionMs))
       .take(100);
-    for (const run of expiredRuns) await ctx.db.delete(run._id);
+    let expiredRunsDeleted = 0;
+    for (const run of expiredRuns) {
+      // Preserve ownership evidence for in-flight or unsuccessfully cleaned
+      // synthetic objects; never turn retention into an orphan generator.
+      if (run.status === 'running' || (run.storageId && !run.cleanupSucceeded)) continue;
+      await ctx.db.delete(run._id);
+      expiredRunsDeleted++;
+    }
     const stale = !latestSuccess || now - latestSuccess.createdAt > CHAT_UPLOAD_CONFIG.canaryStaleAfterMs;
     const failed = latest?.status === 'failed' && (!latestSuccess || latest.createdAt > latestSuccess.createdAt);
     const runningStalled = latest?.status === 'running' && now - latest.createdAt > CHAT_UPLOAD_CONFIG.canaryIntervalMs * 2;
@@ -326,7 +354,7 @@ export const auditProductionUploadCanary = internalMutation({
       failed,
       runningStalled,
       latestStatus: latest?.status ?? 'missing',
-      expiredRunsDeleted: expiredRuns.length,
+      expiredRunsDeleted,
     };
   },
 });

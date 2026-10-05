@@ -692,6 +692,8 @@ export default defineSchema({
         .index('by_session', ['uploadSessionId']),
 
     chatUploadCanaryRuns: defineTable({
+        deploymentUrl: v.optional(v.string()),
+        deadlineAt: v.optional(v.number()),
         status: v.union(v.literal('running'), v.literal('succeeded'), v.literal('failed')),
         phase: v.union(
             v.literal('route'),

@@ -5,6 +5,9 @@ import { qualityCanaryEnabled } from './lib/chatQualityCanaryPolicy';
 
 const crons = cronJobs();
 
+// Owner-requested temporary pause. Resume explicitly per deployment.
+const monitoringEnabled = process.env.BACKGROUND_MONITORING_ENABLED === 'true';
+
 /**
  * Clean up expired tool run records daily.
  * The deleteExpired mutation removes records older than the 30-day retention window.
@@ -70,38 +73,38 @@ crons.interval(
   internal.chatUploads.cleanupDirectResponseLossOrphans,
 );
 
-crons.interval(
+if (monitoringEnabled) crons.interval(
   'audit recent chat upload failures',
   { minutes: 5 },
   internal.chatUploads.auditRecentStorageUploadFailures,
 );
 
-if (uploadCanaryEnabled(process.env)) crons.interval(
+if (monitoringEnabled && uploadCanaryEnabled(process.env)) crons.interval(
   'run production chat upload canary',
   { minutes: 10 },
   internal.chatUploadCanary.runProductionUploadCanary,
 );
 
-if (uploadCanaryEnabled(process.env)) crons.interval(
+if (monitoringEnabled && uploadCanaryEnabled(process.env)) crons.interval(
   'audit production chat upload canary',
   { minutes: 5 },
   internal.chatUploadCanary.auditProductionUploadCanary,
 );
 
-if (qualityCanaryEnabled(process.env)) crons.interval(
+if (monitoringEnabled && qualityCanaryEnabled(process.env)) crons.interval(
   'run executive chat quality canary',
   { minutes: 10 },
   internal.chatQualityCanary.runExecutiveChatCanary,
 );
 
-if (qualityCanaryEnabled(process.env)) crons.interval(
+if (monitoringEnabled && qualityCanaryEnabled(process.env)) crons.interval(
   'audit executive chat quality canary',
   { minutes: 5 },
   internal.chatQualityCanary.auditExecutiveChatCanary,
   {},
 );
 
-if (isProductionDeployment(process.env)) crons.interval(
+if (monitoringEnabled && isProductionDeployment(process.env)) crons.interval(
   'snapshot executive chat rollout health',
   { minutes: 5 },
   internal.executiveChatOperations.audit,

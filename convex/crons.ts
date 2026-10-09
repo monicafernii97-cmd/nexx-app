@@ -1,6 +1,7 @@
 import { cronJobs } from 'convex/server';
 import { internal } from './_generated/api';
-import { uploadCanaryEnabled } from './lib/chatUploadCanaryPolicy';
+import { isProductionDeployment, uploadCanaryEnabled } from './lib/chatUploadCanaryPolicy';
+import { qualityCanaryEnabled } from './lib/chatQualityCanaryPolicy';
 
 const crons = cronJobs();
 
@@ -87,20 +88,20 @@ if (uploadCanaryEnabled(process.env)) crons.interval(
   internal.chatUploadCanary.auditProductionUploadCanary,
 );
 
-crons.interval(
+if (qualityCanaryEnabled(process.env)) crons.interval(
   'run executive chat quality canary',
   { minutes: 10 },
   internal.chatQualityCanary.runExecutiveChatCanary,
 );
 
-crons.interval(
+if (qualityCanaryEnabled(process.env)) crons.interval(
   'audit executive chat quality canary',
   { minutes: 5 },
   internal.chatQualityCanary.auditExecutiveChatCanary,
   {},
 );
 
-crons.interval(
+if (isProductionDeployment(process.env)) crons.interval(
   'snapshot executive chat rollout health',
   { minutes: 5 },
   internal.executiveChatOperations.audit,

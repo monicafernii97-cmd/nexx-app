@@ -2,12 +2,14 @@ export const CANARY_PHASES = ['route', 'generate_url', 'post', 'metadata', 'read
 export type UploadCanaryPhase = typeof CANARY_PHASES[number];
 const PRODUCTION_HOSTS = new Set(['blessed-rabbit-457.convex.site', 'blessed-rabbit-457.convex.cloud']);
 
+export function isProductionDeployment(env: Record<string, string | undefined>) {
+  const url = env.CONVEX_SITE_URL || env.CONVEX_CLOUD_URL;
+  try { return Boolean(url && PRODUCTION_HOSTS.has(new URL(url).hostname)); } catch { return false; }
+}
+
 export function uploadCanaryEnabled(env: Record<string, string | undefined>, now = Date.now()) {
   if (env.CHAT_UPLOAD_CANARY_ENABLED === 'false') return false;
-  const url = env.CONVEX_SITE_URL || env.CONVEX_CLOUD_URL;
-  let production = false;
-  try { production = Boolean(url && PRODUCTION_HOSTS.has(new URL(url).hostname)); } catch { /* Unknown environment stays disabled. */ }
-  if (production) return true;
+  if (isProductionDeployment(env)) return true;
   // Preview test windows must be explicit, finite and at most a day away.
   const until = Date.parse(env.CHAT_UPLOAD_CANARY_PREVIEW_UNTIL ?? '');
   return env.CHAT_UPLOAD_CANARY_ENABLED === 'true'

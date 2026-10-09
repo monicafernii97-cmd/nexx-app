@@ -14,5 +14,6 @@ test('preview builds recreate isolated Convex deployments without changing produ
   assert.match(script, /--preview-create "\$VERCEL_GIT_COMMIT_REF"/);
   assert.match(script, /VERCEL_GIT_COMMIT_REF is required/);
   assert.equal(script.match(/--preview-create/g)?.length, 1);
-  assert.equal(script.match(/exec npx convex deploy/g)?.length, 2);
+  assert.equal(script.match(/exec node scripts\/deploy-convex.mjs/g)?.length, 1);
+  assert.equal(script.match(/exec npx convex deploy/g)?.length, 1);
 });

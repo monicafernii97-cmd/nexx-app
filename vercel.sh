@@ -7,7 +7,7 @@ if [ "${VERCEL_ENV:-}" = "preview" ]; then
     exit 1
   fi
 
-  exec npx convex deploy \
+  exec node scripts/deploy-convex.mjs \
     --preview-create "$VERCEL_GIT_COMMIT_REF" \
     --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL \
     --cmd "npm run build"

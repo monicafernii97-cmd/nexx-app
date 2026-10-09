@@ -7,6 +7,15 @@ Nexx now belongs to Convex team `monica-estimon-39537` under
 the hostname guard, backend URL, and deployment keys do not need replacement
 solely because of this team transfer.
 
+The preserved preview key still contains the old team slug in its routing
+prefix. Convex CLI 1.45 reads that prefix to select the project, causing
+`claim_preview_deployment` to fail with `ProjectNotFound` after transfer.
+The Vercel preview wrapper rewrites only `preview:monica-fernandez:nexx|`
+to `preview:monica-estimon-39537:nexx|` in the child environment, preserving
+the exact issued secret. Production and unrelated keys are untouched. No
+credential is printed or passed as a command argument. Once Vercel holds
+the current prefix, the compatibility rewrite is a no-op.
+
 The executive chat quality canary also defaults to production only. Preview
 validation uses its independent `CHAT_QUALITY_CANARY_ENABLED=true` and
 `CHAT_QUALITY_CANARY_PREVIEW_UNTIL` ISO timestamp (at most 24 hours ahead).

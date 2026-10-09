@@ -2,6 +2,7 @@ import { internalMutation, mutation, query, type MutationCtx } from './_generate
 import { v } from 'convex/values';
 import { deriveExecutiveChatMetrics } from './lib/executiveChatMetrics';
 import { estimateProviderCostMicrousd } from '../src/lib/nexx/provider/usageAccounting';
+import { isProductionDeployment } from './lib/chatUploadCanaryPolicy';
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_ROWS = 2_000;
@@ -498,6 +499,7 @@ async function collectOperationalHealth(ctx: MutationCtx, environment: 'preview'
 export const audit = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (!isProductionDeployment(process.env)) return { disabled: true };
     const health = await collectOperationalHealth(ctx, 'production');
     const snapshotId = await ctx.db.insert('executiveChatOperationalSnapshots', {
       environment: health.environment,

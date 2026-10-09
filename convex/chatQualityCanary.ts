@@ -10,6 +10,7 @@ import { assessGenericAnswer } from '../src/lib/nexx/legal-engine/genericAnswerP
 import type { ConversationControlSnapshot } from '../src/lib/nexx/orchestration/types';
 import { planConversationTurn } from '../src/lib/nexx/conversation/kernel';
 import { verifyConversationOutcome } from '../src/lib/nexx/response/outcomeVerifier';
+import { qualityCanaryEnabled } from './lib/chatQualityCanaryPolicy';
 
 const REQUIRED_INVARIANTS = [
   'INV-FOCUS-001',
@@ -29,6 +30,7 @@ const SCENARIO_ID = 'executive-chat-critical-matrix-v3';
 export const runExecutiveChatCanary = internalMutation({
   args: {},
   handler: async (ctx) => {
+    if (!qualityCanaryEnabled(process.env)) return { skipped: true };
     const startedAt = Date.now();
     const runId = await ctx.db.insert('chatQualityCanaryRuns', {
       scenarioId: SCENARIO_ID,
@@ -200,6 +202,7 @@ export const runExecutiveChatCanary = internalMutation({
 export const auditExecutiveChatCanary = internalMutation({
   args: { maxAgeMs: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    if (!qualityCanaryEnabled(process.env)) return { disabled: true };
     const maxAgeMs = Math.max(5 * 60_000, args.maxAgeMs ?? 30 * 60_000);
     const latest = await ctx.db.query('chatQualityCanaryRuns')
       .withIndex('by_scenario_created', (q) => q.eq('scenarioId', SCENARIO_ID))
